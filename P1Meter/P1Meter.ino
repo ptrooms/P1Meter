@@ -9,13 +9,16 @@
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
 
 #ifdef TEST_MODE
-// #define CALCULATE_TIMINGS       // experiment calculate in setup()  some to interuction cycle/uSec timing.
-#define P1_VERSION_TYPE "t1"    // "t1" for ident nodemcu-xx and other identification to seperate from production
+// #define CALCULATE_TIMINGS    // experiment calculate in setup() ome instruction sequences for cycle/uSec timing.
+#define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
 #define DEF_PROG_VERSION 1119.241 // current version (displayed in mqtt record)
 #else
-#define P1_VERSION_TYPE "p1"    // "p1" production
-#define DEF_PROG_VERSION 2119.241  //  current version (displayed in mqtt record)
+#define P1_VERSION_TYPE "p1"      // "p1" production
+#define DEF_PROG_VERSION 2119.241 //  current version (displayed in mqtt record)
 #endif
+
+// Note changing libaries looks to be useless as onoly 2.4.1 is stable (WDT reset) and 99% (Serial) reliable
+//      but we levae the oportunity to centrally control which specifx libary will be included/
 
 // #define libuse242              // 301136 bytes, not very reliable, serial produces not many successes
 #define libuse241              // 297428/prod, 297412/test bytes, best version offering reliability and NO spontaneous wdt resets
@@ -460,10 +463,10 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 */
 
 #ifndef UseP1SoftSerialLIB   // if not yet included, include standard defined softserial library
-#include <SoftwareSerial.h>           // "standard" version
+#include <SoftwareSerial.h>           // "standard" version , the newer ones  after 2.4.1 are not very reliable.
 #else
 #include <SoftwareSerial241.h>        // Version 2.4.1. adapted for and to P1 communication which set P1Active() method
-#undef UseNewSoftSerialLIB            // softwareserial format made equal to hardware version
+#undef UseNewSoftSerialLIB            // softwareserial class format made equal to hardware version
 // #include </home/pafoxp/code-P1meter/SoftwareSerial_2.4.0/SoftwareSerial.h>
 // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/libraries/SoftwareSerial_2.4.0/SoftwareSerial240.h>
 #endif
@@ -481,15 +484,15 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
             ^
 */
 
-// Standard includes for Wifi, OTA, ds18b20 temperatur
-#include <ESP8266WiFi.h>
-// #include <ESP8266mDNS.h>        // ESP8266 Multicast DNS req. ESP8266WiFi AND needed for dynamic OTA
+// Standard includes for Wifi, OTA, ds18b20 temperature
+#include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform
+// #include <ESP8266mDNS.h>        // standard, ESP8266 Multicast DNS req. ESP8266WiFi AND needed for dynamic OTA
 // #include <ESP8266HTTPClient.h>   // not needed
 // #include <WiFiUdp.h>             // not needed
-#include <ArduinoOTA.h>         // requires mDNS & Udp
+#include <ArduinoOTA.h>           // standard, will also automgically include mDNS & UDP
 // ================================================================ Temperature processing ===============
-// #include <OneWire.h>            // not sure if this is required, this is done in <DallasTemperature.h>
-#include <DallasTemperature.h>
+// #include <OneWire.h>           // <DallasTemperature.h will ask/include this themselves
+#include <DallasTemperature.h>    // DS18B20 temporatur Onewire     
 //------------------------------------------------------------------------------------------------ DS18B20
 #define ONE_WIRE_BUS DS18B20_SENSOR       // GPIO0 Pin to which is attached a temperature sensor 
 #define ONE_WIRE_MAX_DEV 15               // The maximum number of devices on a single wire
@@ -506,14 +509,16 @@ const int durationTemp = 5000;            // The frequency of temperature measur
 // char temperatureString1[6];            // formatted value 99,99-99,99 sensor1
 
 // ==========================================================================================
-//ADJUST THIS SETTING TO 768 IN pubsubclient.h
+//Optional add/change THIS SETTING TO 768 IN pubsubclient.h to allow long MQTT messages
 //#define MQTT_MAX_PACKET_SIZE 768
 
-// pafoxp@ubuntuO380:~$ mosquitto_sub -v -R -h 192.168.1.8 -t "/energy/#
-// pafoxp@ubuntuO380:~$ mosquitto_pub -h 192.168.1.8 -t "nodemcu-t1/switch/port1" -m "0" =Off/1=On/2=Follow/3=NotUsed-Skip
-// i/I make P1 timeout critica, l/L logging, R-estart, P/p-ublish-P1
+// ==========================================================================================
+// instructions to interact with the program:
+//  pafoxp@ubuntuO380:~$ mosquitto_sub -v -R -h 192.168.1.8 -t "/energy/#
+//  pafoxp@ubuntuO380:~$ mosquitto_pub -h 192.168.1.8 -t "nodemcu-t1/switch/port1" -m "0" =Off/1=On/2=Follow/3=NotUsed-Skip
+//  port1 commands: i/I make P1 timeout critica, l/L logging, R-estart, P/p-ublish-P1
 
-// array (not used) to facilitate character ruler
+// array (not used) to facilitate character ruler (if any)
 const char *decArray  = "000000000111111111122222222223333333333444444444455555555556666666666777777777788888888888";
 const char *numArray  = "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890";
 const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9";
@@ -535,11 +540,11 @@ bool allowOtherActivities = true; // allow other activities if not reading seria
 bool p1SerialActive   = false;   // start program with inactive P1 port
 bool p1SerialFinish   = false;   // transaction finished (at end of !xxxx )
 
-long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields
-long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active.
+long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields while tapping water, which may bounce
+long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active with serial communication
 
 int  telegramError    = false;   // indicate the P1 Telegram contains non-printable data ((e=...)
-// -------------------------------------------------------------------------------------------------- DEBUG putput
+// -------------------------------------------------------------------------------------------------- DEBUG output
 #ifdef TEST_MODE
 bool outputOnSerial  = true;    // "D" debug default output in Testmode
 #else
@@ -550,7 +555,7 @@ bool outputOnSerial  = false;   // "D" No debug default output in production
 
 bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
-bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2
+bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
 bool outputMqttLog    = false;   // "L" ptro false -> true , output to /log/t0
 bool outputMqttPower  = true;    // "P" ptro false -> true , output to /energy/t0current
 
@@ -558,7 +563,7 @@ bool outputMqttPower  = true;    // "P" ptro false -> true , output to /energy/t
 bool mqttP1Published = false;        //flag to cgheck if we have published
 long mqttCnt = 0;                    // updated with each publish as of 19nov19
 bool validCRCFound = false;          // Set by DdecodeTelegram if Message CRC = valid and send with Mqtt
-// P1smartmeter time on messages
+// P1smartmeter timestate messages
 long currentTime   =  210402;        // Meter reading Electrics - datetime  0-0:1.0.0(180611210402S)
 char currentTimeS[] = "210401";      // same in String format time, will be overriden by Telegrams
 const char dummy1[] = {0x0000};      // prevent overwrite
@@ -644,7 +649,7 @@ void callback(char* topic, byte* payload, unsigned int length);   // pubsubscrib
 // Note Software serial uses "attachinterrupt" FALLING on pin to calculate BAUD timing
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
 #ifdef UseNewSoftSerialLIB
-// 2.5.2+: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+//  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
 SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
 SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
 #else
@@ -662,33 +667,32 @@ SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2
 
 // Wifi
 WiFiClient espClient;             // declare and name our Internet conenction
-PubSubClient client(espClient);   // Use this espClient - the network client to use, for example WiFiClient
+PubSubClient client(espClient);   // Use this connection client
 
 void setup()
 {
-  pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue
+  pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
   // pinMode(THERMOSTAT_READ, INPUT);      // Declare Pin mode INPUT read always low
-  pinMode(THERMOSTAT_READ, INPUT_PULLUP);  // Declare Pin mode INPUT with pullup
-  pinMode(LIGHT_READ, INPUT_PULLUP);       // Declare Pin mode INPUT with pullup
+  pinMode(THERMOSTAT_READ, INPUT_PULLUP);  // Declare Pin mode INPUT with pullup to Read room thermostate
+  pinMode(LIGHT_READ, INPUT_PULLUP);       // Declare Pin mode INPUT with pullup to read HotWater valve
 
-  pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Woggle the Input pin
+  pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Woggle the Input pin to read Waterpulsed infrared
   pinMode(WATERSENSOR_READ, INPUT);        // Declare Pin mode INPUT with no pullup
 
-  pinMode(THERMOSTAT_WRITE, OUTPUT);       // Declare Pin mode OUTPUT
+  pinMode(THERMOSTAT_WRITE, OUTPUT);       // Declare Pin mode OUTPUT to control Heat-Valve
 
-  digitalWrite(BLUE_LED, LOW);             //Turn the LED ON
+  digitalWrite(BLUE_LED, LOW);             //Turn the LED ON  (active-low)
 
   // Thermostats initialisation
-  thermostatReadState   = digitalRead(THERMOSTAT_READ); // read
-  thermostatWriteState  = thermostatReadState;          // move this to output
-  digitalWrite(THERMOSTAT_WRITE, thermostatWriteState); // ThermostatWriteout
+  thermostatReadState   = digitalRead(THERMOSTAT_READ); // read current room state
+  thermostatWriteState  = thermostatReadState;          // move this to output 
+  digitalWrite(THERMOSTAT_WRITE, thermostatWriteState); // ThermostatWriteout valve (TBD: only when required)
 
   // Lightread initialisation
-  lightReadState   = digitalRead(LIGHT_READ); // read
+  lightReadState   = digitalRead(LIGHT_READ); // read Hotwater valve state
 
   Serial.begin(115200);
-  Serial.println("Booting");
-
+  Serial.println("Booting");              // message to serial log
 
   /*//DebugCRC print a test mesaage tov erify if CRC is functional, Yes it is
     // check display CRC ode to determine the type to use
@@ -701,14 +705,14 @@ void setup()
     CRC-16/ARC   0xBB3D  0xBB3D  0x8005  0x0000  true  true  0x0000
   */
 
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_STA);            // Client mode
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, password);     // login to AP
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED)
   {
-    Serial.println("Connection Failed! Rebooting...");
-    for (int i = 0; i < 9; i++) {   // flash led 5 seconds
+    Serial.println("Connection Failed! Rebooting...");  // wait 5 seconds before retry
+    for (int i = 0; i < 9; i++) {                       // while flashing led
       bool blueLedState = digitalRead(BLUE_LED);
       digitalWrite(BLUE_LED, !blueLedState);
       delay(250);
@@ -717,7 +721,6 @@ void setup()
     }
     ESP.restart();
   }
-
 
 
   /*
@@ -734,7 +737,7 @@ void setup()
     #endif
   */
 
-  ArduinoOTA.setHostname(hostName);
+  ArduinoOTA.setHostname(hostName);   // nodemcut1/p1
 
   ArduinoOTA.onStart([]() {
     Serial.println("Start");
@@ -768,7 +771,7 @@ void setup()
   Serial.println(WiFi.localIP());
   client.setServer(mqttServer, mqttPort);
 
-  digitalWrite(BLUE_LED, LOW);   //Turn the LED off and ready to go for fire
+  digitalWrite(BLUE_LED, LOW);   //Turn the LED ON and ready to go for process
   mqttP1Published = false; //flag to track if we have published....
 
   // client.setServer(mqtt_server,1883);   // for pubsubscribe // already set in mqttPort
@@ -962,7 +965,6 @@ void setup()
 
 void loop()
 {
-
   // declare global timers loop(s)
   currentMillis = millis(); // Get snapshot of runtime
   currentMicros = micros(); // get current cycle time
@@ -1054,12 +1056,12 @@ void loop()
         waterTriggerTime = 0;                        // reset counter for next trigger
         // waterTriggerCnt  = 0;                     // reset ISR counter
         if (waterReadState != waterTriggerState) {   // switchsetting) {  // read switch state
-          waterReadState = waterTriggerState ;     // stabilize switch
-          if (!waterReadState) waterReadCounter++;        // count this as pulse if switch went LOW
+          waterReadState = waterTriggerState ;       // stabilize switch
+          if (!waterReadState) waterReadCounter++;   // count this as pulse if switch went LOW
           if (!waterReadState && !lightReadState) waterReadHotCounter++; // count this as pulse if switch went LOW
           // accomodate/enforce stability
-          if ( waterReadState) pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve our external pull-up
-          if (!waterReadState) pinMode(WATERSENSOR_READ, INPUT);        //  Weaken our external pull-up
+          if ( waterReadState) pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage our external pull-up
+          if (!waterReadState) pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external pull-up
         } // if waterReadState
       } // else waterTriggerCnt = 1
 
@@ -1190,11 +1192,10 @@ void readTelegram() {             // Process  P1 serial data buffer and sendout 
     p1TriggerTime = millis();
   }
 
-#ifdef UseP1SoftSerialLIB
-  if ( mySerial.P1active())  return ;  // return if serial is receiving, fucntion of SoftwareSerial for P1
+#ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
+  if ( mySerial.P1active())  return ;  // quick return if serial is receiving, fucntion of SoftwareSerial for P1
 #endif  
-  if (!mySerial.available()) return ;  // return if no data
-
+  if (!mySerial.available()) return ;  // quick return if no data
 
   if (outputOnSerial)    {
     if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + "s=s123..\b\b\b\b\b") ; // print message line
@@ -1325,7 +1326,6 @@ void readTelegram() {             // Process  P1 serial data buffer and sendout 
 } // void
 
 
-
 //process the secondary serial input port, to be used  in future for 1200Baud GJ meter
 void readTelegram2() {
   // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
@@ -1385,6 +1385,7 @@ void readTelegram2() {
   }  // if available
 } // void
 
+// Handle GPIO pins
 void processGpio() {    // Do regular functions of the system
   int  tmpb = processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
   bool tmpc = processLightRead(digitalRead(LIGHT_READ));        // process LedLightstatus read pin D6
@@ -1555,9 +1556,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 
-//
+// -------------------------------------------------------------------------------
 //                        Publish full as JSONPATH record
-//
+// -------------------------------------------------------------------------------
 void publishP1ToMqtt()    // this will go to Mosquitto
 {
 
@@ -1710,7 +1711,6 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     digitalWrite(BLUE_LED, thermostatReadState);   //Turn the ESPLED according to input thermostate
   }
 }
-
 
 //    If output = input then false changed
 //    bool thermostatChanged = processThermostat(LOW) || thermostatReadState = processThermostat(HIGH) || processThermostat(thermostatWriteState)
@@ -1973,6 +1973,7 @@ bool decodeTelegram(int len)
       } // if output serial
     } // else if endChar >= 0 && telegramP1header
   } // startChar >= 0
+
   if (outputMqttLog) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
   // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
 
@@ -2071,7 +2072,6 @@ bool decodeTelegram(int len)
   if (strncmp(telegram, "1-0:1.8.2(", strlen("1-0:1.8.2(")) == 0)         // total Watts High
     powerConsumptionHighTariff = getValue(telegram, len);
 
-
   // 1-0:2.8.1(000348.890*kWh)
   // 1-0:2.8.1 = Elektra opbrengst laag tarief (DSMR v4.0)
   if (strncmp(telegram, "1-0:2.8.1(", strlen("1-0:2.8.1(")) == 0)         // total Production Low
@@ -2162,7 +2162,7 @@ int FindCharInArrayRev(char array[], char c, int len)               // Find char
   return -1;
 }
 
-bool CheckData()                                                // Check if we are complete
+bool CheckData()        // Check if we are complete on gathering
 {
   if (firstRun)  {      // at start initialise and set olddata to new data
     SetOldValues();
@@ -2170,9 +2170,7 @@ bool CheckData()                                                // Check if we a
     return true;
   }
 
-  if (outputMqttLog)        // if we LOG status old values not yet set
-  {
-
+  if (outputMqttLog) {  // if we LOG status old values not yet set
     char msgpub[768];
     char output[768];
     String msg = "{";
@@ -2381,10 +2379,9 @@ void GetTemperatures() {
   }
 }
 
-
 /* 20mar21 ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec */
 // attach waterinterrupt
-void attachWaterInterrupt() {
+void attachWaterInterrupt() {   // Activate ISR water interurpt and choose between two operative versions W/w
   if (useWaterTrigger1) {
     attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
     if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
@@ -2393,12 +2390,12 @@ void attachWaterInterrupt() {
     if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger_ISR routine");
   }
 }
-void detachWaterInterrupt() {
+void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent inteference while doing serial communication
   detachInterrupt(WATERSENSOR_READ); // trigger at every change
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // Prevent calls as per expressif intruction
 }
 
-void WaterTrigger_ISR()   // No Pull Up rutine
+void WaterTrigger_ISR()     // ISR  water pulse routine detach during excessive vibration
 {
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
   digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
@@ -2410,7 +2407,7 @@ void WaterTrigger_ISR()   // No Pull Up rutine
   if (loopbackRx2Tx2) digitalWrite(SERIAL_TX2, waterTriggerState); // here test trigger to find if it is attached
 }
 
-void WaterTrigger1_ISR()    //  Pulled Up routine
+void WaterTrigger1_ISR()    // ISR wate rpusle, will detach during excessive vibration
 {
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
   waterTriggerCnt++ ;             // increase call counter
@@ -2443,9 +2440,8 @@ void WaterTrigger1_ISR()    //  Pulled Up routine
   }
 */
 
-
 //------------------------------------------
-//Convert device id to String
+//Convert device id to HEX String
 String GetAddressToString(DeviceAddress deviceAddress) {
   String str = "";
   for (uint8_t i = 0; i < 8; i++) {
