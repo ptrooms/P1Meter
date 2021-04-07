@@ -1,4 +1,4 @@
-!ptro logo](/tools/logo/ptro_930x474_longwhite_ends.svg)
+[ptro logo](/tools/logo/ptro_930x474_longwhite_ends.svg)
 # Changelog
 All notable changes to this project will be documented in this file.
 
