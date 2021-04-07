@@ -1,5 +1,5 @@
-Home Automation via ESP8266 WiFi chip
-======================================
+W.i.P Home Automation via ESP8266 WiFi chip
+===========================================
 
 This project brings control using the ESP8266 NodeMCU 12E board to the Home.
 The project aims control throught MQTT as a central control module for
