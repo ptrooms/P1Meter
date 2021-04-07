@@ -7,12 +7,12 @@
 ## Localised setting ######
 *.bak
 *.save
-src/P1OverrideSettings.h
+P1Meter/P1OverrideSettings.h
 notes.txt
 gitignore*
 
 ## Program related ##
-src/*.txt
+P1Meter/*.txt
 
 ## Project files ######
 .platformio
@@ -24,7 +24,7 @@ build
 build_output
 firmware.map
 firmware.asm
-src/P1Meter.ino.cpp
+P1Meter/P1Meter.ino.cpp
 P1Meter*.bin
 P1Meter*.bin.gz
 P1Meter*.map

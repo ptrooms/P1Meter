@@ -1,0 +1,15 @@
+{
+    "name": "P1SoftwareSerial",
+    "version": "2.4.1",
+    "keywords": [
+      "serial", "io", "softwareserial"
+    ],
+    "description": "Implementation of the Arduino software serial for ESP8266.",
+    "repository":
+    {
+        "type": "git",
+        "url": "https://github.com/ptro/p1softwareserial"
+    },
+    "frameworks": "arduino",
+    "platforms": "espressif8266"
+}
