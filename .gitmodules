@@ -1,6 +1,3 @@
-[submodule "Arduino"]
-	path = Arduino
-	url = https://github.com/esp8266/Arduino/tree/2.4.1
 [submodule "libs/DallasTemperature"]
 	path = libs/DallasTemperature
 	url = https://github.com/milesburton/Arduino-Temperature-Control-Library
