@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern "C" {
 #include "gpio.h"
 }
+#include <eagle_soc.h>     // required as we use GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS to preven re-interrupt
 
 // #include <SoftwareSerial.h>
 // #include </home/pafoxp/code-P1meter/SoftwareSerial_2.4.1/SoftwareSerial.h>

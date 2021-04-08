@@ -2,7 +2,8 @@
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
 // --> use NodeMCU1.0 ESP-12E with LwIp V2 lower memory, BuiltIn led (GPIO)16
 
-#define TEST_MODE               // (un)set to re-wire wifi SSID, and Mqtt to workstation and activate D-ebug messages
+// #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
+// #define TEST_MODE    // set in PlatformIO; use our file defined confidential wifi/server/mqtt settings
 
 
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
@@ -10,11 +11,11 @@
 
 #ifdef TEST_MODE
 // #define CALCULATE_TIMINGS    // experiment calculate in setup() ome instruction sequences for cycle/uSec timing.
-#define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-#define DEF_PROG_VERSION 1119.241 // current version (displayed in mqtt record)
+  #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
+  #define DEF_PROG_VERSION 1119.241 // current version (displayed in mqtt record)
 #else
-#define P1_VERSION_TYPE "p1"      // "p1" production
-#define DEF_PROG_VERSION 2119.241 //  current version (displayed in mqtt record)
+  #define P1_VERSION_TYPE "p1"      // "p1" production
+  #define DEF_PROG_VERSION 2119.241 //  current version (displayed in mqtt record)
 #endif
 
 // Note changing libaries looks to be useless as onoly 2.4.1 is stable (WDT reset) and 99% (Serial) reliable
@@ -329,9 +330,9 @@
 // Note 2.4.1  very stable and reliable softserial and now wdt resets
 #ifdef libuse241
 #undef UseNewSoftSerialLIB      // use the the standard  localised library
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/Arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/variants/nodemcu/pins_arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/stdlib_noniso.h>
+// #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/Arduino.h>
+// #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/variants/nodemcu/pins_arduino.h>
+// #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/stdlib_noniso.h>
 #endif
 
 // Note 2.4.2  TBI
@@ -378,7 +379,7 @@
 #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/stdlib_noniso.h>
 #endif
 
-#ifndef P1_VERSION_TYPE;        // if not defined, fallback to test version
+#ifndef P1_VERSION_TYPE         // if not defined, fallback to test version
 #define P1_VERSION_TYPE "t1"    // "t1" test "p1" production
 #endif
 
@@ -398,20 +399,19 @@
 
 const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
 
-#ifndef P1_Override_Settings      // include our P1_Override_Settings
-#include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
-#endif
-#ifndef P1_Override_Settings      // defaults if previous file was not found/activated
+#ifdef P1_Override_Settings      // include our P1_Override_Settings
+  #include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
+#else
   #ifdef TEST_MODE                  // Note: we use the override file at compile
     const char *ssid = "Production ssid";    // "Pafo SSID4"    //  T E  S T   setting
     const char *password = "wifipassword";
-    const char *hostName = "nodemcu"        P1_VERSION_TYPE;          // our hostname for OTA nodemcut1
+    const char *hostName = "nodemcu" P1_VERSION_TYPE;          // our hostname for OTA nodemcut1
     const char *mqttServer = "192.168.1.45";                          // our mqtt server adress (desk top test)
     const char *mqttClientName = "nodemcu-" P1_VERSION_TYPE;          // Note our ClientId for mqtt
-    const char *mqttTopic = "/T1meter/"     P1_VERSION_TYPE;          // mqtt topic s is /T1Meter/p1
-    const char *mqttLogTopic = "/log/"      P1_VERSION_TYPE;          // mqtt topic is /log/p1
-    const char *mqttErrorTopic = "/error/"  P1_VERSION_TYPE;          // mqtt topic is /error/p1
-    const char *mqttPower = "/T1meter/"     P1_VERSION_TYPE "power";  // mqtt topic is /T1meter/P1power
+    const char *mqttTopic = "/T1meter/" P1_VERSION_TYPE;          // mqtt topic s is /T1Meter/p1
+    const char *mqttLogTopic = "/log/" P1_VERSION_TYPE;          // mqtt topic is /log/p1
+    const char *mqttErrorTopic = "/error/" P1_VERSION_TYPE;          // mqtt topic is /error/p1
+    const char *mqttPower = "/T1meter/" P1_VERSION_TYPE "power";  // mqtt topic is /T1meter/P1power
     const int   mqttPort = 1883;
   #else
     const char *ssid = "Test ssid";    // "Pafo SSID5"    //  P R O D U C T I O N  setting
@@ -442,6 +442,7 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 
 // start regular program code
 #include <PubSubClient.h>
+#include <eagle_soc.h>     // required as we use GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS to preven re-interrupt
 
 /*
   before:
@@ -517,6 +518,33 @@ const int durationTemp = 5000;            // The frequency of temperature measur
 //  pafoxp@ubuntuO380:~$ mosquitto_sub -v -R -h 192.168.1.8 -t "/energy/#
 //  pafoxp@ubuntuO380:~$ mosquitto_pub -h 192.168.1.8 -t "nodemcu-t1/switch/port1" -m "0" =Off/1=On/2=Follow/3=NotUsed-Skip
 //  port1 commands: i/I make P1 timeout critica, l/L logging, R-estart, P/p-ublish-P1
+
+/* // playing around with settings
+  #if defined(ARDUINO_ESP8266_RELEASE_2_4_0) 
+  const int Arduino Version = 240;            // The frequency of temperature measurement
+  #else
+    #if defined(ARDUINO_ESP8266_RELEASE_2_4_1) 
+      const int Arduino Version = 241;            // The frequency of temperature measurement
+    #else
+      #if defined(ARDUINO_ESP8266_RELEASE_2_7_1) 
+        const int Arduino Version = 271;            // The frequency of temperature measurement
+      #else
+        #if defined(ARDUINO_ESP8266_RELEASE_2_7_4) 
+          const int Arduino Version = 274;            // The frequency of temperature measurement
+        #else
+          const int Arduino Version = 999;            // The frequency of temperature measurement
+        #endif
+      #endif
+    #endif
+  #endif
+
+
+  || defined(ARDUINO_ESP8266_RELEASE_2_4_0) 
+  || defined(ARDUINO_ESP8266_RELEASE_2_4_2) 
+  || defined(ARDUINO_ESP8266_RELEASE_2_5_0) 
+  || defined(ARDUINO_ESP8266_RELEASE_2_5_1) 
+  || defined(ARDUINO_ESP8266_RELEASE_2_5_2)
+*/
 
 // array (not used) to facilitate character ruler (if any)
 const char *decArray  = "000000000111111111122222222223333333333444444444455555555556666666666777777777788888888888";
@@ -703,15 +731,17 @@ void setup()
     see []
     "A"=0x30C0  , "B"=0x3180 , "123456789"=0xBB3D (0x31 0x32 0x33 0x34 0x35 0x36 0x37 0x38  0x39 )
     CRC-16/ARC   0xBB3D  0xBB3D  0x8005  0x0000  true  true  0x0000
-  */
+    */
 
+  Serial.println("Settingup WifiSTAtion.");  // wait 5 seconds before retry
   WiFi.mode(WIFI_STA);            // Client mode
 
+  Serial.println((String) "Connecting to " + ssid);  // wait 5 seconds before retry
   WiFi.begin(ssid, password);     // login to AP
-
+    
   while (WiFi.waitForConnectResult() != WL_CONNECTED)
   {
-    Serial.println("Connection Failed! Rebooting...");  // wait 5 seconds before retry
+    Serial.print((String)"Connection to "+ ssid +", Failing ..");  // wait 5 seconds before retry
     for (int i = 0; i < 9; i++) {                       // while flashing led
       bool blueLedState = digitalRead(BLUE_LED);
       digitalWrite(BLUE_LED, !blueLedState);
@@ -719,6 +749,8 @@ void setup()
       digitalWrite(BLUE_LED, blueLedState);
       delay(250);
     }
+    Serial.print((String) "Connection to "+ ssid +", Faild, restartting in 5 seconds..");  // wait 5 seconds before retry
+    delay(2000);
     ESP.restart();
   }
 
