@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - Development
 
 ## [V21.19]
+- 08apr20 05u30 - PtrO Adapted to Arduino-IDE (checked) & PlatformIO  (checked) see ini files.
 - 07apr21 19u13 - PtrO Initiial GIT version , Arduino compile succesfull using this Repo
 ---------------------------------------------------------------------------------------
 ## Old log within program at development site:
