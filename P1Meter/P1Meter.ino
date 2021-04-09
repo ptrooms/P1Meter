@@ -2,6 +2,7 @@
 
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
 // see/for git: https://github.com/ptrooms/P1Meter
+// Update on V20 to check if this works in Visual Studio Code 
 
 // --> use NodeMCU1.0 ESP-12E with LwIp V2 lower memory, BuiltIn led (GPIO)16
 
