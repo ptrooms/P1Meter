@@ -1,75 +1,36 @@
-// use NodeMCU1.0 12E  and Lwip lowver memory
+
+
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
+
 // --> use NodeMCU1.0 ESP-12E with LwIp V2 lower memory, BuiltIn led (GPIO)16
 
-// #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
+#define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
 // #define TEST_MODE    // set in PlatformIO; use our file defined confidential wifi/server/mqtt settings
+#define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.0 and use P1serial verion to listen /header & !finish
+#define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 
 
-// #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
-// tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
 
 #ifdef TEST_MODE
-// #define CALCULATE_TIMINGS    // experiment calculate in setup() ome instruction sequences for cycle/uSec timing.
+  #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1119.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1120.241 // current version (displayed in mqtt record)
+      // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup() ome instruction sequences for cycle/uSec timing.
+    #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
+  #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2119.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2120.241 //  current version (displayed in mqtt record)
 #endif
-
-// Note changing libaries looks to be useless as onoly 2.4.1 is stable (WDT reset) and 99% (Serial) reliable
-//      but we levae the oportunity to centrally control which specifx libary will be included/
-
-// #define libuse242              // 301136 bytes, not very reliable, serial produces not many successes
-#define libuse241              // 297428/prod, 297412/test bytes, best version offering reliability and NO spontaneous wdt resets
-// #define libuse250             // TBI 322320 bytes, not very trustfull, serial is interrupt and causes soft errors, not sure about wdt
-// #define libuse252             // unreliable (in the past, not sure how i operates with adapted P1 softserial), UseNewSoftSerialLIB
-// #define libuse241             // 297428 bytes, very stable, fast compile (note we use the softserial 2.4.1. adapted to p1), 
-// #define libuse274             // unstable, the esp remains for at 10 to 35 minutes active and then goes into wdt, UseNewSoftSerialLIB
-// Note any library must be available with(in) Arduino/esp8266 Boardmanager
-// #define libuse240             // very goed library, fast compile to use UseNewSoftSerialLIB
-#define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
-#define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.0 and use P1serial verion to listen /header & !finish
-
-#define bSERIAL_INVERT  true  // P1 meter require - here - inverted serial levels (TRUE) for RS232
-#define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232
-// #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
-/*
- * // lwip lower memory no features
-        Executable segment sizes:
-        RODATA : 4500  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        IROM   : 289728          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        BSS    : 28184 )         - zeroed variables      (global, static) in RAM/HEAP 
-        Sketch uses 324608 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34028 bytes (41%) of dynamic memory, leaving 47892 bytes for local variables. Maximum is 81920 bytes.
-  // lwip lower memory no features
-        Executable segment sizes:
-        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.        
-  // removed httpclient
-        Executable segment sizes:
-        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
-        
- */
+// #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
+// tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
 
 // *
 // * * * * * L O G  B O O K
 // *
-
+// 08apr21 V21.20/241 adapted for PlatformIO AND Arduino 
+//             -
+// 07apr21 V21.19/241 adapted for PaltformIO
 // 04apr21 V21.19/241 Hardware Library 2.4.1 and use Lwip 2.0 lower memory, very stable
 /*
                 Sketch uses 297412 bytes (28%) of program storage space. Maximum is 1044464 bytes.
@@ -227,9 +188,10 @@
 //    sudo cat /dev/ttyS4 | stdbuf -o0 grep -a -E '(started|stopped|wdt)' | stdbuf -o0 ts | stdbuf -o0  grep -a -A 1 -B 1 -E '(wdt)'
 //    mosquitto_pub -t nodemcu-p1/switch/port1 -m D
 
-// #if defined(ARDUINO_ESP8266_RELEASE_2_3_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_1) || defined(ARDUINO_ESP8266_RELEASE_2_4_2) || defined(ARDUINO_ESP8266_RELEASE_2_5_0) || defined(ARDUINO_ESP8266_RELEASE_2_5_1) || defined(ARDUINO_ESP8266_RELEASE_2_5_2)
-//  #error "Arduino ESP8266 Core versions before 2.7.1 are not supported"
-// #endif
+// The next may be usefull in determining which Core version is (not) to be used.
+//  #if defined(ARDUINO_ESP8266_RELEASE_2_3_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_1) || defined(ARDUINO_ESP8266_RELEASE_2_4_2) || defined(ARDUINO_ESP8266_RELEASE_2_5_0) || defined(ARDUINO_ESP8266_RELEASE_2_5_1) || defined(ARDUINO_ESP8266_RELEASE_2_5_2)
+//   #warning "Arduino ESP8266 Core versions before 2.7.1 are not supported"
+//   #endif
 /*
    Executable segment sizes:
    IROM   : 298880          - code in flash         (default or ICACHE_FLASH_ATTR)
@@ -307,6 +269,17 @@
 
 //
 
+// Note changing libarieslooks to be useless as only 2.4.1 seem to resist WDT reset and is 99% (Serial) reliable
+//      but we levae the oportunity to centrally control which specifx libary will be included/
+//      any library must be made available with(in) Arduino/esp8266 Boardmanager
+// #define libuse242  // 301136 bytes, not very reliable, serial produces not many successes
+#define libuse241     // 297428/prod, 297412/test bytes, best version offering reliability and NO spontaneous wdt resets
+// #define libuse250  // TBI 322320 bytes, not very trustfull, serial is interrupt and causes soft errors, not sure about wdt
+// #define libuse252  // unreliable (in the past, not sure how i operates with adapted P1 softserial), UseNewSoftSerialLIB
+// #define libuse241  // 297428 bytes, very stable, fast compile (note we use the softserial 2.4.1. adapted to p1), 
+// #define libuse274  // unstable, the esp remains for at 10 to 35 minutes active and then goes into wdt, UseNewSoftSerialLIB
+// #define libuse240  // very goed library, fast compile to use UseNewSoftSerialLIB
+
 // - - - > following was for test experimenting with libbary use directived. Can be deleted.
 // test #include </home/pafoxp/code-P1meter/SoftwareSerial_2.4.0/SoftwareSerial.h>
 // #ifdef UseP1SoftSerialLIB   // do we use an old library
@@ -383,7 +356,14 @@
 #define P1_VERSION_TYPE "t1"    // "t1" test "p1" production
 #endif
 
-// hardware settings, change accordingly , total esp8266 pins 17
+
+// communication mode settings
+#define bSERIAL_INVERT  true  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+#define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232
+// #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
+
+
+// hardware PIN settings, change accordingly , total esp8266 pins 17
 #define BLUE_LED         D0  // pin GPIO16 output to BLUE signal indcator
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
 #define SERIAL_RX2       D2  // pin GPIO14 input  for SoftwareSerial RX  GJ
@@ -399,9 +379,19 @@
 
 const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
 
+#ifndef ARDUINO_ESP8266_RELEASE
+  // note: file [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_version.h] contains 
+  #include <core_version.h>
+  // see also file: [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_esp8266_main.cpp]
+#endif  
+// const const char *core_version_P1Meter_Release = ARDUINO_ESP8266_RELEASE ; 
+
+
 #ifdef P1_Override_Settings      // include our P1_Override_Settings
   #include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
+  // #warning Using override settings
 #else
+  #warning Using default settings, please use override for settings
   #ifdef TEST_MODE                  // Note: we use the override file at compile
     const char *ssid = "Production ssid";    // "Pafo SSID4"    //  T E  S T   setting
     const char *password = "wifipassword";
@@ -436,32 +426,13 @@ unsigned long startMicros = 0;   // micros()
 unsigned long previousBlinkMillis = 0; // used to shortblink the BLUELED, at serialinput this is set to high value
 const long    intervalBlinkMillis = 250;
 
-// CRC16/arc value (data including between / and ! of P1 Telegram )
+// CRC16/arc redundancy check (data including between / and ! of P1 Telegram )
 unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 #include "CRC16.h"              // CRC-16/ARC
 
-// start regular program code
+// start regular program soruce segment
 #include <PubSubClient.h>
 #include <eagle_soc.h>     // required as we use GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS to preven re-interrupt
-
-/*
-  before:
-    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
-    IROM   : 299232          - code in flash         (default or ICACHE_FLASH_ATTR)
-    RODATA : 4364  ) / 81920 - constants             (global, static) in RAM/HEAP
-    BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP
-    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-    Sketch uses 333956 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-    Global variables use 33948 bytes (41%) of dynamic memory, leaving 47972 bytes for local variables. Maximum is 81920 bytes.
-  after:
-    RODATA : 4364  ) / 81920 - constants             (global, static) in RAM/HEAP
-    IROM   : 299232          - code in flash         (default or ICACHE_FLASH_ATTR)
-    BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP
-    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
-    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-    Sketch uses 333956 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-    Global variables use 33948 bytes (41%) of dynamic memory, leaving 47972 bytes for local variables. Maximum is 81920 bytes
-*/
 
 #ifndef UseP1SoftSerialLIB   // if not yet included, include standard defined softserial library
 #include <SoftwareSerial.h>           // "standard" version , the newer ones  after 2.4.1 are not very reliable.
@@ -472,7 +443,7 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/libraries/SoftwareSerial_2.4.0/SoftwareSerial240.h>
 #endif
 
-/*
+/* leave to check test developement
    // #include <SoftwareSerial.h>   // testRX2 usinbg oldversion
     // cannot use the duplicate
     In file included from /home/pafoxp/code-P1meter/T1Meter1.13/T1Meter1.13.ino:213:0:
@@ -490,7 +461,9 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 // #include <ESP8266mDNS.h>        // standard, ESP8266 Multicast DNS req. ESP8266WiFi AND needed for dynamic OTA
 // #include <ESP8266HTTPClient.h>   // not needed
 // #include <WiFiUdp.h>             // not needed
+
 #include <ArduinoOTA.h>           // standard, will also automgically include mDNS & UDP
+
 // ================================================================ Temperature processing ===============
 // #include <OneWire.h>           // <DallasTemperature.h will ask/include this themselves
 #include <DallasTemperature.h>    // DS18B20 temporatur Onewire     
@@ -518,33 +491,6 @@ const int durationTemp = 5000;            // The frequency of temperature measur
 //  pafoxp@ubuntuO380:~$ mosquitto_sub -v -R -h 192.168.1.8 -t "/energy/#
 //  pafoxp@ubuntuO380:~$ mosquitto_pub -h 192.168.1.8 -t "nodemcu-t1/switch/port1" -m "0" =Off/1=On/2=Follow/3=NotUsed-Skip
 //  port1 commands: i/I make P1 timeout critica, l/L logging, R-estart, P/p-ublish-P1
-
-/* // playing around with settings
-  #if defined(ARDUINO_ESP8266_RELEASE_2_4_0) 
-  const int Arduino Version = 240;            // The frequency of temperature measurement
-  #else
-    #if defined(ARDUINO_ESP8266_RELEASE_2_4_1) 
-      const int Arduino Version = 241;            // The frequency of temperature measurement
-    #else
-      #if defined(ARDUINO_ESP8266_RELEASE_2_7_1) 
-        const int Arduino Version = 271;            // The frequency of temperature measurement
-      #else
-        #if defined(ARDUINO_ESP8266_RELEASE_2_7_4) 
-          const int Arduino Version = 274;            // The frequency of temperature measurement
-        #else
-          const int Arduino Version = 999;            // The frequency of temperature measurement
-        #endif
-      #endif
-    #endif
-  #endif
-
-
-  || defined(ARDUINO_ESP8266_RELEASE_2_4_0) 
-  || defined(ARDUINO_ESP8266_RELEASE_2_4_2) 
-  || defined(ARDUINO_ESP8266_RELEASE_2_5_0) 
-  || defined(ARDUINO_ESP8266_RELEASE_2_5_1) 
-  || defined(ARDUINO_ESP8266_RELEASE_2_5_2)
-*/
 
 // array (not used) to facilitate character ruler (if any)
 const char *decArray  = "000000000111111111122222222223333333333444444444455555555556666666666777777777788888888888";
@@ -644,7 +590,6 @@ int filteredValueAdc = 0; // average between previous and and published
     Sketch uses 333148 bytes (31%) of program storage space. Maximum is 1044464 bytes.
     Global variables use 33620 bytes (41%) of dynamic memory, leaving 48300 bytes for local variables. Maximum is 81920 bytes.
 */
-// #define MAXLINELENGTH 64         // buffered if this helps: the 589 byte message takes about 1.065 Seconds
 /*  #define MAXLINELENGTH 64            // shorten to see if this helps
     Executable segment sizes:
     IROM   : 298592          - code in flash         (default or ICACHE_FLASH_ATTR)
@@ -655,6 +600,7 @@ int filteredValueAdc = 0; // average between previous and and published
     Sketch uses 333148 bytes (31%) of program storage space. Maximum is 1044464 bytes.
     Global variables use 33044 bytes (40%) of dynamic memory, leaving 48876 bytes for local variables. Maximum is 81920 bytes.
 */
+
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 char dummy2[17];       // add some spare bytes
 char telegram[MAXLINELENGTH];       // telegram maxsize 64bytes for P1 meter
@@ -699,6 +645,7 @@ PubSubClient client(espClient);   // Use this connection client
 
 void setup()
 {
+  asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
   // pinMode(THERMOSTAT_READ, INPUT);      // Declare Pin mode INPUT read always low
   pinMode(THERMOSTAT_READ, INPUT_PULLUP);  // Declare Pin mode INPUT with pullup to Read room thermostate
@@ -799,6 +746,7 @@ void setup()
 
   ArduinoOTA.begin();
   Serial.println("Ready");
+  Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
   client.setServer(mqttServer, mqttPort);
@@ -825,7 +773,20 @@ void setup()
   Serial.print(intervalP1 );
   Serial.print(" mSecs,");
 
-#ifdef CALCULATE_TIMINGS
+#ifdef TEST_PRINTF_FLOAT
+  // Test float functions
+  Serial.printf ("Test FloatingPoint support\n", mqttCnt);
+  // asm(".global _printf_float"); // setin in Setup()
+  Serial.printf ("\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);
+  Serial.printf ("\tmqttCnt ValueUu = %u\n", mqttCnt);
+  Serial.printf ("\t9.0453 Value4.1f = %4.1f\n", 9.0453);   
+  Serial.printf ("\t9.12 Value4.1f = %4.1f\n", 9.0); 
+  Serial.printf ("\t9.12340 Value5.1f = %5.2f\n", 9.0); 
+  Serial.printf ("\t 9.0 Value4.1f = %6.1f\n", 9.0);
+  Serial.printf ("\t1234.567 Value6.1f = %6.6f\n", 1234.567);
+#endif
+
+#ifdef TEST_CALCULATE_TIMINGS
   Serial.print((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
 
   // insert a small loop to stabilize
@@ -1203,10 +1164,10 @@ void doCritical() {   // do the critical core function: reading thermostat and s
   // with sensors this Gpio process took -78 mS
   bool save_outputOnSerial = outputOnSerial;
   outputOnSerial = false;                  // disable frequent prints
-  unsigned long startMillis = millis();
+  // unsigned long startMillis = millis(); // not used
   ArduinoOTA.handle();  // check if we must service on the Air update
   processGpio();        // Do regular functions of the system
-  signed long durationMillis =  startMillis - millis();
+  // signed long durationMillis =  startMillis - millis();
   outputOnSerial = save_outputOnSerial;    // re-establish serial print
   // Serial.print((String)"Gpio process took " + durationMillis + " mS.\r\n");
 }
@@ -1223,6 +1184,7 @@ void readTelegram() {             // Process  P1 serial data buffer and sendout 
     }
     p1TriggerTime = millis();
   }
+
 
 #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
   if ( mySerial.P1active())  return ;  // quick return if serial is receiving, fucntion of SoftwareSerial for P1
@@ -1419,9 +1381,15 @@ void readTelegram2() {
 
 // Handle GPIO pins
 void processGpio() {    // Do regular functions of the system
+  /*
   int  tmpb = processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
   bool tmpc = processLightRead(digitalRead(LIGHT_READ));        // process LedLightstatus read pin D6
   bool tmpa = processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
+  */
+  processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
+  processLightRead(digitalRead(LIGHT_READ));        // process LedLightstatus read pin D6
+  processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
+
   GetTemperatures();      // from DS18B20 tempsensors
 
   // debug pin status 
@@ -1578,7 +1546,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     // error if (outputOnSerial) Serial.print("Invalid command:" + (char)(char)payload[0]);
 
     // if (outputOnSerial) Serial.print("Invalid command:" + receivedChar);
-    char receivedChar = (char)payload[0];
+    // char receivedChar = (char)payload[0];
     // if (outputOnSerial) Serial.print("Invalid command:" + receivedChar);
     if (outputOnSerial) Serial.print("Invalid command:" + mqttCommand);
   }
@@ -2057,8 +2025,8 @@ bool decodeTelegram(int len)
   if ( !(telegram[len - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
 
   //  c h e c k   t e s t   P 1   r e c o r d s
-  long val = 0;
-  long val2 = 0;
+  // long val = 0;
+  // long val2 = 0;
 
   // client.publish(mqttLogTopic, telegram );    // show what we have got
 
@@ -2482,3 +2450,35 @@ String GetAddressToString(DeviceAddress deviceAddress) {
   }
   return str;
 }
+
+// useless data to be kept for reference
+/*
+ * // lwip lower memory no features
+        Executable segment sizes:
+        RODATA : 4500  ) / 81920 - constants             (global, static) in RAM/HEAP 
+        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+        IROM   : 289728          - code in flash         (default or ICACHE_FLASH_ATTR) 
+        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+        BSS    : 28184 )         - zeroed variables      (global, static) in RAM/HEAP 
+        Sketch uses 324608 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+        Global variables use 34028 bytes (41%) of dynamic memory, leaving 47892 bytes for local variables. Maximum is 81920 bytes.
+  // lwip lower memory no features
+        Executable segment sizes:
+        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
+        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
+        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.        
+  // removed httpclient
+        Executable segment sizes:
+        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
+        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
+        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
+        
+ */
