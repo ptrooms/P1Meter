@@ -16,13 +16,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1120.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1121.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup() ome instruction sequences for cycle/uSec timing.
     #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2120.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2121.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -425,6 +425,11 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
 unsigned long currentMillis = 0; // millis() mainloop
 unsigned long currentMicros = 0; // micros() mainloop
 unsigned long startMicros = 0;   // micros()
+
+// used to research and find position of wdt resets
+unsigned long test_WdtTime = 0;   // time the mainloop
+unsigned long loopcnt = 0;        // countthe loop
+
 
 // control the informative led within the loop
 unsigned long previousBlinkMillis = 0; // used to shortblink the BLUELED, at serialinput this is set to high value
@@ -970,6 +975,8 @@ void setup()
   attachWaterInterrupt();
 
   waterTriggerTime = 0;  // ensure and assum no trigger yet
+  test_WdtTime = 0;  // set first loop timer
+  loopcnt = 0;              // set loopcount to 0
 }
 
 
@@ -991,6 +998,12 @@ void loop()
   currentMillis = millis(); // Get snapshot of runtime
   currentMicros = micros(); // get current cycle time
   unsigned long debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by ISR waterTrigger
+
+  if (test_WdtTime < currentMillis )  {
+    loopcnt++ ;
+    Serial.print((String)"-"+(loopcnt%99)+" \b");  //here
+    test_WdtTime = currentMillis + 1000;  // next interval
+  }
 
   // Following will trackdown loops
   if (currentMillis > previousLoop_Millis + 1000) { // exceeding one second  ?, warn user
@@ -1037,7 +1050,7 @@ void loop()
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
-        if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
+        if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
@@ -1248,7 +1261,7 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started here
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\rDataCnt: %u started at %6.6f\t", (mqttCnt + 1), ((float) startMicros / 1000000));
+  if (!outputOnSerial) Serial.printf("\rDataCnt: %u started at %6.6f \b\b\t", (mqttCnt + 1), ((float) startMicros / 1000000));
 
 
   if (outputMqttLog) client.publish(mqttLogTopic, mqttClientName );
@@ -1262,7 +1275,8 @@ void readTelegram() {
   // Serial.println("startbuf..");
 
   while (mySerial.available())     {      // If serial data in buffer
-    Serial.print((String) "xa\b");
+    // Serial.print((String) "xa\b"); no need to display serial available this goes ok
+    
     /*
         if (outputOnSerial) {         // do we want/need to print the Telegram
           Serial.print("\nDataP1>");
@@ -1273,7 +1287,7 @@ void readTelegram() {
     // The function returns the characters up to the last character before the supplied terminator.
 
     int len = mySerial.readBytesUntil('\n', telegram, MAXLINELENGTH - 2); // read a max of  64bytes-2 per line, termination is not supplied
-    Serial.print((String) "yb\b");
+    // Serial.print((String) "yb\b"); no need to display RX progess this goes ok
     
 
     if (outputOnSerial) {         // do we want/need to print the Telegram
