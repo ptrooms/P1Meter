@@ -30,6 +30,8 @@
 // *
 // * * * * * L O G  B O O K
 // *
+// 13apr21 V21.20/241 improved and added better yield that also calls the pubsub mqtt loop *(if connected)
+// __ap21  migrated to github repo and CHANGED.md
 // 08apr21 V21.20/241 adapted for PlatformIO AND Arduino 
 //             -
 // 07apr21 V21.19/241 adapted for PaltformIO
@@ -53,7 +55,7 @@
 
 */
 // 03apr21 V21.18/274 +332 bytes: sprintf causes corruption, use snprinf when using multiple formatted valaues 
-//                - removed unused librabries //here ESP8266mDNS.h ESP8266HTTPClient.h WiFiUdp.h OneWire.h
+//                - removed unused librabries ESP8266mDNS.h ESP8266HTTPClient.h WiFiUdp.h OneWire.h
 /*                 
  *                Executable segment sizes:
                   BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
@@ -645,6 +647,18 @@ SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2
 WiFiClient espClient;             // declare and name our Internet conenction
 PubSubClient client(espClient);   // Use this connection client
 
+
+/* Setup
+  - allow/include printf support
+  - define initialise gpio pins
+  - prepare serial connections
+  - start wifi
+  - handle/setup OTA
+  - handle/callback Mqtt conenction commands (topic nodemcu-...)
+  - initialise temperature sensors DS18B20
+  - (TESTMODE) do timing calculations to research exact timing of routines
+  - attach waterpulse interrupt
+*/
 void setup()
 {
   asm(".global _printf_float");            // include floating point support
@@ -958,6 +972,19 @@ void setup()
   waterTriggerTime = 0;  // ensure and assum no trigger yet
 }
 
+
+/* 
+  Mainloop:
+    - supervise timers to prevent wdt reset
+    - manage serialconnection during P1 intervals
+    - handle/decode P1 readings
+    - monitor water pulses (, specifically wheel debounce)
+    - process secondary serial
+    - prevent WDT reset (mqtt_local_yield)
+    - watchdog/force for timeouts (P1 serial too long not connected)
+    - Handle OTA updates
+
+*/
 void loop()
 {
   // declare global timers loop(s)
@@ -968,7 +995,8 @@ void loop()
   // Following will trackdown loops
   if (currentMillis > previousLoop_Millis + 1000) { // exceeding one second  ?, warn user
     Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yielding\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
-    yield();
+    // yield();
+    mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
   }
   previousLoop_Millis = currentMillis;  // registrate our loop time
 
@@ -1070,10 +1098,7 @@ void loop()
   // (p1SerialActive && !p1SerialFinish) , process Telegram data
   readTelegram();     // read P1 gpio14 (if serial data available)
 
-  // Allow / Do (likely) superfluous control to esp8266 routines
-  yield();  // give control to wifi management
-  delay(0); // delay 50 mSec
-  ESP.wdtFeed(); // feed the hungry timer
+  mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
 
   p1TriggerTime = millis();   // indicate our mainloop yield
 
@@ -1087,6 +1112,19 @@ void loop()
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
     } else {
+
+      // report to error mqtt, //V20 candidate for a callable error routine
+      char mqttOutput[128];
+      String mqttMsg = "{";  // start of Json
+        mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 serial not connected\""); 
+        // String mqttMsg = "Error, "; // build mqtt frame 
+        // mqttMsg.concat("serial not connected ");  
+        // mqttMsg,concat("interval="); // build mqtt frame 
+        // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
+        mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+      mqttMsg.concat("}");  // end of json
+      mqttMsg.toCharArray(mqttOutput, 128);
+      if (client.connected()) client.publish(mqttErrorTopic, mqttOutput); // report to error topic
       if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking" );  // report we have survived this interval
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
@@ -1125,16 +1163,19 @@ void loop()
 
 }
 
-void reconnect() {                 // mqtt
+/* 
+  Reconnect lost mqtt connection
+*/
+void reconnect() {                 // mqtt read usage doc https://pubsubclient.knolleary.net/api
   // Loop until we're reconnected
   int mqttConnectDelay    = 2000;     // start reconnect and ease things increasingly to 30000 if this continues to fail
   while (!client.connected())   {
     Serial.print((String)"Attempt MQTT connection to " + mqttClientName + " ..." );
     if (client.connect(mqttClientName))     {
-      Serial.print("connected");
+      Serial.print((String)"(re)connected to " + mqttServer);
       // Serial.print(client.state());
     } else {
-      Serial.print("failed");
+      Serial.print((String)"failed to " + mqttServer);
       // Serial.print(" try again in 5 seconds...");
       // Wait 2 seconds before retrying
       // delay(2000);
@@ -1161,7 +1202,11 @@ void reconnect() {                 // mqtt
   Serial.println("< .");
 }
 
-void doCritical() {   // do the critical core function: reading thermostat and setting the heating
+/* 
+    Do the critical core functions: reading thermostat and setting the heating
+    We must ensure the thermostater is supervised, even if mqtt or network is not connected.
+*/
+void doCritical() {
   // takes 18mS without sensors if printing in processGpio() is left on, without its 2-4mS
   // with sensors this Gpio process took -78 mS
   bool save_outputOnSerial = outputOnSerial;
@@ -1175,12 +1220,16 @@ void doCritical() {   // do the critical core function: reading thermostat and s
 }
 
 
-void readTelegram() {             // Process  P1 serial data buffer and sendout result at P1 trailer
+/* 
+  Process  P1 serial data buffer and sendout result at P1 trailer
+*/
+void readTelegram() {
 
   unsigned long p1Debounce_time = millis() - p1TriggerTime; // mSec - waterTriggerTime in micro seconds set by ISR waterTrigger
   // if (p1SerialActive && p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
   if (p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
-    yield();                // allow time to others
+    // yield();                // allow time to others
+    mqtt_local_yield();
     if (outputOnSerial) {   // indicate on console
       Serial.print((String) " !!>" + millis() + " yield due " + p1TriggerTime + "< exceeded !!" ); // length processed previous line
     }
@@ -1322,7 +1371,10 @@ void readTelegram() {             // Process  P1 serial data buffer and sendout 
 } // void
 
 
-//process the secondary serial input port, to be used  in future for 1200Baud GJ meter
+
+/* 
+  process the secondary serial input port, to be used  in future for 1200Baud GJ meter
+*/
 void readTelegram2() {
   // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
 #ifdef UseP1SoftSerialLIB
@@ -1381,7 +1433,10 @@ void readTelegram2() {
   }  // if available
 } // void
 
-// Handle GPIO pins
+
+/* 
+  Handle GPIO pins Adc, Thermostat and Waterheating light
+*/
 void processGpio() {    // Do regular functions of the system
   /*
   int  tmpb = processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
@@ -1417,8 +1472,9 @@ void processGpio() {    // Do regular functions of the system
   // publishP1ToMqtt();      // PUBLISH this mqtt
 }
 
-
-// Callled whenever a MQTT subscription message arrives
+/* 
+    Mqtt input received, callled whenever a MQTT subscription message arrives
+*/
 void callback(char* topic, byte* payload, unsigned int length) {
   previousBlinkMillis = millis() + intervalBlinkMillis ; // end the shortblink (if any)
 
@@ -1558,14 +1614,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 
-// -------------------------------------------------------------------------------
-//                        Publish full as JSONPATH record
-// -------------------------------------------------------------------------------
+/* 
+    // -------------------------------------------------------------------------------
+    /                        Publish full as JSONPATH record
+    / -------------------------------------------------------------------------------
+*/
 void publishP1ToMqtt()    // this will go to Mosquitto
 {
 
   mqttCnt++ ;             // update counter
-  if (CheckData() || forceCheckData )        // do we have some valid P1 meterread
+  if (CheckData() || forceCheckData )        // do we have/want some valid P1 meter reading
   {
     /*
       digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off to signal a short
@@ -1714,9 +1772,12 @@ void publishP1ToMqtt()    // this will go to Mosquitto
   }
 }
 
-//    If output = input then false changed
-//    bool thermostatChanged = processThermostat(LOW) || thermostatReadState = processThermostat(HIGH) || processThermostat(thermostatWriteState)
-//    true state was changed , false state was already as instructed
+/* 
+    If output = input then false changed
+    bool thermostatChanged = processThermostat(LOW) || thermostatReadState = processThermostat(HIGH) || processThermostat(thermostatWriteState)
+    true state was changed , false state was already as instructed
+
+*/
 bool processThermostat(bool myOperation)    // my operation is currently readed thermostate during call
 {
   thermostatReadState = digitalRead(THERMOSTAT_READ); // read
@@ -1801,7 +1862,10 @@ bool processThermostat(bool myOperation)    // my operation is currently readed 
 }
 
 
-// read analog, return smoothed  lux value
+/* 
+   read analog ADC, return smoothed (averaged) lux value
+*/
+
 int processAnalogRead()   // read adc analog A0 pin and smooth it with previous read (addtwo /2)
 { // return filtervalue
   pastValueAdc = nowValueAdc;
@@ -1828,7 +1892,9 @@ bool processLightRead(bool myOperation)
 }
 
 
-// process P1 data start / to ! Let us see what the /KFM5KAIFA-METER meter is reading
+/* 
+  process P1 data start / to ! Let us decode to see what the /KFM5KAIFA-METER meter is reading
+*/
 bool decodeTelegram(int len)
 {
   //need to check for start
@@ -2103,8 +2169,10 @@ bool decodeTelegram(int len)
 }
 
 
-
-long getValue(char *buffer, int maxlen)                               // string to long value in numeric (...* strings
+/* 
+  get string to long value in numeric (...* strings)
+*/
+long getValue(char *buffer, int maxlen)
 {
   // 1234567890123456789012345678901234567890   = 40    18061   000   // countlist 1
   // 01234567890123456789012345678901234567890  = 40                  // countlist 0
@@ -2146,7 +2214,9 @@ long getValue(char *buffer, int maxlen)                               // string 
 }
 
 
-// generic subroutine to find a character in reverse , return position as offset to 0
+/* 
+  generic subroutine to find a character in reverse , return position as offset to 0
+*/
 int FindCharInArrayRev(char array[], char c, int len)               // Find character >=0 found, -1 failed
 {
   //           123456789012
@@ -2164,7 +2234,10 @@ int FindCharInArrayRev(char array[], char c, int len)               // Find char
   return -1;
 }
 
-bool CheckData()        // Check if we are complete on gathering
+/* 
+  Check if we are complete on data retrieval and construct and publish output to mqtt LOG topic
+*/
+bool CheckData()        // 
 {
   if (firstRun)  {      // at start initialise and set olddata to new data
     SetOldValues();
@@ -2266,6 +2339,9 @@ bool CheckData()        // Check if we are complete on gathering
   return true;
 }
 
+/* 
+  Initise consumption variables to zero
+*/
 void InitialiseValues()  // executed at every telegram new run
 {
   powerConsumptionLowTariff  = 0;
@@ -2299,7 +2375,9 @@ bool isNumber(char *res, int len)       // False/true if numeriv
 }
 
 // =============================================== routines added for temperature processing
-//Setting the temperature sensor
+/* 
+  Setting the temperature sensor
+*/
 void SetupDS18B20() {
 
   for (int i = 0; i < ONE_WIRE_MAX_DEV; i++) {    // search temperature sensors
@@ -2350,7 +2428,9 @@ void SetupDS18B20() {
   // test if (numberOfDsb18b20Devices < 6) intervalP1cnt=-1; // check and do something if devices are missing.
 }
 
-//------------------------------------------
+/* 
+  Read and get DS18B20 temperatures
+*/
 void GetTemperatures() {
   // String message = "Number of devices: ";
   // message += numberOfDsb18b20Devices;
@@ -2381,9 +2461,13 @@ void GetTemperatures() {
   }
 }
 
-/* 20mar21 ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec */
-// attach waterinterrupt
-void attachWaterInterrupt() {   // Activate ISR water interurpt and choose between two operative versions W/w
+
+/*
+  attach waterinterrupt
+  Activate ISR water interurpt and choose between two operative versions W/w
+  ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec
+*/
+void attachWaterInterrupt() {   // 
   if (useWaterTrigger1) {
     attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
     if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
@@ -2397,7 +2481,11 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent intefer
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // Prevent calls as per expressif intruction
 }
 
-void WaterTrigger_ISR()     // ISR  water pulse routine detach during excessive vibration
+
+/*
+  ISR  water pulse primary (select via W,w) will detach during excessive vibration
+*/
+void WaterTrigger_ISR()
 {
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
   digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
@@ -2409,7 +2497,10 @@ void WaterTrigger_ISR()     // ISR  water pulse routine detach during excessive 
   if (loopbackRx2Tx2) digitalWrite(SERIAL_TX2, waterTriggerState); // here test trigger to find if it is attached
 }
 
-void WaterTrigger1_ISR()    // ISR wate rpusle, will detach during excessive vibration
+/*
+  ISR water pulse, alternate (select via W,w) will detach during excessive vibration
+*/
+void WaterTrigger1_ISR()
 {
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
   waterTriggerCnt++ ;             // increase call counter
@@ -2442,8 +2533,9 @@ void WaterTrigger1_ISR()    // ISR wate rpusle, will detach during excessive vib
   }
 */
 
-//------------------------------------------
-//Convert device id to HEX String
+/*
+  Convert device id to HEX String
+*/
 String GetAddressToString(DeviceAddress deviceAddress) {
   String str = "";
   for (uint8_t i = 0; i < 8; i++) {
@@ -2452,6 +2544,21 @@ String GetAddressToString(DeviceAddress deviceAddress) {
   }
   return str;
 }
+
+/*
+   Need a local yield that that calls yield() and mqttClient.loop()
+   The system yield() routine does not call mqttClient.loop()
+*/
+void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubclient
+{
+    // Allow / Do (likely) superfluous control to esp8266 routines
+  yield();        // give control to wifi management
+  delay(50);      // delay 50 mSec
+  ESP.wdtFeed();  // feed the hungry timer
+  if (client.connected()) client.loop();  // feed the mqtt client
+}
+
+
 
 // useless data to be kept for reference
 /*
