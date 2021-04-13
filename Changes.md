@@ -3,10 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - Development
-## [V21.20]
+## [V21.21]
+- 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
+	--- (+9sec after last mqtt)
 - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop() during speific yields,
 	-- normal yield does support Wifi but NOT the (disconnected) Pubsubclient
 	-- Beautified
+## [V21.20]
 - 11apr21 16u29 V20: added JSON error message to topic /error/.. if P1 serial is not (properly) connected
 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt":28}
 - 11apr21 15u16 mqtt timeout (override) set from 15 to 60 seconds #define MQTT_KEEPALIVE = 60
