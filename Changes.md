@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - Development
 ## [V21.21]
+- 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
 - 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
 	--- (+9sec after last mqtt)
 - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop() during speific yields,

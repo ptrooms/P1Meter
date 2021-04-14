@@ -1019,11 +1019,11 @@ void loop()
   {
     reconnect();               // reconnect Mqtt
     mqttP1Published = false;   // flag to check if we have published procssed data
-    delay(1000);               // delay processing to repvent overflow on error messages
+    delay(1000);               // delay processing to prevent overflow on error messages
     Serial.println("\n #!!# ESP P1 reconnected."); // print message line
   }
 
-  client.loop();
+  mqtt_local_yield();      //   client.loop(); // handle mqtt
 
   if (allowOtherActivities) {     // are we outside P1 Telegram processing (which require serial time resources)
 
@@ -1120,7 +1120,7 @@ void loop()
     //  if (millis() > 600000) {  // autonomous restart every 5 minutes
     intervalP1cnt--;            // decrease reliability
     if ( intervalP1cnt < 1) {   // if we multiple or frequent misses, restart esp266 to survive
-      if (outputMqttLog)  client.publish(mqttLogTopic, "ESP P1 not connected" );  // report we have survived this interval
+      if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, "ESP P1 not connected" );  // report we have survived this interval
       Serial.print("\n #!!# ESP P1 not connected, cnt="); // print message line
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
@@ -1137,8 +1137,11 @@ void loop()
         mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
       mqttMsg.toCharArray(mqttOutput, 128);
-      if (client.connected()) client.publish(mqttErrorTopic, mqttOutput); // report to error topic
-      if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking" );  // report we have survived this interval
+      if (client.connected()) {
+        client.publish(mqttErrorTopic, mqttOutput); // report to error topic
+        if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking" );  // report we have survived this interval
+      }
+
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
       Serial.print("\n#!!# ESP P1 Active interval checking ");
@@ -1163,7 +1166,7 @@ void loop()
     // If no MQTT poublished in this timout interval, whatever the reason, execute a restart to reset
     if (!mqttP1Published) {  // in case no publish energy yet , try restart
       Serial.println("ESP timeout.restart"); // print message line
-      client.publish(mqttLogTopic, "ESP timeout.restart" );
+      if (client.connected()) client.publish(mqttLogTopic, "ESP timeout.restart" );
       ESP.restart();     // if no/yet data published force restart
     }
 
@@ -1263,8 +1266,7 @@ void readTelegram() {
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
   if (!outputOnSerial) Serial.printf("\rDataCnt: %u started at %6.6f \b\b\t", (mqttCnt + 1), ((float) startMicros / 1000000));
 
-
-  if (outputMqttLog) client.publish(mqttLogTopic, mqttClientName );
+  if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
 
   int lenTelegram = 0;
   memset(telegram, 0, sizeof(telegram));   // initialise 640byte telegram array to 0
@@ -1777,9 +1779,10 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
             prog_Version );             // (fixed) Version from program , see top
 
-    if (outputMqttPower) client.publish(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
-
-    mqttP1Published = true;             // yes we have publised energy data
+    if (client.connected()) {
+      if (outputMqttPower) client.publish(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
+      mqttP1Published = true;             // yes we have publised energy data
+    }
 
     // digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off
     digitalWrite(BLUE_LED, thermostatReadState);   //Turn the ESPLED according to input thermostate
@@ -2056,7 +2059,8 @@ bool decodeTelegram(int len)
     } // else if endChar >= 0 && telegramP1header
   } // startChar >= 0
 
-  if (outputMqttLog) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
+
+  if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
   // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
 
   /*
@@ -2291,7 +2295,7 @@ bool CheckData()        //
             OldPowerConsumptionLowTariff, OldPowerConsumptionHighTariff,
             OldPowerProductionLowTariff, OldPowerProductionHighTariff,
             OldGasConsumption);
-    client.publish(mqttLogTopic, output);
+    if (client.connected()) client.publish(mqttLogTopic, output);
   }
 
 
@@ -2347,7 +2351,7 @@ bool CheckData()        //
     msg.concat("CurrentPowerConsumption: %lu");       // format data
     msg.toCharArray(msgpub, 768);                     // move it to format buffwer
     sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-    client.publish(mqttPower, output);                // publish output
+    if (client.connected()) client.publish(mqttPower, output);                // publish output
   }
 
   return true;
