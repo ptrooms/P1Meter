@@ -3,12 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - Development
+## [V21.23]
+	- mqtt Callback routine shortened and incoming command done in mainloop
+
 ## [V21.22]
 	- 19apr21 21u38 option added to make nodemcu Ip adress static
 	- -- override added/extended with production/static Ip information
 	- 19apr21 21u38 display library version at start
 	- 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
-	- 15arp21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
+	- 15apr21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
 	- removed delay in local-yields
 ## [V21.21]
 - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 

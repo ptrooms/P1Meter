@@ -15,13 +15,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1122.240 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1123.240 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
     #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2122.240 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2123.240 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -36,11 +36,12 @@
     // Subnet IPAddress subnet(255, 255, 255, 0);
     // DNS1 IPAddress primaryDNS(192.168.1.8);   //optional
     // DNS2 IPAddress secondaryDNS(192.168.1.1); //optional
+// ## [V21.22]
+//  19apr21 23u39 added ESP.wdtFeed(); in loop ()
 //  - 19apr21 15u22 - added diagnostic information sdk version & emempry use etc.etc.
 //  - 15apr21 14u14
 //    Sketch uses 298836 bytes (28%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 40276 bytes (49%) of dynamic memory, leaving 41644 bytes for local variables. Maximum is 81920 bytes.
-// ## [V21.22]
 // 	- 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
 // 	- 15arp21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
 // 	- removed delay in local-yields
@@ -630,7 +631,8 @@ int filteredValueAdc = 0; // average between previous and and published
 
 
 //Infrastructure stuff
-#define MQTTBUFFERLENGTH 480          // define our mqtt buffer
+#define MQTTCOMMANDLENGTH 80          // define our receiving buffer
+#define MQTTBUFFERLENGTH 480          // define our sending mqtt buffer
 #define MAXLINELENGTH 768           // full P1 serial message: the 589 byte message takes about 0.440 Seconds
 /*  #define MAXLINELENGTH 768            // shorten to see if this helps
     Executable segment sizes:
@@ -653,6 +655,7 @@ int filteredValueAdc = 0; // average between previous and and published
     Global variables use 33044 bytes (40%) of dynamic memory, leaving 48876 bytes for local variables. Maximum is 81920 bytes.
 */
 
+
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 char dummy2[17];       // add some spare bytes
 char telegram[MAXLINELENGTH];       // telegram maxsize 64bytes for P1 meter
@@ -669,8 +672,8 @@ char telegramLast2[3];              // overflow used to catch line termination b
 // Callback mqtt value which is used to received data
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
 int new_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
-void callback(char* topic, byte* payload, unsigned int length);   // pubsubscribe
-
+void callbackMqtt(char* topic, byte* payload, unsigned int length);   // pubsubscribe
+char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format time, will be overriden by Telegrams
 
 // Note Software serial uses "attachinterrupt" FALLING on pin to calculate BAUD timing
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
@@ -822,8 +825,11 @@ void setup()
       Serial.println("End Failed");
   });
   
+  
+    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
+  #define DEF_PROG_VERSION 1123.240
   ArduinoOTA.begin();
-  Serial.println("Ready");
+  Serial.println("Ready version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
   Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
   Serial.print   ("IP address: ");
@@ -841,7 +847,8 @@ void setup()
 
   // client.setServer(mqtt_server,1883);   // for pubsubscribe // already set in mqttPort
   // client.subscribe(submqtt_topic);       // put pubsubscribe in reconnect section
-  client.setCallback(callback);             // for pubsubscribe
+  memset(mqttReceivedCommand, 0, sizeof(mqttReceivedCommand));  // initialise
+  client.setCallback(callbackMqtt);             // for pubsubscribe
 
   // 1531562100: New connection from 192.168.1.35 on port 1883.
   // 1531562100: New client connected from 192.168.1.35 as nodemcu-t1 (c1, k15).
@@ -1060,7 +1067,6 @@ void setup()
 
 //  WiFi.printDiag(Serial) 
 // Serial.printDiag(Wifi);
-//here
 
 // WiFi.printDiag(Serial);
  
@@ -1073,7 +1079,7 @@ void loop()
 
   if (test_WdtTime < currentMillis )  {
     loopcnt++ ;
-    Serial.print((String)"-"+(loopcnt%99)+" \b");  //here
+    Serial.print((String)"-"+(loopcnt%99)+" \b");
     test_WdtTime = currentMillis + 1000;  // next interval
   }
 
@@ -1152,6 +1158,8 @@ void loop()
       } // else p1SerialFinish
     } // else !!p1SerialActive
 
+    ESP.wdtFeed();  // as advised by forums
+
     // Check for WaterPulse trigger
     if ( (waterTriggerCnt == 1) && (debounce_time > waterReadDebounce * 100)) {
       // we are in hold read interrupt mode , re-establish interrupts
@@ -1174,6 +1182,11 @@ void loop()
         } // if waterReadState
       } // else waterTriggerCnt = 1
 
+      if (mqttReceivedCommand[0] != '\x00') {
+          ProcessMqttCommand(mqttReceivedCommand,2); // process incoming Mqtt command (if any)
+          memset(mqttReceivedCommand,0,sizeof(mqttReceivedCommand));
+      }
+
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
     readTelegram2();    // read GJ gpio4-input (if available), write gpio2 output
 
@@ -1183,8 +1196,9 @@ void loop()
 
   // (p1SerialActive && !p1SerialFinish) , process Telegram data
   readTelegram();     // read P1 gpio14 (if serial data available)
-
+ 
   mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
+  ESP.wdtFeed();  // as advised by forums
 
   p1TriggerTime = millis();   // indicate our mainloop yield
 
@@ -1342,7 +1356,7 @@ void readTelegram() {
   if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
 
   int lenTelegram = 0;
-  memset(telegram, 0, sizeof(telegram));   // initialise 640byte telegram array to 0
+  memset(telegram, 0, sizeof(telegram));   // initialitelegram buffer-array to 0
   memset(telegramLast, 0, sizeof(telegramLast));     // initialise 3 byte array to 0
 
   //DebugCRC memset(testTelegram, 0, sizeof(testTelegram));   // initialise 640byte telegram array to 0 to test/check single array
@@ -1564,7 +1578,7 @@ void processGpio() {    // Do regular functions of the system
 /* 
     Mqtt input received, callled whenever a MQTT subscription message arrives
 */
-void callback(char* topic, byte* payload, unsigned int length) {
+void callbackMqtt(char* topic, byte* payload, unsigned int length) {
   previousBlinkMillis = millis() + intervalBlinkMillis ; // end the shortblink (if any)
 
   // struggling with C++ forbids comparison between pointer and integer
@@ -1574,132 +1588,137 @@ void callback(char* topic, byte* payload, unsigned int length) {
   // String w1="";
   //  w1 = (char)payload[0];
 
-  String mqttCommand = ""; // initilise as string
+  String mqttCommand = ""; // initialise as string
+  int i = 0;
+  for (i = 0; (i < length && i < sizeof(mqttReceivedCommand)); i++) { // read mqtt payload
+      char receivedChar = (char)payload[i];
+      mqttCommand += receivedChar;
+      mqttReceivedCommand[i] = (char)payload[i];
+      mqttReceivedCommand[i+1] = '\x00';
+  }
+
   if (outputOnSerial) {
     Serial.print("\rCallback Message arrived [");
     Serial.print(topic);
     Serial.print("]: ");
     // char w1 = (char)payload[0];
-    for (int i = 0; i < length; i++) { // read mqtt payload
-      char receivedChar = (char)payload[i];
-      mqttCommand += receivedChar;
-    }
-    Serial.println(mqttCommand);
+    Serial.println((String)(mqttCommand) + ", len=" + i );
+    // Serial.println((String)mqttReceivedCommand[0] + (int)mqttReceivedCommand[1]); 
     // yield();  // do background processing required for wifi etc.
   }
+}
 
 
+/* 
+  Processing queued mqttCommand, received by callbackMqtt 
+*/
+void ProcessMqttCommand(char* payload, unsigned int length) {
   // int new_ThermostatState = 3;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Follow
-  if         ((char)payload[0] == '0') {
-    new_ThermostatState = 0;                   // Heating on
-    if (outputOnSerial) Serial.print("Thermostat will be switched off.");
-  } else  if ((char)payload[0] == '1') {
-    new_ThermostatState = 1;                   // Heating off
-    if (outputOnSerial) Serial.print("Thermostat will be switched on.");
-  } else  if ((char)payload[0] == '2') {
-    new_ThermostatState = 2;                   // Heating follows input
-    if (outputOnSerial) Serial.print("Thermostat will follow input.");
-  } else  if ((char)payload[0] == '3') {
-    new_ThermostatState = 3;                   // Heating left alone
-    if (outputOnSerial) Serial.print("Thermostat routine disabled.");
-  } else  if ((char)payload[0] == 'R') {                                            // Restart
-    if (outputOnSerial) Serial.print("Restart Request Received.");
-    ESP.restart();
-  } else  if ((char)payload[0] == 'D') {
-    outputOnSerial  = !outputOnSerial ; // re/enable print logging
-    Serial.print("Serial Debug ");
-    if (!outputOnSerial)  Serial.print("Inactive\n\r");
-    if (outputOnSerial) Serial.println("\nActive.");
-  } else  if ((char)payload[0] == 'L') {
-    outputMqttLog   = true ;         // Do not log
-    if (outputOnSerial) {
-      Serial.print("outputMqttLog now ON.");
-    }
-
-  } else  if ((char)payload[0] == 'l') {
-    outputMqttLog   = false ;       // Do not publish Log
-    if (outputOnSerial) {
-      Serial.print("outputMqttLog now OFF");
-    }
-
-  } else  if ((char)payload[0] == 'T') {
-    loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
-    // mySerial2.begin( 1200);    // GJ meter port   1200 baud
-    // mySerial2.println("..echo.."); // echo back
-    if (outputOnSerial) {
-      Serial.print("RX2TX2 looptest=");
-      if (loopbackRx2Tx2)  Serial.print("ON.");
-      if (!loopbackRx2Tx2) Serial.print("OFF.");
-    }
-
-  } else  if ((char)payload[0] == 'W') {
-    useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
-    detachWaterInterrupt();
-    // detachInterrupt(WATERSENSOR_READ); // disconnect ISR
-    waterTriggerTime = micros();       // set our time
-    waterTriggerCnt  = 1;              // indicate we are in detached mode
-    if (outputOnSerial) {
-      Serial.print("useWaterTrigger1=");
-      if (useWaterTrigger1) {
-        Serial.print("ON .");
-        // attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // trigger at every change
-      } else {
-        Serial.print("OFF .");
-        // attachInterrupt(WATERSENSOR_READ,  WaterTrigger_ISR, CHANGE); // trigger at every change
+  if ((char)payload[0] != '\x00' && (char)payload[1] == '\x00' )  {   // only single command supported for now
+    if         ((char)payload[0] == '0') {
+      new_ThermostatState = 0;                   // Heating on
+      if (outputOnSerial) Serial.print("Thermostat will be switched off.");
+    } else  if ((char)payload[0] == '1') {
+      new_ThermostatState = 1;                   // Heating off
+      if (outputOnSerial) Serial.print("Thermostat will be switched on.");
+    } else  if ((char)payload[0] == '2') {
+      new_ThermostatState = 2;                   // Heating follows input
+      if (outputOnSerial) Serial.print("Thermostat will follow input.");
+    } else  if ((char)payload[0] == '3') {
+      new_ThermostatState = 3;                   // Heating left alone
+      if (outputOnSerial) Serial.print("Thermostat routine disabled.");
+    } else  if ((char)payload[0] == 'R') {                                            // Restart
+      if (outputOnSerial) Serial.print("Restart Request Received.");
+      ESP.restart();
+    } else  if ((char)payload[0] == 'D') {
+      outputOnSerial  = !outputOnSerial ; // re/enable print logging
+      Serial.print("Serial Debug ");
+      if (!outputOnSerial)  Serial.print("Inactive\n\r");
+      if (outputOnSerial) Serial.println("\nActive.");
+    } else  if ((char)payload[0] == 'L') {
+      outputMqttLog   = true ;         // Do not log
+      if (outputOnSerial) {
+        Serial.print("outputMqttLog now ON.");
       }
-    }
 
-  } else  if ((char)payload[0] == 'w') {
-    useWaterPullUp = !useWaterPullUp;  // No/Yes use internal pullup
-    if (outputOnSerial) {
-      Serial.print("assist useWaterPullUp=");
-      if (useWaterPullUp) {
-        Serial.print("ON .");
-        pinMode(WATERSENSOR_READ, INPUT_PULLUP);        // Use watersensor with internal pullup
-      } else {
-        Serial.print("OFF .");
-        pinMode(WATERSENSOR_READ, INPUT);               // Do not use internal pullup
+    } else  if ((char)payload[0] == 'l') {
+      outputMqttLog   = false ;       // Do not publish Log
+      if (outputOnSerial) {
+        Serial.print("outputMqttLog now OFF");
       }
+
+    } else  if ((char)payload[0] == 'T') {
+      loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
+      // mySerial2.begin( 1200);    // GJ meter port   1200 baud
+      // mySerial2.println("..echo.."); // echo back
+      if (outputOnSerial) {
+        Serial.print("RX2TX2 looptest=");
+        if (loopbackRx2Tx2)  Serial.print("ON.");
+        if (!loopbackRx2Tx2) Serial.print("OFF.");
+      }
+
+    } else  if ((char)payload[0] == 'W') {
+      useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
+      detachWaterInterrupt();
+      // detachInterrupt(WATERSENSOR_READ); // disconnect ISR
+      waterTriggerTime = micros();       // set our time
+      waterTriggerCnt  = 1;              // indicate we are in detached mode
+      if (outputOnSerial) {
+        Serial.print("useWaterTrigger1=");
+        if (useWaterTrigger1) {
+          Serial.print("ON .");
+          // attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // trigger at every change
+        } else {
+          Serial.print("OFF .");
+          // attachInterrupt(WATERSENSOR_READ,  WaterTrigger_ISR, CHANGE); // trigger at every change
+        }
+      }
+
+    } else  if ((char)payload[0] == 'w') {
+      useWaterPullUp = !useWaterPullUp;  // No/Yes use internal pullup
+      if (outputOnSerial) {
+        Serial.print("assist useWaterPullUp=");
+        if (useWaterPullUp) {
+          Serial.print("ON .");
+          pinMode(WATERSENSOR_READ, INPUT_PULLUP);        // Use watersensor with internal pullup
+        } else {
+          Serial.print("OFF .");
+          pinMode(WATERSENSOR_READ, INPUT);               // Do not use internal pullup
+        }
+      }
+
+    } else  if ((char)payload[0] == 'Z') {
+      waterReadCounter = 0 ;     // Zero the Water counters
+      waterReadHotCounter = 0 ;  // Zero the WaterHot counter
+      mqttCnt = 0;               // Zero mqttCnt
+      waterTriggerTime  = 0;     // initialise debounce
+      waterTriggerState = LOW;   // reset debounce
+      waterReadState    = LOW;   // read watersensor pin
+      if (outputOnSerial) {
+        Serial.print("WaterCnt = 0, mqttCnt = 0, reset/Watersensor/timers");
+      }
+    } else  if ((char)payload[0] == 'I') {
+      intervalP1cnt = 2880;              // make P1 Interval not critical
+    } else  if ((char)payload[0] == 'i') {              // make P1  stepping down interval
+      if (intervalP1cnt > 1000) intervalP1cnt = intervalP1cnt - 500;
+      if (intervalP1cnt > 500)  intervalP1cnt = intervalP1cnt - 100;
+      if (intervalP1cnt > 50)   intervalP1cnt = intervalP1cnt - 25;
+      if (intervalP1cnt > 10)   intervalP1cnt = intervalP1cnt - 10;
+      if (intervalP1cnt > 3)    intervalP1cnt = intervalP1cnt - 2;
+      Serial.println((String)"#!!# ESP P1 timeout count intervalP1cnt=" + intervalP1cnt );
+    } else  if ((char)payload[0] == 'P') {
+      outputMqttPower = !outputMqttPower ;       // Do not publish P1 meter
+      if (outputOnSerial) {
+        Serial.print("outputMqttPower now ");
+        if (outputMqttPower ) Serial.print("Active.");
+        if (!outputMqttPower ) Serial.print("Inactive.");
+      }
+    } else  {
+      if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" );
     }
 
-  } else  if ((char)payload[0] == 'Z') {
-    waterReadCounter = 0 ;     // Zero the Water counters
-    waterReadHotCounter = 0 ;  // Zero the WaterHot counter
-    mqttCnt = 0;               // Zero mqttCnt
-    waterTriggerTime  = 0;     // initialise debounce
-    waterTriggerState = LOW;   // reset debounce
-    waterReadState    = LOW;   // read watersensor pin
-    if (outputOnSerial) {
-      Serial.print("WaterCnt = 0, mqttCnt = 0, reset/Watersensor/timers");
-    }
-  } else  if ((char)payload[0] == 'I') {
-    intervalP1cnt = 2880;              // make P1 Interval not critical
-  } else  if ((char)payload[0] == 'i') {              // make P1  stepping down interval
-    if (intervalP1cnt > 1000) intervalP1cnt = intervalP1cnt - 500;
-    if (intervalP1cnt > 500)  intervalP1cnt = intervalP1cnt - 100;
-    if (intervalP1cnt > 50)   intervalP1cnt = intervalP1cnt - 25;
-    if (intervalP1cnt > 10)   intervalP1cnt = intervalP1cnt - 10;
-    if (intervalP1cnt > 3)    intervalP1cnt = intervalP1cnt - 2;
-    Serial.println((String)"#!!# ESP P1 timeout count intervalP1cnt=" + intervalP1cnt );
-  } else  if ((char)payload[0] == 'P') {
-    outputMqttPower = !outputMqttPower ;       // Do not publish P1 meter
-    if (outputOnSerial) {
-      Serial.print("outputMqttPower now ");
-      if (outputMqttPower ) Serial.print("Active.");
-      if (!outputMqttPower ) Serial.print("Inactive.");
-    }
-  } else  {
-    // } else {    if (outputOnSerial) Serial.print("Invalid command:" + (char)payload[0] );
-    // error if (outputOnSerial) Serial.print("Invalid command:" + (char)(char)payload[0]);
-
-    // if (outputOnSerial) Serial.print("Invalid command:" + receivedChar);
-    // char receivedChar = (char)payload[0];
-    // if (outputOnSerial) Serial.print("Invalid command:" + receivedChar);
-    if (outputOnSerial) Serial.print("Invalid command:" + mqttCommand);
+     if (outputOnSerial) Serial.println();   // ensure crlf
   }
-
-  if (outputOnSerial) Serial.println();   // ensure crlf
-
 }
 
 
@@ -1812,7 +1831,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     }
 
     msg.concat(", \"Version\":%u");                    // version to determine message layout
-//here
+
     msg.concat(" }"); // terminate JSON
     
     msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
