@@ -10,19 +10,18 @@
 // #define TEST_MODE    // set in PlatformIO; use our file defined confidential wifi/server/mqtt settings
 #define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.0 and use P1serial verion to listen /header & !finish
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
-
-
+#define P1_STATIC_IP          // if define we use Fixed-IP, else (undefined) we use dhcp
 
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1121.241 // current version (displayed in mqtt record)
-      // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup() ome instruction sequences for cycle/uSec timing.
+  #define DEF_PROG_VERSION 1122.240 // current version (displayed in mqtt record)
+      // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
     #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2121.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2122.240 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -30,6 +29,34 @@
 // *
 // * * * * * L O G  B O O K
 // *
+// Compiled on Arduino:
+//  - fixed Ip adress to eliminate iterference (if defined P1_STATIC_IP )
+    // Set your Static IP address IPAddress local_IP(192, 168, 1, 125);
+    // Set your Gateway IP address IPAddress gateway(192, 168, 1, 1);
+    // Subnet IPAddress subnet(255, 255, 255, 0);
+    // DNS1 IPAddress primaryDNS(192.168.1.8);   //optional
+    // DNS2 IPAddress secondaryDNS(192.168.1.1); //optional
+//  - 19apr21 15u22 - added diagnostic information sdk version & emempry use etc.etc.
+//  - 15apr21 14u14
+//    Sketch uses 298836 bytes (28%) of program storage space. Maximum is 1044464 bytes.
+//    Global variables use 40276 bytes (49%) of dynamic memory, leaving 41644 bytes for local variables. Maximum is 81920 bytes.
+// ## [V21.22]
+// 	- 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
+// 	- 15arp21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
+// 	- removed delay in local-yields
+// ## [V21.21]
+// - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
+// - 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
+// 	--- (+9sec after last mqtt)
+// - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop() during speific yields,
+// 	-- normal yield does support Wifi but NOT the (disconnected) Pubsubclient
+// 	-- Beautified
+// ## [V21.20]
+// - 11apr21 16u29 V20: added JSON error message to topic /error/.. if P1 serial is not (properly) connected
+// 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt":28}
+// - 11apr21 15u16 mqtt timeout (override) set from 15 to 60 seconds #define MQTT_KEEPALIVE = 60
+// 	-- sometimes the mqtt server is very busy and we do not want a preliminary reboot
+// - 11apr21 15u15 Added mqtt server address  in serial debug at startup
 // 13apr21 V21.20/241 improved and added better yield that also calls the pubsub mqtt loop *(if connected)
 // __ap21  migrated to github repo and CHANGED.md
 // 08apr21 V21.20/241 adapted for PlatformIO AND Arduino 
@@ -390,7 +417,8 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
 #endif  
 // const const char *core_version_P1Meter_Release = ARDUINO_ESP8266_RELEASE ; 
 
-
+// Standard includes for Wifi, OTA, ds18b20 temperature
+#include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform
 #ifdef P1_Override_Settings      // include our P1_Override_Settings
   #include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
   // #warning Using override settings
@@ -407,6 +435,13 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
     const char *mqttErrorTopic = "/error/" P1_VERSION_TYPE;          // mqtt topic is /error/p1
     const char *mqttPower = "/T1meter/" P1_VERSION_TYPE "power";  // mqtt topic is /T1meter/P1power
     const int   mqttPort = 1883;
+    #ifdef P1_STATIC_IP
+      IPAddress local_IP(192, 168, 1, 35);
+      IPAddress gateway(192, 168, 1, 1);
+      IPAddress subnet(255, 255, 255, 0);
+      IPAddress primaryDNS(192, 168, 1, 8);   //optional
+      IPAddress secondaryDNS(192, 168, 1, 1); //optional
+    #endif
   #else
     const char *ssid = "Test ssid";    // "Pafo SSID5"    //  P R O D U C T I O N  setting
     const char *password = "wifipassword";
@@ -418,6 +453,13 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
     const char *mqttErrorTopic = "/error/"  P1_VERSION_TYPE;          // mqtt topic is /error/p1
     const char *mqttPower = "/P1meter/"     P1_VERSION_TYPE "power";  // mqtt topic is /P1meter/P1power
     const int   mqttPort = 1883;
+    #ifdef P1_STATIC_IP
+      IPAddress local_IP(192, 168, 1, 35);
+      IPAddress gateway(192, 168, 1, 1);
+      IPAddress subnet(255, 255, 255, 0);
+      IPAddress primaryDNS(192, 168, 1, 8);   //optional
+      IPAddress secondaryDNS(192, 168, 1, 1); //optional
+    #endif    
   #endif  // TEST_MODE 
 #endif  // P1_Override_Settings
 
@@ -466,7 +508,8 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 */
 
 // Standard includes for Wifi, OTA, ds18b20 temperature
-#include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform
+// #include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform
+
 // #include <ESP8266mDNS.h>        // standard, ESP8266 Multicast DNS req. ESP8266WiFi AND needed for dynamic OTA
 // #include <ESP8266HTTPClient.h>   // not needed
 // #include <WiFiUdp.h>             // not needed
@@ -511,7 +554,7 @@ const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+
 int intervalP1    = 12000;    // mSecs : P1 30 --> 12 seconds response time interval of meter is 10 seconds
 int intervalP1cnt =   360;    // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
 bool forceCheckData = false;  // force check on data in order to output some essential mqtt (Thermostat & Temprature) functions.
-bool firstRun = true;         // do not use forceCheckData (which might be activated during setup() or first loop-() )
+bool firstRun = true;         // do not use forceCheckData (which might be activated during setup-() or first loop-() )
 
 // Tracks the time since last event fired between serial reads
 unsigned long previousMillis = 0;      // this controls the functional loop
@@ -664,6 +707,9 @@ PubSubClient client(espClient);   // Use this connection client
   - (TESTMODE) do timing calculations to research exact timing of routines
   - attach waterpulse interrupt
 */
+
+
+
 void setup()
 {
   asm(".global _printf_float");            // include floating point support
@@ -700,6 +746,17 @@ void setup()
     "A"=0x30C0  , "B"=0x3180 , "123456789"=0xBB3D (0x31 0x32 0x33 0x34 0x35 0x36 0x37 0x38  0x39 )
     CRC-16/ARC   0xBB3D  0xBB3D  0x8005  0x0000  true  true  0x0000
     */
+
+  #ifdef P1_STATIC_IP
+    
+    // Configures static IP address
+    if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+      Serial.print((String)"STA Failed to configure: ");
+    } else {
+      Serial.print((String)"STA Using fixed adresses: ");
+    }
+    Serial.println(local_IP );
+  #endif
 
   Serial.println("Settingup WifiSTAtion.");  // wait 5 seconds before retry
   WiFi.mode(WIFI_STA);            // Client mode
@@ -764,12 +821,19 @@ void setup()
     else if (error == OTA_END_ERROR)
       Serial.println("End Failed");
   });
-
+  
   ArduinoOTA.begin();
   Serial.println("Ready");
   Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
+  Serial.print   ("IP address: ");
+    Serial.println(WiFi.localIP());
+  Serial.println ("ESP8266-free-space: "+   String(ESP.getFreeSketchSpace()));
+  Serial.println ("ESP8266-sketch-size: "+  String(ESP.getSketchSize()));
+  Serial.println ("ESP8266-sketch-md5: "+   String(ESP.getSketchMD5()));
+  Serial.println ("ESP8266-chip-size: "+    String(ESP.getFlashChipRealSize()));
+  Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
+  
   client.setServer(mqttServer, mqttPort);
 
   digitalWrite(BLUE_LED, LOW);   //Turn the LED ON and ready to go for process
@@ -977,8 +1041,9 @@ void setup()
   waterTriggerTime = 0;  // ensure and assum no trigger yet
   test_WdtTime = 0;  // set first loop timer
   loopcnt = 0;              // set loopcount to 0
-}
 
+  WiFi.printDiag(Serial);   // print data
+}
 
 /* 
   Mainloop:
@@ -992,9 +1057,16 @@ void setup()
     - Handle OTA updates
 
 */
+
+//  WiFi.printDiag(Serial) 
+// Serial.printDiag(Wifi);
+//here
+
+// WiFi.printDiag(Serial);
+ 
 void loop()
 {
-  // declare global timers loop(s)
+   // declare global timers loop(s)
   currentMillis = millis(); // Get snapshot of runtime
   currentMicros = micros(); // get current cycle time
   unsigned long debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by ISR waterTrigger
@@ -1021,6 +1093,7 @@ void loop()
     mqttP1Published = false;   // flag to check if we have published procssed data
     delay(1000);               // delay processing to prevent overflow on error messages
     Serial.println("\n #!!# ESP P1 reconnected."); // print message line
+    // WiFi.printDiag(Serial);   // print data ESP8266WiFiClass::printDiag(Print& p)
   }
 
   mqtt_local_yield();      //   client.loop(); // handle mqtt
@@ -2571,7 +2644,7 @@ void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubcli
 {
     // Allow / Do (likely) superfluous control to esp8266 routines
   yield();        // give control to wifi management
-  delay(50);      // delay 50 mSec
+  // delay(50);      // delay 50 mSec
   ESP.wdtFeed();  // feed the hungry timer
   if (client.connected()) client.loop();  // feed the mqtt client
 }
