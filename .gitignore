@@ -39,4 +39,5 @@ platformio_P1Meter_cenv.ini
 *.bak
 *.code-workspace
 *.bin
+*.elf
 
