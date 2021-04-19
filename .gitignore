@@ -9,6 +9,7 @@
 *.save
 P1Meter/P1OverrideSettings.h
 notes.txt
+compile_version_notes.txt
 gitignore*
 
 ## Program related ##
