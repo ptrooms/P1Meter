@@ -49,6 +49,7 @@ public:
    virtual int available();
    virtual void flush();
    virtual bool P1active();          // defined class used during P1 serilisation
+   // virtual unsigned long P1activeCnt();          // defined class used during P1 serilisation
    operator bool() {return m_rxValid || m_txValid;}
 
    // Disable or enable interrupts on the rx pin
@@ -72,6 +73,7 @@ private:
    bool m_txValid, m_txEnableValid;
    bool m_invert;
    bool m_P1active;                 // Ptro 28mar21 to support P1 messageing
+   // unsigned long m_P1activeCnt;     // Ptro 20apr21 to debug stalltime
    bool m_overflow;
    unsigned long m_bitTime;
    bool m_highSpeed;

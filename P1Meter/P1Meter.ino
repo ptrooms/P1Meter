@@ -1344,9 +1344,11 @@ void readTelegram() {
   if ( mySerial.P1active())  return ;  // quick return if serial is receiving, fucntion of SoftwareSerial for P1
 #endif  
   if (!mySerial.available()) return ;  // quick return if no data
-
+  
+ 
   if (outputOnSerial)    {
-    if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + "s=s123..\b\b\b\b\b") ; // print message line
+    // if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + "ss=" + mySerial.P1activeCnt() + " s=s123..\b\b\b\b\b") ; // print message line
+    if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + " s=s123..\b\b\b\b\b") ; // print message line
     // if (  telegramP1header) Serial.print("\n\rxP= "); // print message line if message is broken in buffer
   }
   startMicros = micros();  // Exact time we started here

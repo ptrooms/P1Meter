@@ -118,6 +118,7 @@ void SoftwareSerial::begin(long speed) {
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;
    m_highSpeed = speed > 9600;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
+   // m_P1activeCnt = 0;                     // 20apr21 reset software counter before '/start'
    if (!m_rxEnabled)
      enableRx(true);
 }
@@ -159,6 +160,12 @@ bool SoftwareSerial::P1active() {                // When / is read on serial P1A
    if (m_P1active) return true;                  // 28mar21 added Ptro for P1 serialisation (to checkout)
    return false;
 }
+
+/*
+unsigned long SoftwareSerial::P1activeCnt() {    // Between /start and !finish we count number of interrupt calls
+   return m_P1activeCnt;
+}
+*/
 
 int SoftwareSerial::available() {
    if (m_P1active) return 0;                     // Return 0 if P1 is active, buffer will be filled until receive '!'
@@ -224,6 +231,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 425 115k2@80MHz
    // unsigned long wait = 425; // harcoded
    unsigned long start = ESP.getCycleCount();
+   // m_P1activeCnt++;                             // increase callcounter
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
      WAIT;
