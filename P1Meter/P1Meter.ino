@@ -390,7 +390,7 @@
 
 
 // communication mode settings
-#define bSERIAL_INVERT  true  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+#define bSERIAL_INVERT  false  // P1 meter require - here - inverted serial levels (TRUE) for RS232
 #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232
 // #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
 
