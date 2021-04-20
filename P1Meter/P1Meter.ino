@@ -17,7 +17,7 @@
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   #define DEF_PROG_VERSION 1123.240 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
-    #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
+      // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
@@ -390,7 +390,12 @@
 
 
 // communication mode settings
-#define bSERIAL_INVERT  true  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+#ifdef TEST_MODE
+bool bSERIAL_INVERT = false;  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+#else
+bool bSERIAL_INVERT = true;  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+#endif
+
 #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232
 // #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
 
@@ -690,6 +695,7 @@ SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 ba
 /// @param bufCapacity the capacity for the received bytes buffer
 /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
 // 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+
 SoftwareSerial mySerial(SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
 SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
@@ -826,7 +832,7 @@ void setup()
   });
   
   
-    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
+//    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   #define DEF_PROG_VERSION 1123.240
   ArduinoOTA.begin();
   Serial.println("Ready version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
@@ -839,7 +845,8 @@ void setup()
   Serial.println ("ESP8266-sketch-md5: "+   String(ESP.getSketchMD5()));
   Serial.println ("ESP8266-chip-size: "+    String(ESP.getFlashChipRealSize()));
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
-  
+
+  WiFi.printDiag(Serial);   // print data  
   client.setServer(mqttServer, mqttPort);
 
   digitalWrite(BLUE_LED, LOW);   //Turn the LED ON and ready to go for process
@@ -1049,7 +1056,7 @@ void setup()
   test_WdtTime = 0;  // set first loop timer
   loopcnt = 0;              // set loopcount to 0
 
-  WiFi.printDiag(Serial);   // print data
+//  WiFi.printDiag(Serial);   // print data
 }
 
 /* 
@@ -1077,7 +1084,8 @@ void loop()
   currentMicros = micros(); // get current cycle time
   unsigned long debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by ISR waterTrigger
 
-  if (test_WdtTime < currentMillis )  {
+  // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
+  if (test_WdtTime < currentMillis ) {
     loopcnt++ ;
     Serial.print((String)"-"+(loopcnt%99)+" \b");
     test_WdtTime = currentMillis + 1000;  // next interval
@@ -1656,6 +1664,16 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         if (loopbackRx2Tx2)  Serial.print("ON.");
         if (!loopbackRx2Tx2) Serial.print("OFF.");
       }
+
+/* Does not operate, as serial isetup during setup
+    } else  if ((char)payload[0] == 't') {
+      bSERIAL_INVERT = !bSERIAL_INVERT ; // switch between invert/noninvert
+      if (outputOnSerial) {
+        Serial.print("P1rx=");
+        if (bSERIAL_INVERT)  Serial.print("Positive P1 serial.");
+        if (!bSERIAL_INVERT) Serial.print("Negative P1 serial.");
+      }
+*/
 
     } else  if ((char)payload[0] == 'W') {
       useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
