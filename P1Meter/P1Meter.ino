@@ -1391,6 +1391,15 @@ void readTelegram() {
     // Serial.print((String) "yb\b"); no need to display RX progess this goes ok
     
 
+    if (len > 1) {      // correct dual Carrigage returns, Windows formatted testdata on Linux
+      // decrease len as the dual 0x0d 0x0d is from streamed testdata
+      if (telegram[len-2] == '\x0d' && telegram[len-1] == '\x0d' ) len-- ;  
+    }
+    // debug this
+    // if (len > 1)  Serial.print((String)" La="+ (int)telegram[len-2]);
+    // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
+    // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
+    
     if (outputOnSerial) {         // do we want/need to print the Telegram
       Serial.print((String)"\nlT=" + (len-1) + " \t[");
       for (int cnt = 0; cnt < len; cnt++) {
