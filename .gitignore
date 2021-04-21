@@ -31,6 +31,7 @@ P1Meter*.bin.gz
 P1Meter*.map
 platformio_override.ini
 platformio_P1Meter_cenv.ini
+telegram0crlf.txt
 
 ## Visual Studio Code specific ######
 .vscode

@@ -14,9 +14,8 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len)
 	for (int pos = 0; pos < len; pos++)
 	{
 		crc ^= (unsigned int)buf[pos];    // XOR byte into least sig. byte of crc
-    // Serial.printf("%02x",buf[pos]);
+     	// Serial.printf("x%02x",buf[pos]);
 		for (int i = 8; i != 0; i--) {    // Loop over each bit
-    //here to test
 			if ((crc & 0x0001) != 0) {      // If the LSB is set
 				crc >>= 1;                    // Shift right and XOR 0xA001
 				crc ^= 0xA001;

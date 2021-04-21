@@ -3,9 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - Development
+	- V21.23_seriallib - testing/dding P1ActiveCnt which correctly tell we have rxRead loop during serial
+## [V21.24
+	- tested & verified on test using dummy data
+	- restructered decode-routine and disconnected from readecodepart
+	- now the readed telegram is executed WITH the offered 0x0D (carriage return)
 ## [V21.23]
+	- production version
 	- mqtt Callback routine shortened and incoming command done in mainloop
-
+	- set ESP.wdtEnable(WDTO_8S)in setup() to 8seconds see https://github.com/esp8266/Arduino/issues/555
 ## [V21.22]
 	- 19apr21 21u38 option added to make nodemcu Ip adress static
 	- -- override added/extended with production/static Ip information
