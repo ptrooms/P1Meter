@@ -15,13 +15,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1123.240 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1124.240 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2123.240 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2124.240 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -742,6 +742,10 @@ void setup()
   // Lightread initialisation
   lightReadState   = digitalRead(LIGHT_READ); // read Hotwater valve state
 
+  // prepare wdt
+  ESP.wdtDisable();
+  ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S
+
   Serial.begin(115200);
   Serial.println("Booting");              // message to serial log
 
@@ -757,8 +761,8 @@ void setup()
     */
 
   #ifdef P1_STATIC_IP
-    
     // Configures static IP address
+    // WiFi.config(IPAddress(192,168,1,125), IPAddress(192,168,1,1), IPAddress(255,255,255,0));    
     if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
       Serial.print((String)"STA Failed to configure: ");
     } else {
@@ -1357,7 +1361,7 @@ void readTelegram() {
     if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + "s=s123..\b\b\b\b\b") ; // print message line
     // if (  telegramP1header) Serial.print("\n\rxP= "); // print message line if message is broken in buffer
   }
-  startMicros = micros();  // Exact time we started here
+  startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
   if (!outputOnSerial) Serial.printf("\rDataCnt: %u started at %6.6f \b\b\t", (mqttCnt + 1), ((float) startMicros / 1000000));
 
@@ -1369,7 +1373,7 @@ void readTelegram() {
 
   //DebugCRC memset(testTelegram, 0, sizeof(testTelegram));   // initialise 640byte telegram array to 0 to test/check single array
 
-  // Serial.println("startbuf..");
+  // Serial.println("Debug: startbuf..");
 
   while (mySerial.available())     {      // If serial data in buffer
     // Serial.print((String) "xa\b"); no need to display serial available this goes ok
@@ -1388,12 +1392,18 @@ void readTelegram() {
     
 
     if (outputOnSerial) {         // do we want/need to print the Telegram
-      Serial.print((String)"\nlT=" + (len - 1) + " \t>");
-      for (int cnt = 0; cnt <= len; cnt++) {
-        Serial.print(telegram[cnt - 1]);
-        // Serial.printf("%02x",telegram[cnt-1]);   // hexadecimal formatted
+      Serial.print((String)"\nlT=" + (len-1) + " \t[");
+      for (int cnt = 0; cnt < len; cnt++) {
+          
+        if (telegram[cnt] == '\x0D') {
+            Serial.print("_");
+        } else {
+            // Serial.print(telegram[cnt - 1]);
+            Serial.print(telegram[cnt]);
+        }
+          // Serial.printf("%02x",telegram[cnt-1]);   // hexadecimal formatted
       }
-      // Serial.print((String)"<");
+      Serial.print((String)"]");
     }
 
     /* //debugCRC
@@ -1410,7 +1420,7 @@ void readTelegram() {
     //debugCRC if ( len == 0 && outputOnSerial) Serial.print(" <0> "); // debug print processing serial data
     //debugCRC if (outputOnSerial) Serial.printf("{%02X %02X %02X}",telegram[len-2],telegram[len-1],telegram[len]);
 
-    lenTelegram = lenTelegram + (len - 1); // accumulate actual number of characters
+    lenTelegram = lenTelegram + (len - 1); // accumulate actual number of characters (excluding cr/lf)
     if ( len == 0) lenTelegram = -1; // if len = 0 indicate for report
 
 
@@ -1421,7 +1431,7 @@ void readTelegram() {
        if (outputOnSerial) Serial.print(">"); // debug print processing serial data
     */
 
-    if (len > 1 )  {  // len=0 indicates serial error, a length of 1 means the zerobyte (0x00-0d-0a) string.
+    if (len > 0 )  {  // len=0 indicates serial error, a length of 1 means the zerobyte (0x00-0d-0a) string.
 
       /* //debugCRC
                // Extract last character into a printable string to  //debugCRC
@@ -1437,7 +1447,7 @@ void readTelegram() {
                if (outputOnSerial) Serial.print((String)"\n\r1:"+String(telegramLast[0],HEX)+"="+telegramLast[0]+"  >"); // Hex debug print line last character
       */
 
-      if (decodeTelegram(len + 1)) {        // process data did we have a 'true' end of message condition
+      if (decodeTelegram(len + 1)) {        // process data did we have a 'true' end of message condition including terminating CR
 
         /*  //debugCRC
             // print/display readed length
@@ -1451,10 +1461,11 @@ void readTelegram() {
         */
         yield();                    // do background processing required for wifi etc.
         ESP.wdtFeed();              // feed the hungry timer
-        Serial.print((String) "zc");
+        Serial.print((String) "zc");  //here
         p1TriggerTime = millis();   // indicate we have a yield
 
         processGpio() ; // do read and process regular data pins and finish  this with mqtt
+        
         publishP1ToMqtt();      // PUBLISH this mqtt
         // Note: after this we could do the serial2 process for a period of about 6-8seconds ......
         // this is arranged in the mainloop
@@ -1749,8 +1760,9 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 {
 
   mqttCnt++ ;             // update counter
-  if (CheckData() || forceCheckData )        // do we have/want some valid P1 meter reading
-  {
+  // Serial.println("Debug4 publishP1ToMqtt");
+  if (CheckData() || forceCheckData ) {       // do we have/want some valid P1 meter reading
+    // Serial.println("Debug CheckData=true");
     /*
       digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off to signal a short
       previousBlinkMillis = millis();   // initialize start and wiat for interval blinks
@@ -2022,7 +2034,7 @@ bool processLightRead(bool myOperation)
 /* 
   process P1 data start / to ! Let us decode to see what the /KFM5KAIFA-METER meter is reading
 */
-bool decodeTelegram(int len)
+bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
 {
   //need to check for start
   validCRCFound = false;  // bool Global defined
@@ -2052,8 +2064,17 @@ bool decodeTelegram(int len)
     // initialise CRC
 
     if (strncmp(telegram, "/KFM5KAIFA-METER", strlen("/KFM5KAIFA-METER")) == 0) telegramP1header = true;   // indicate we are in header mode
-    currentCRC = CRC16(0x0000, (unsigned char *) telegram + startChar, len - startChar - 1);
-    if (telegram[len - 1] == '\x00') currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a\x0d\x0a", 3); // add stripped header
+    currentCRC = CRC16(0x0000, (unsigned char *) telegram + startChar, len - startChar - 1); 
+    if (telegram[startChar+len-2] == '\x0d') currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
+
+    /*
+    if ( len = 1 && telegram[len-1] == '\x0d') {
+      Serial.print("DebugAddCrLf.."); 
+      currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a\x0d\x0a", 3); // add stripped header
+    }
+    */
+
+
 
     // digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off
     // digitalWrite(BLUE_LED, LOW);       // Turn the ESPLED on to inform user
@@ -2169,7 +2190,6 @@ bool decodeTelegram(int len)
     } // else if endChar >= 0 && telegramP1header
   } // startChar >= 0
 
-
   if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
   // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
 
@@ -2209,6 +2229,7 @@ bool decodeTelegram(int len)
     }
     return endOfMessage;
   }
+
   if ( !telegramP1header) return endOfMessage; // if not in header received mode then return
   // 11jun20 yield();  // do background Wifi processing else things will not work
 
@@ -2218,8 +2239,14 @@ bool decodeTelegram(int len)
   // if (telegram[len - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
 
   if (   telegram[0] != '0' && telegram[0] != '1' && telegram[1] != '-' ) return endOfMessage; // if not start wih 0- or 1-
+
+  // if ( !(telegram[len - 3] == ')' || telegram[len - 4] == ')' )) return endOfMessage; // if not terminated by bracket then return
   if ( !(telegram[len - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
 
+  // Serial.println((String)"DebugDecode6:"+ (int)telegram[len - 3] );   // with testdata, does not arrive here
+  
+  // Serial.println((String)"DebugDecode7 (=" + strncmp(telegram, "(", strlen("(")) + " )="+strncmp(telegram, ")", strlen(")"))) ;
+  // Serial.println((String)"DebugDecode7 substr1-7(=" + telegram[0]+telegram[1]+telegram[2]+telegram[3]+telegram[4]+"<");
   //  c h e c k   t e s t   P 1   r e c o r d s
   // long val = 0;
   // long val2 = 0;
@@ -2229,7 +2256,7 @@ bool decodeTelegram(int len)
   //  0123456789012345678901234567890
   //  0-0:1.0.0(180611014816S) added ptro
   //  0-0:1.0.0(191119182821W)
-
+  
   if (strncmp(telegram, "0-0:1.0.0(", strlen("0-0:1.0.0(")) == 0) {       // do we have a Date record ?
     if (telegram[22] == 'S' || telegram[22] == 'W') {  // check for Summer or Wintertime
       char resDate[16];     // maximum prefix of timestamp message
@@ -2259,9 +2286,10 @@ bool decodeTelegram(int len)
   // yield();  // do background processing else things will not work
 
   // 1-0:1.8.1(000992.992*kWh)
-  // 1-0:1.8.1 = Elektra verbruik laag tarief (DSMR v4.0)
-  if (strncmp(telegram, "1-0:1.8.1(", strlen("1-0:1.8.1(")) == 0)         // total Watts Low
+  // 1-0:1.8.1 = Elektra verbruik laag tarief (DSMR v4.0)  
+  if (strncmp(telegram, "1-0:1.8.1(", strlen("1-0:1.8.1(")) == 0) {        // total Watts Low
     powerConsumptionLowTariff = getValue(telegram, len);
+    }
 
   // 1-0:1.8.2(000560.157*kWh)
   // 1-0:1.8.2 = Elektra verbruik hoog tarief (DSMR v4.0)
@@ -2367,6 +2395,7 @@ int FindCharInArrayRev(char array[], char c, int len)               // Find char
 */
 bool CheckData()        // 
 {
+
   if (firstRun)  {      // at start initialise and set olddata to new data
     SetOldValues();
     firstRun = false;
@@ -2408,10 +2437,14 @@ bool CheckData()        //
     if (client.connected()) client.publish(mqttLogTopic, output);
   }
 
-
+  
   // check overrating more then 25.200kWh per 10sec read (=70w/s => 80Amps) is likely die to misread, can require recycle to recover
   if ((powerConsumptionLowTariff  - OldPowerConsumptionLowTariff > 70) || powerConsumptionLowTariff < 1)   // ignore zero reads
   {
+    
+    // problem: test_mode alsways ends in powerConsumptionLowTariff=0
+    // Serial.println((String)"Checkdata3.."+" new="+powerConsumptionLowTariff+" old="+OldPowerConsumptionLowTariff);   // problem returns and does not let publish
+
     OldPowerConsumptionLowTariff = powerConsumptionLowTariff ;
     if (powerConsumptionLowTariff < 1) OldPowerConsumptionLowTariff = 0 ;
     return false;
@@ -2423,7 +2456,6 @@ bool CheckData()        //
     if (powerConsumptionHighTariff < 1) OldPowerConsumptionHighTariff = 0 ;
     return false;
   }
-
 
   // following is totally not used at our place but can be used if/when we have solarpanels.
 
@@ -2463,7 +2495,7 @@ bool CheckData()        //
     sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
     if (client.connected()) client.publish(mqttPower, output);                // publish output
   }
-
+  // Serial.println("Debug5, Checkdata..true");
   return true;
 }
 
