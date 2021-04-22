@@ -2,8 +2,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+Note: upto V24 we developed on Vxx. starting now we develop on development 
+create stable Versions-Vxx which when stable are merged into master.
+
 ## [Unreleased] - Development
-	- V21.23_seriallib - testing/dding P1ActiveCnt which correctly tell we have rxRead loop during serial
+	- V21.23_seriallib - testing/adding P1ActiveCnt which correctly tell we have rxRead loop during serial
+	-- we can confirm that rxRead is called per byte.
 ## [V21.24
 	- merged to master
 	- tested & verified on test using dummy data
