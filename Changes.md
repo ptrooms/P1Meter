@@ -3,7 +3,35 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - Development
-
+	- V21.23_seriallib - testing/dding P1ActiveCnt which correctly tell we have rxRead loop during serial
+## [V21.24
+	- tested & verified on test using dummy data
+	- restructered decode-routine and disconnected from readecodepart
+	- now the readed telegram is executed WITH the offered 0x0D (carriage return)
+## [V21.23]
+	- production version
+	- mqtt Callback routine shortened and incoming command done in mainloop
+	- set ESP.wdtEnable(WDTO_8S)in setup() to 8seconds see https://github.com/esp8266/Arduino/issues/555
+## [V21.22]
+	- 19apr21 21u38 option added to make nodemcu Ip adress static
+	- -- override added/extended with production/static Ip information
+	- 19apr21 21u38 display library version at start
+	- 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
+	- 15apr21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
+	- removed delay in local-yields
+## [V21.21]
+- 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
+- 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
+	--- (+9sec after last mqtt)
+- 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop() during speific yields,
+	-- normal yield does support Wifi but NOT the (disconnected) Pubsubclient
+	-- Beautified
+## [V21.20]
+- 11apr21 16u29 V20: added JSON error message to topic /error/.. if P1 serial is not (properly) connected
+	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt":28}
+- 11apr21 15u16 mqtt timeout (override) set from 15 to 60 seconds #define MQTT_KEEPALIVE = 60
+	-- sometimes the mqtt server is very busy and we do not want a preliminary reboot
+- 11apr21 15u15 Added mqtt server address  in serial debug at startup
 ## [V21.19]
 - 08apr20 05u30 - PtrO Adapted to Arduino-IDE (checked) & PlatformIO  (checked) see ini files.
 - 07apr21 19u13 - PtrO Initiial GIT version , Arduino compile succesfull using this Repo
