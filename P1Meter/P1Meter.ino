@@ -15,13 +15,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1124.240 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1125.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2124.240 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2125.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -36,6 +36,8 @@
     // Subnet IPAddress subnet(255, 255, 255, 0);
     // DNS1 IPAddress primaryDNS(192.168.1.8);   //optional
     // DNS2 IPAddress secondaryDNS(192.168.1.1); //optional
+// ## [V21.25]    
+//  - Using SDK 2.4.1 to investigate stability
 // ## [V21.22]
 //  19apr21 23u39 added ESP.wdtFeed(); in loop ()
 //  - 19apr21 15u22 - added diagnostic information sdk version & emempry use etc.etc.
