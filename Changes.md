@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - Development
 	- V21.23_seriallib - testing/dding P1ActiveCnt which correctly tell we have rxRead loop during serial
 ## [V21.24
+	- merged to master
 	- tested & verified on test using dummy data
 	- restructered decode-routine and disconnected from readecodepart
 	- now the readed telegram is executed WITH the offered 0x0D (carriage return)
