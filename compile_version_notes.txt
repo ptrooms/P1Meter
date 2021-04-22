@@ -1,0 +1,89 @@
+toolchain being used by platformio is 4.8.2. .////
+
+arduino uses xtensa toolchain: /home/pafoxp/.arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2
+
+	PIO_FRAMEWORK_ARDUINO_ESPRESSIF_SDK3			NONOSDK3V0"
+	PIO_FRAMEWORK_ARDUINO_ESPRESSIF_SDK221 			NONOSDK221"
+	PIO_FRAMEWORK_ARDUINO_ESPRESSIF_SDK22x_190313 	NONOSDK22x_190313"
+	PIO_FRAMEWORK_ARDUINO_ESPRESSIF_SDK22x_191024 	NONOSDK22x_191024"
+	PIO_FRAMEWORK_ARDUINO_ESPRESSIF_SDK22x_191105 	NONOSDK22x_191105"
+	PIO_FRAMEWORK_ARDUINO_ESPRESSIF_SDK22x_191122 	NONOSDK22x_191122"
+--> PIO_FRAMEWORK_ARDUINO_ESPRESSIF_SDK22x_190703 	NONOSDK22x_190703"
+
+	PIO_FRAMEWORK_ARDUINO_LWIP2_IPV6_LOW_MEMORY	TCP_MSS", 536	lwip6-536-feat
+	PIO_FRAMEWORK_ARDUINO_LWIP2_IPV6_HIGHER_BANDWIDTH			lwip6-1460-feat
+	PIO_FRAMEWORK_ARDUINO_LWIP2_HIGHER_BANDWIDTH				lwip2-1460-feat
+	PIO_FRAMEWORK_ARDUINO_LWIP2_LOW_MEMORY_LOW_FLASH			lwip2-536
+	PIO_FRAMEWORK_ARDUINO_LWIP2_HIGHER_BANDWIDTH_LOW_FLASH		lwip2-1460
+-->	PIO_FRAMEWORK_ARDUINO_LWIP2_LOW_MEMORY (default)			lwip2-536-feat
+
+
+Arduino/240:
+	pafoxp@ubuntuO380:~$ /home/pafoxp/.arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/bin/xtensa-lx106-elf-c++ -v
+	Using built-in specs.
+	COLLECT_GCC=/home/pafoxp/.arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/bin/xtensa-lx106-elf-c++
+	COLLECT_LTO_WRAPPER=/home/pafoxp/.arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/bin/../libexec/gcc/xtensa-lx106-elf/4.8.2/lto-wrapper
+	Target: xtensa-lx106-elf
+	Configured with: /home/igrokhotkov/xtensa/crosstool-NG/.build/src/gcc-4.8.2/configure --build=x86_64-build_unknown-linux-gnu --host=x86_64-build_unknown-linux-gnu --target=xtensa-lx106-elf --prefix=/home/igrokhotkov/xtensa/crosstool-NG/builds/xtensa-lx106-elf --with-local-prefix=/home/igrokhotkov/xtensa/crosstool-NG/builds/xtensa-lx106-elf/xtensa-lx106-elf/sysroot --disable-libmudflap --with-sysroot=/home/igrokhotkov/xtensa/crosstool-NG/builds/xtensa-lx106-elf/xtensa-lx106-elf/sysroot --with-newlib --enable-threads=no --disable-shared --with-pkgversion='crosstool-NG 1.20.0' --disable-__cxa_atexit --with-gmp=/home/igrokhotkov/xtensa/crosstool-NG/.build/xtensa-lx106-elf/buildtools --with-mpfr=/home/igrokhotkov/xtensa/crosstool-NG/.build/xtensa-lx106-elf/buildtools --with-mpc=/home/igrokhotkov/xtensa/crosstool-NG/.build/xtensa-lx106-elf/buildtools --with-isl=/home/igrokhotkov/xtensa/crosstool-NG/.build/xtensa-lx106-elf/buildtools --with-cloog=/home/igrokhotkov/xtensa/crosstool-NG/.build/xtensa-lx106-elf/buildtools --with-libelf=/home/igrokhotkov/xtensa/crosstool-NG/.build/xtensa-lx106-elf/buildtools --enable-lto --enable-target-optspace --disable-libgomp --disable-libmudflap --disable-nls --disable-multilib --enable-languages=c,c++
+	Thread model: single
+	gcc version 4.8.2 (crosstool-NG 1.20.0)
+
+pio:
+	pafoxp@ubuntuO380:~$ /home/pafoxp/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-c++ -v
+	Using built-in specs.
+	COLLECT_GCC=/home/pafoxp/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-c++
+	COLLECT_LTO_WRAPPER=/home/pafoxp/.platformio/packages/toolchain-xtensa/bin/../libexec/gcc/xtensa-lx106-elf/4.8.2/lto-wrapper
+	Target: xtensa-lx106-elf
+	Configured with: /workdir/repo/gcc/configure --prefix=/workdir/xtensa-lx106-elf.x86_64 --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=xtensa-lx106-elf --disable-shared --with-newlib --enable-threads=no --disable-__cxa_atexit --disable-libgomp --disable-libmudflap --disable-nls --disable-multilib --disable-bootstrap --enable-languages=c,c++ --enable-lto --enable-static=yes --disable-libstdcxx-verbose
+	Thread model: single
+	gcc version 4.8.2 (GCC) 
+
+
+
+list from from: [https://www.espressif.com/en/products/software/esp-sdk/resource]
+	ESP-IDF (ESP32, ESP32-S2)				RTOS SDK 	V4.2 	2020.12.07 	
+	ESP8266 RTOS SDK (IDF Style)			RTOS SDK 	V3.1.1 	2020.03.24 	
+	ESP8266 NONOS SDK V3.0.0				NON-OS SDK 	V3.0.0 	2018.08.24 	
+	ESP8266 NONOS SDK V2.2.1				NON-OS SDK 	V2.2.1 	2018.06.08 	
+	ESP8266 RTOS SDK V2.0.0					RTOS SDK 	V2.0.0 	2018.04.02 	
+	ESP8266 NONOS SDK V2.1.0 20170505		NON-OS SDK 	V2.1.0 	2017.05.05 	
+	ESP8266 RTOS SDK V1.5.0					RTOS SDK 	V1.5.0 	2016.11.11 	
+	ESP8266 NONOS SDK V2.0.0 20160810		NON-OS SDK 	V2.0.0 	2016.08.10 	
+	ESP8266 NONOS SDK V2.0.0 patch 20160809	NON-OS SDK 	V2.0.0 	2016.08.08
+
+
+from: [https://www.esp8266.com/viewtopic.php?f=159&t=20069#p83272]
+	-->	NONOS_SDK is bare-metal, check out the "code structure" section in the "2c-esp8266_non_os_sdk_api" manual. Quick and dirty said:
+		+ think about non-os-sdk like something similar to node.js (an asynchronous event driven engine) not an operating system
+		+ let your application be driven by events (wifi events, communications events, interrupts ...)
+		+ in case you need to do polling or periodic tasks use timers
+		+ the only thing you have to care about is that your code execution does not take that long to trigger the watchdog
+
+		+ RTOS_SDK is an OS layer API based on FreeRTOS thus featuring:
+		+ multitasking operation
+		+ networking using lwIP API (standard interface)
+
+		RTOS will require you more expertise but will result in more portable code.
+
+Lwip: Arduino 2.4.0. uses
+	generic.menu.LwIPVariant.v2mss536=v2 Prebuilt (MSS=536)
+	generic.menu.LwIPVariant.v2mss536.build.lwip_include=lwip2/include
+	generic.menu.LwIPVariant.v2mss536.build.lwip_lib=-llwip2
+	generic.menu.LwIPVariant.v2mss536.build.lwip_flags=-DLWIP_OPEN_SRC -DTCP_MSS=536
+	generic.menu.LwIPVariant.v2mss1460=v2 Prebuilt (MSS=1460, unstable)
+	generic.menu.LwIPVariant.v2mss1460.build.lwip_include=lwip2/include
+	generic.menu.LwIPVariant.v2mss1460.build.lwip_lib=-llwip2_1460
+	generic.menu.LwIPVariant.v2mss1460.build.lwip_flags=-DLWIP_OPEN_SRC -DTCP_MSS=1460
+	generic.menu.LwIPVariant.Prebuilt=v1.4 Prebuilt
+	generic.menu.LwIPVariant.Prebuilt.build.lwip_lib=-llwip_gcc
+	generic.menu.LwIPVariant.Prebuilt.build.lwip_flags=-DLWIP_OPEN_SRC
+	generic.menu.LwIPVariant.OpenSource=v1.4 Open Source
+	generic.menu.LwIPVariant.OpenSource.build.lwip_lib=-llwip_src
+	generic.menu.LwIPVariant.OpenSource.build.lwip_flags=-DLWIP_OPEN_SRC
+
+Platformio 2.4.0 uses  PIO_FRAMEWORK_ARDUINO_LWIP2_LOW_MEMORY -->
+    env.Append(
+        CPPDEFINES=[("TCP_MSS", 536), ("LWIP_FEATURES", 1), ("LWIP_IPV6", 0)],
+        CPPPATH=[join(FRAMEWORK_DIR, "tools", "sdk", "lwip2", "include")],
+        LIBS=["lwip2-536-feat"]
+    )	
