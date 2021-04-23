@@ -746,7 +746,8 @@ void setup()
 
   // prepare wdt
   ESP.wdtDisable();
-  ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S
+  // ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S
+  ESP.wdtEnable(22000); // allow two passses missing
 
   Serial.begin(115200);
   Serial.println("Booting");              // message to serial log
@@ -846,11 +847,13 @@ void setup()
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
   Serial.print   ("IP address: ");
     Serial.println(WiFi.localIP());
+  Serial.println ("ESP8266-ResetReason: "+  String(ESP.getResetReason()));
   Serial.println ("ESP8266-free-space: "+   String(ESP.getFreeSketchSpace()));
   Serial.println ("ESP8266-sketch-size: "+  String(ESP.getSketchSize()));
   Serial.println ("ESP8266-sketch-md5: "+   String(ESP.getSketchMD5()));
   Serial.println ("ESP8266-chip-size: "+    String(ESP.getFlashChipRealSize()));
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
+  Serial.println ("ESP8266-getChipId: "+    ESP.getChipId()); 
 
   WiFi.printDiag(Serial);   // print data  
   client.setServer(mqttServer, mqttPort);
@@ -1365,7 +1368,7 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\rDataCnt: %u started at %6.6f \b\b\t", (mqttCnt + 1), ((float) startMicros / 1000000));
+  if (!outputOnSerial) Serial.printf("\r Cycle: %2.9f DataCnt: %u started at %6.6f \b\b\t", ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
 
   if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
 
