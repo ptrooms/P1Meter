@@ -15,13 +15,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1125.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 11275.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2125.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2127.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -478,7 +478,8 @@ unsigned long startMicros = 0;   // micros()
 
 // used to research and find position of wdt resets
 unsigned long test_WdtTime = 0;   // time the mainloop
-unsigned long loopcnt = 0;        // countthe loop
+unsigned long loopCnt = 0;        // countthe loop
+unsigned int  serialLoopCnt = 0;        // countthe loop
 
 
 // control the informative led within the loop
@@ -622,14 +623,14 @@ bool lightReadState       = LOW;      // assume Input is active HEATING Light re
 
 void WaterTrigger_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
-long waterTriggerCnt   = 0;   // initialize trigger count
+volatile long waterTriggerCnt   = 0;   // initialize trigger count
 long waterDebounceCnt  = 0;   // administrate usage  for report
 bool waterReadState    = LOW; // switchsetting
 long waterReadDebounce = 200; // 200mS debounce
 long waterReadCounter  = 0;   // nothing to read ye  for regular water counter
 long waterReadHotCounter  = 0;// nothing to read yet for HotWaterCounter
-long waterTriggerTime  = 0;   // initialise for ISR WaterTrigger()
-bool waterTriggerState = LOW; // switchsetting during trigger
+volatile long waterTriggerTime  = 0;   // initialise for ISR WaterTrigger()
+volatile bool waterTriggerState = LOW; // switchsetting during trigger
 
 // used for analog read ADC port
 int nowValueAdc = 0;      // actual read
@@ -1063,7 +1064,7 @@ void setup()
 
   waterTriggerTime = 0;  // ensure and assum no trigger yet
   test_WdtTime = 0;  // set first loop timer
-  loopcnt = 0;              // set loopcount to 0
+  loopCnt = 0;              // set loopcount to 0
 
 //  WiFi.printDiag(Serial);   // print data
 }
@@ -1095,9 +1096,10 @@ void loop()
 
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
-    loopcnt++ ;
-    Serial.print((String)"-"+(loopcnt%99)+" \b");
+    loopCnt++ ;
+    Serial.print((String)"-"+(loopCnt%99)+" \b");
     test_WdtTime = currentMillis + 1000;  // next interval
+    if (serialLoopCnt >= 0 && serialLoopCnt <= 5 ) serialLoopCnt++;
   }
 
   // Following will trackdown loops
@@ -1125,6 +1127,7 @@ void loop()
 
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
       if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial started at " + currentMillis);
+      serialLoopCnt = 0;
       p1SerialActive = !p1SerialActive ; // indicate we have started
       p1SerialFinish = false; // and let transaction finish
       mySerial2.end();          // Stop- if any - GJ communication
@@ -1147,6 +1150,7 @@ void loop()
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
         if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
+        serialLoopCnt = 10; // debug end printing progress during readTelegram
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
@@ -1345,6 +1349,16 @@ void doCritical() {
 */
 void readTelegram() {
 
+#ifdef TEST_MODE
+    // Serial.print("+");
+    // Serial.print(serialLoopCnt);
+    // if (serialLoopCnt >= 3 && serialLoopCnt <= 4) Serial.print("+");
+    // if (serialLoopCnt == 3) Serial.print(".");
+    if (serialLoopCnt == 4) Serial.print("+");  //. after the fourth count, things goes intermittently to wdt
+    if (serialLoopCnt == 5) Serial.print("#");
+#endif
+
+
   unsigned long p1Debounce_time = millis() - p1TriggerTime; // mSec - waterTriggerTime in micro seconds set by ISR waterTrigger
   // if (p1SerialActive && p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
   if (p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
@@ -1357,10 +1371,14 @@ void readTelegram() {
   }
 
 
-#ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
-  if ( mySerial.P1active())  return ;  // quick return if serial is receiving, fucntion of SoftwareSerial for P1
-#endif  
   if (!mySerial.available()) return ;  // quick return if no data
+
+#ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
+  if ( mySerial.P1active()) {
+    Serial.print("XxX");
+    return ;  // quick return if serial is receiving, fucntion of SoftwareSerial for P1
+  }
+#endif  
 
   if (outputOnSerial)    {
     if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + "s=s123..\b\b\b\b\b") ; // print message line
