@@ -774,6 +774,17 @@ void setup()
     Serial.println(local_IP );
   #endif
 
+  /*
+    Added 2021-04-26 22:06:55 to test/check wifi issues
+  */
+  WiFi.persistent(false); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083)
+  // WiFi.disconnect(true); // Delete SDK wifi config (after is has connected)
+  delay(200);
+  // WiFi.mode(WIFI_STA); // Disable AP mode
+  // WiFi.setSleepMode(WIFI_MODEM_SLEEP); // Disable sleep (Esp8288/Arduino core and sdk default)
+  
+  
+
   Serial.println("Settingup WifiSTAtion.");  // wait 5 seconds before retry
   WiFi.mode(WIFI_STA);            // Client mode
 
@@ -792,7 +803,10 @@ void setup()
     }
     Serial.print((String) "Connection to "+ ssid +", Faild, restartting in 5 seconds..");  // wait 5 seconds before retry
     delay(2000);
+    // WiFi.disconnect(true);   // ToTest 2021-04-26 22:30:51 still not erasing the ssid/pw. Will happily reconnect on next start
+    // WiFi.begin("0","0");     // ToTest 2021-04-26 22:30:51 adding this effectively seems to erase the previous stored SSID/PW
     ESP.restart();
+    // delay(1000);             // ToTest 2021-04-26 22:30:51 (read https://github.com/espressif/arduino-esp32/issues/400)
   }
 
 
