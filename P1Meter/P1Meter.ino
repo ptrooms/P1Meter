@@ -844,8 +844,10 @@ void setup()
   // #define DEF_PROG_VERSION 1123.240
   ArduinoOTA.begin();
   Serial.println("Ready version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
+  // Serial.println("ESP_SDK_VERSION_STRING:" + ESP_SDK_VERSION_STRING ); 
   Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
-  // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
+  Serial.println ("getFullVersion:" + ESP.getFullVersion()); 
+    // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
   Serial.print   ("IP address: ");
     Serial.println(WiFi.localIP());
   Serial.println ("ESP8266-ResetReason: "+  String(ESP.getResetReason()));
@@ -1100,6 +1102,10 @@ void loop()
     Serial.print((String)"-"+(loopCnt%99)+" \b");
     test_WdtTime = currentMillis + 1000;  // next interval
     if (serialLoopCnt >= 0 && serialLoopCnt <= 5 ) serialLoopCnt++;
+    if (serialLoopCnt == 4 && outputOnSerial) {
+        WiFi.printDiag(Serial);
+        Serial.print ((String) "Wifi RSSI:"+ WiFi.RSSI ());
+    }
   }
 
   // Following will trackdown loops
@@ -1350,12 +1356,14 @@ void doCritical() {
 void readTelegram() {
 
 #ifdef TEST_MODE
+  if (outputOnSerial) {
     // Serial.print("+");
     // Serial.print(serialLoopCnt);
     // if (serialLoopCnt >= 3 && serialLoopCnt <= 4) Serial.print("+");
     // if (serialLoopCnt == 3) Serial.print(".");
     if (serialLoopCnt == 4) Serial.print("+");  //. after the fourth count, things goes intermittently to wdt
     if (serialLoopCnt == 5) Serial.print("#");
+  }
 #endif
 
 
@@ -1372,6 +1380,9 @@ void readTelegram() {
 
 
   if (!mySerial.available()) return ;  // quick return if no data
+  
+  delay(250); // serial calm down 
+  mqtt_local_yield();
 
 #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
   if ( mySerial.P1active()) {
