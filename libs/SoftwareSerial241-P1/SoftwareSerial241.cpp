@@ -6,6 +6,11 @@ P1 is the smart electricity meter that output data on its serial port at speed
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
 Extended for P1  (c) 2021 Peter Ooms.  All rights reserved.
 
+Changes to core version:
+	int getCycleCountIram() function (in header) added as WAITIram replacement for the ESP classed version
+	bool m_P1active()  true if readRx is in the midst of reading a P1/DSMR telegram
+	
+
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
 License as published by the Free Software Foundation; either
@@ -169,6 +174,7 @@ int SoftwareSerial::available() {
 }
 
 #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
+#define WAITIram { while (SoftwareSerial::getCycleCountIram()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
 
 size_t SoftwareSerial::write(uint8_t b) {
    if (!m_txValid) return 0;
@@ -223,17 +229,17 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // initial delay which occurs before the interrupt is delivered
    unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 425 115k2@80MHz
    // unsigned long wait = 425; // harcoded
-   unsigned long start = ESP.getCycleCount();
+   unsigned long start = getCycleCountIram();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAIT;
+     WAITIram; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
    }
    if (m_invert) rec = ~rec;
    // Stop bit
-   WAIT;
+   WAITIram; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {

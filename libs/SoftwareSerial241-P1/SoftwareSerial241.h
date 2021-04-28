@@ -62,6 +62,8 @@ public:
    bool isListening() { return m_rxEnabled; }
    bool stopListening() { enableRx(false); return true; }
 
+   inline uint32_t getCycleCountIram();
+
    using Print::write;
 
 private:
@@ -81,6 +83,13 @@ private:
 
 
 };
+
+uint32_t ICACHE_RAM_ATTR SoftwareSerial::getCycleCountIram()
+{
+    uint32_t ccount;
+    __asm__ __volatile__("esync; rsr %0,ccount":"=a" (ccount));
+    return ccount;
+}
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
 #define SW_SERIAL_UNUSED_PIN -1

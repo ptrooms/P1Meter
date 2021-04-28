@@ -30,6 +30,8 @@
 // * * * * * L O G  B O O K
 // *
 // Compiled on Arduino:
+// 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
+// 27apr21 23u38: getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
 //  - fixed Ip adress to eliminate iterference (if defined P1_STATIC_IP )
     // Set your Static IP address IPAddress local_IP(192, 168, 1, 125);
     // Set your Gateway IP address IPAddress gateway(192, 168, 1, 1);
@@ -489,6 +491,8 @@ const long    intervalBlinkMillis = 250;
 unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 #include "CRC16.h"              // CRC-16/ARC
 
+// #include <exception>          // added to allow/throw exceptions 2021-04-28 00:34:20 , not used as I do not know yet how to force an exception
+
 // start regular program soruce segment
 #include <PubSubClient.h>
 #include <eagle_soc.h>     // required as we use GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS to preven re-interrupt
@@ -857,6 +861,7 @@ void setup()
   // #define DEF_PROG_VERSION 1123.240
   ArduinoOTA.begin();
   Serial.println("Ready version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
+  Serial.println ("getFullVersion:" + ESP.getFullVersion());   
   Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
   Serial.print   ("IP address: ");
@@ -1687,7 +1692,31 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       if (outputOnSerial) {
         Serial.print("outputMqttLog now ON.");
       }
-
+    } else  if ((char)payload[0] == 'e') {    // here
+        Serial.print("forcing infinite loop");
+        while (true) {
+          int a = 0;
+          int b = 10;
+          volatile int c = b / a;
+          // force a never ending loop        
+        } 
+    } else  if ((char)payload[0] == 'E') {    // here
+        Serial.print("forcing infinite loop");
+        while (true) {
+          int a = 0;
+          int b = 10;
+          volatile int c = b / a;
+          // force a never ending loop        
+        } 
+        
+/* DNO , leave it to investigate how to force an exception
+    } else  if ((char)payload[0] == 'e') {    // here
+          try {
+              throwExceptionFunction();
+          } catch (const exception& e) {
+              Serial.print((String) "Exception activated" + e.what() );
+          }
+*/
     } else  if ((char)payload[0] == 'l') {
       outputMqttLog   = false ;       // Do not publish Log
       if (outputOnSerial) {
@@ -2746,6 +2775,11 @@ void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubcli
   if (client.connected()) client.loop();  // feed the mqtt client
 }
 
+/* leave this for leaer to investigate why runtime-error is not found ...
+void throwExceptionFunction(void) {
+    throw runtime_error("exception thrown."); // here2
+}
+*/
 
 
 // useless data to be kept for reference
