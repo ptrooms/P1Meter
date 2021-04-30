@@ -84,6 +84,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    m_overflow = false;
    m_rxEnabled = false;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
+   m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
@@ -227,7 +228,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 
    // Advance the starting point for the samples but compensate for the
    // initial delay which occurs before the interrupt is delivered
-   unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 425 115k2@80MHz
+   unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
+   // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded
    unsigned long start = getCycleCountIram();
    uint8_t rec = 0;
