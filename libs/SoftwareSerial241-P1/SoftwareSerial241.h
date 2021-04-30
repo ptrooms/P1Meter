@@ -76,6 +76,7 @@ private:
    bool m_P1active;                 // Ptro 28mar21 to support P1 messageing
    bool m_overflow;
    unsigned long m_bitTime;
+   volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
