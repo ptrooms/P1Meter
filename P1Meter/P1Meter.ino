@@ -393,11 +393,11 @@
 #endif
 
 
-// communication mode settings
+// communication mode settings, is the Startbit RISING edge or (inverted) FALLING edge
 #ifdef TEST_MODE
-bool bSERIAL_INVERT = false;  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+bool bSERIAL_INVERT = false;  // Simulatated P1 meter is USB interface of a PC to GPIO, does not required invert
 #else
-bool bSERIAL_INVERT = true;  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
 #endif
 
 #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232
@@ -913,8 +913,40 @@ void setup()
   Serial.printf ("\t1234.567 Value6.1f = %6.6f\n", 1234.567);
 #endif
 
-#ifdef TEST_CALCULATE_TIMINGS
-  Serial.print((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
+#ifdef TEST_CALCULATE_TIMINGS //here
+  // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
+  // 8bitstart TestRead4Rx start4=3405964740, end4=3405970810,  diff4=6070, wait4=6673, bittime4=694  = 72,84 µS =  8.5 bits
+  // 4bitSStop TestRead4Rx start4= 668982987, end4= 668987238,  diff4=4251, wait4=4591, bittime4=694
+  // 1bitStart TestRead4Rx start4=4090473783, end4=4090475689,  diff4=1906, wait4=2509, bittime4=694
+  // 1bitWait  TestRead4Rx start4=1430700974, end4=1430701833,  diff4=859,  wait4=1121, bittime4=694
+  // 8bitOnly  TestRead4Rx start4=1597461092, end4=1597462357,  diff4=1265, wait4=427,  bittime4=694
+  // 4bitOnly  TestRead4Rx start4=2339998248, end4=2339999243,  diff4=995,  wait4=427,  bittime4=694
+  // 2BitOnly  TestRead4Rx start4=3978366322, end4=3978367168,  diff4=846,  wait4=427,  bittime4=694
+  // 1bitOnly  TestRead4Rx start4=2601377338, end4=2601377762,  diff4=424,  wait4=427,  bittime4=694  (time to read 1 bit = 424 cycles)
+  // noloop:   TestRead4Rx start4= 547644023, end4= 547644025,  diff4=2,    wait4=427,  bittime4=694
+  // waitonly: TestRead4Rx start4= 625878073, end4= 625878512,  diff4=439,  wait4=1121, bittime4=694  (427+694=1121)
+
+  // Setup our test skeleton
+    #define WAITtest4  { while (ESP.getCycleCount()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+    Serial.println((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
+    int m_rxPin4 = SERIAL_RX; 
+    unsigned long speed4 = 115200;
+    unsigned long m_bitTime4 = ESP.getCpuFreqMHz()*1000000/speed4;
+    bool m_highSpeed4 = true;
+    // simulate the serial routine for 1byte   
+    unsigned long wait4 = m_bitTime4 + m_bitTime4/3 - 498;		// offset 501=425 offset 498=427cycles 115k2@80MHz
+    unsigned long start4 = ESP.getCycleCount();
+    uint8_t rec = 0;
+    WAITtest4;    // wait/skip startbit
+    for (int i = 0; i < 0; i++) {  // this routine takes 424 cycles without any wait and for-test-consumes 12cyles
+      WAITtest4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+      rec >>= 1;
+      if (digitalRead(m_rxPin4))
+        rec |= 0x80;
+    }
+    // WAITtest4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+    unsigned long start4e = ESP.getCycleCount();
+    Serial.println((String)" TestRead4Rx start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
 
   // insert a small loop to stabilize
   for (int i = 0; i < 1000; i++) {
@@ -1387,7 +1419,7 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r Cycle: %2.9f DataCnt: %u started at %6.6f \b\b\t", ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
+  if (!outputOnSerial) Serial.printf("\r\n Cycle: %02.9f DataCnt: %u started at %06.6f \b\b\t", ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
 
   if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
 
@@ -2772,7 +2804,7 @@ void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubcli
   yield();        // give control to wifi management
   // delay(50);      // delay 50 mSec
   ESP.wdtFeed();  // feed the hungry timer
-  if (client.connected()) client.loop();  // feed the mqtt client
+  if (client.connected()) client.loop();  // feed the mqtt client, required to collect mqtt commands
 }
 
 /* leave this for leaer to investigate why runtime-error is not found ...

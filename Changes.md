@@ -6,6 +6,8 @@ Note: upto V24 we developed on Vxx. starting now we develop on development
 create stable Versions-Vxx which when stable are merged into master.
 
 ## [Unreleased] - Development
+	- V21.31 Do not wait in full for finishing stopbit  at a serial read (hosrten the wait).
+	-- this also limits the risk of an infinite loop is ESP.GetCyleCnt does not pace up.
 	- V21.31 step by step changes to check why volatile changes corrupts the P1 production meter.
 	- V21.25 Core 2.4.1, ESP8266-sdk-version: 2.2.1(cfd48f3) testing stability (wdt reset)
 	-- The SoftSerialP1 librbay is changed by putting esp.getcyclecnt readRx as GetCycleCntIram into cache.

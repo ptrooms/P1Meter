@@ -231,7 +231,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
    unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
-   // unsigned long wait = 425; // harcoded
+   // unsigned long wait = 425; // harcoded too fast as cycles for caculation time is omitted
    unsigned long start = getCycleCountIram();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
@@ -241,8 +241,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
        rec |= 0x80;
    }
    if (m_invert) rec = ~rec;
-   // Stop bit
+   // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
+   // wait = wait - 400; // try to play with this time
+   // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
+   // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
    WAITIram; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {
