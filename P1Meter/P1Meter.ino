@@ -913,7 +913,7 @@ void setup()
   Serial.printf ("\t1234.567 Value6.1f = %6.6f\n", 1234.567);
 #endif
 
-#ifdef TEST_CALCULATE_TIMINGS //here
+#ifdef TEST_CALCULATE_TIMINGS
   // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
   // 8bitstart TestRead4Rx start4=3405964740, end4=3405970810,  diff4=6070, wait4=6673, bittime4=694  = 72,84 µS =  8.5 bits
   // 4bitSStop TestRead4Rx start4= 668982987, end4= 668987238,  diff4=4251, wait4=4591, bittime4=694
@@ -932,26 +932,106 @@ void setup()
     int m_rxPin4 = SERIAL_RX; 
     unsigned long speed4 = 115200;
     unsigned long m_bitTime4 = ESP.getCpuFreqMHz()*1000000/speed4;
+    int m_buffSize4 = 66; // test
+    bool m_overflow4 = false;
+    bool m_P1active4 = false;
     bool m_highSpeed4 = true;
     // simulate the serial routine for 1byte   
     unsigned long wait4 = m_bitTime4 + m_bitTime4/3 - 498;		// offset 501=425 offset 498=427cycles 115k2@80MHz
+    
+    // below a 1:1 copy of the serial routine of plerup
     unsigned long start4 = ESP.getCycleCount();
     uint8_t rec = 0;
-    WAITtest4;    // wait/skip startbit
-    for (int i = 0; i < 0; i++) {  // this routine takes 424 cycles without any wait and for-test-consumes 12cyles
+    // WAITtest4;    // wait/skip startbit 427 cycles
+    for (int i = 0; i < 8; i++) {  // this routine takes 424 cycles without any wait and for-test-consumes 12cyles
       WAITtest4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
       rec >>= 1;
-      if (digitalRead(m_rxPin4))
-        rec |= 0x80;
+      if (digitalRead(m_rxPin4)) rec |= 0x80;
     }
-    // WAITtest4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+    WAITtest4; // stopbit while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+    if (m_rxPin4) rec = ~rec;   // simulate the invert
+    unsigned int m_inPos4 = 10;
+    unsigned int m_outPos4 = 5;
+    int next4 = (m_inPos4 +1) % m_buffSize4;
+    if (next4 != m_outPos4) {
+        if (rec == '/') m_P1active4 = true ;   // 26mar21 Ptro P1 messageing has started by header
+        if (rec == '!') m_P1active4 = false; // 26mar21 Ptro P1 messageing has ended due valid trailer
+        // m_buffer[m_inPos4] = rec;
+        m_inPos4 = next4;
+    } else {
+        m_P1active4 = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
+        m_overflow4 = true;
+    }
     unsigned long start4e = ESP.getCycleCount();
+    
     Serial.println((String)" TestRead4Rx start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
 
-  // insert a small loop to stabilize
-  for (int i = 0; i < 1000; i++) {
-    int test = 0;
-  }
+
+    // calculate getCycleCnt
+    wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+    start4 = ESP.getCycleCount(); 
+    start4e = ESP.getCycleCount();  // delta between these two = 348 cycles
+    // TestIramWait0 start4=1709979665, end4=1709979667, diff4=2, wait4=427, bittime4=694
+    Serial.println((String)" TestIramWait0 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+    start4 = ESP.getCycleCount();
+    // while loop here takes 91 cycles
+    { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+    start4e = ESP.getCycleCount();
+    // TestIramWait1 start4=594504443, end4=594504882,   diff4=439, wait4=1121, bittime4=694
+    Serial.println((String)" TestIramWait1 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+
+    // Test inline assembled copy of GetCycleCount
+    for (int i = 0; i < 3; i++) {
+      wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+      start4 = getCycleCountIramLocal();
+      // while loop here takes 91 cycles
+      // { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+      start4e = getCycleCountIramLocal();
+      // TestIramWait3 start4=1713581182, end4=1713581184, diff4=2, wait4=427, bittime4=69
+      Serial.println((String)" TestIramWait3 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+      start4 = getCycleCountIramLocal();
+      { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+      start4e = getCycleCountIramLocal();
+      // TestIramWait4 start4=1714171078, end4=1714171510, diff4=432, wait4=1121, bittime4=694
+      Serial.println((String)" TestIramWait4 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+      
+
+      // getCycleCountIramLocal();   // 9 cycles
+      // TestIramWait5 start4=541067741, end4=541068175, diff4=434, wait4=1121, bittime4=694
+      // { while (getCycleCountIramLocal()-start4 < wait4) ; wait4 += m_bitTime4; }
+
+      start4 = getCycleCountIramLocal();
+      wait4 = start4 + (m_bitTime4 + m_bitTime4/3 - 498);
+      { while (getCycleCountIramLocal() < wait4) ; wait4 += m_bitTime4; }
+      start4e = getCycleCountIramLocal();
+      // TestIramWait7 start4=3440482983, end4=3440483418, diff4=435, wait4=3440484104, bittime4=694
+      Serial.println((String)" TestIramWait7 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+     
+    } // for loop
+  
+    wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+    start4 = ESP.getCycleCount();
+    long test4 = 0;
+    for (long i = 0; i < 46; i++) {  // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
+        // long test4 = ESP.getCycleCount(); // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
+        // long test4 = ESP.getCycleCount()+ESP.getCycleCount(); // add/sub@i46=715 , 
+        // long test4 = ESP.getCycleCount()+ESP.getCycleCount()+ESP.getCycleCount(); // triple=808
+        // long test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // quadro46 = 1245    
+        test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // inlinequadro46 = 1245 
+    }
+    start4e = ESP.getCycleCount();
+    // for (int i = 0; i < 1000; i++) = 348
+    // Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test=" + test4 );
+    // TestIramWait9 gc4-1=906115867, gc4-2=906120354, gc4-3=906124820, gc4-4=906128621
+    Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test4=" + test4 );
+
+    // diffs: 3801-4487-4466
+    Serial.println((String)" TestIramWait9 gc4-1=" + ESP.getCycleCount() + ", gc4-2="+ ESP.getCycleCount() + ", gc4-3="+ ESP.getCycleCount() + ", gc4-4="+ ESP.getCycleCount());
+
+    // insert a small loop to stabilize
+    for (int i = 0; i < 100; i++) {
+      int test = 0;
+    }
 
   // #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
   // Checktiming for test only
@@ -2806,6 +2886,15 @@ void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubcli
   ESP.wdtFeed();  // feed the hungry timer
   if (client.connected()) client.loop();  // feed the mqtt client, required to collect mqtt commands
 }
+
+#ifdef TEST_CALCULATE_TIMINGS
+uint32_t getCycleCountIramLocal() {   // ICACHE_RAM_ATTR does no influence speed wqhen used in program
+    uint32_t ccount;
+    __asm__ __volatile__("esync; rsr %0,ccount":"=a" (ccount));
+    return ccount;
+  }
+#endif
+
 
 /* leave this for leaer to investigate why runtime-error is not found ...
 void throwExceptionFunction(void) {
