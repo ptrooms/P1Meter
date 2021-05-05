@@ -6,6 +6,10 @@ Note: upto V24 we developed on Vxx. starting now we develop on development
 create stable Versions-Vxx which when stable are merged into master.
 
 ## [Unreleased] - Development
+	- V21.31 changed P1-Rxread to ensure that the wait for clock-sync never exceeds 14bits of waitcycles
+	-- Note this is doen by limiting the wait to 10.000 cycles and meant for highspeed connection
+	-- at a later stage we can look at adaptation for lower speeds (either integrate or seperation)
+	- V21.31 test restoreed to work on production servers, local mqtt & wifi has nu influence on quality
 	- V21.31 Do not wait in full for finishing stopbit  at a serial read (hosrten the wait).
 	-- this also limits the risk of an infinite loop is ESP.GetCyleCnt does not pace up.
 	- V21.31 step by step changes to check why volatile changes corrupts the P1 production meter.
