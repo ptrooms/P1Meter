@@ -5,7 +5,7 @@ calculation in SoftwareSerial241/V31 will change intstructions cycles.
 ## The disassembly libs/SoftwareSerial241-P1/SoftwareSerial241.cpp  v31 2021-04-310
 -- decoding, to check intruction path length for various combinations, done via:
     ~/.platformio/packages/toolchain-xtensa32/bin/xtensa-esp32-elf-objdump -C -d
-    .pio/build/p1meter-test-OTA-ssid8/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o
+    ~/code-P1Meter/.pio/build/p1meter-test-OTA/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o
 
 
 ## source libs/SoftwareSerial241-P1/SoftwareSerial241.cpp v31 2021-04-310
