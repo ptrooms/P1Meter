@@ -1,6 +1,7 @@
 ![ptro logo](/tools/logo/ptro_930x474_longwhite_ends_bg.svg)
 # Changelog
 All notable changes to this project will be documented in this file.
+Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 
 Note: upto V24 we developed on Vxx. starting now we develop on development 
 create stable Versions-Vxx which when stable are merged into master.
