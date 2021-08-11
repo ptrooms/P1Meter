@@ -223,7 +223,10 @@ int SoftwareSerial::peek() {
    return m_buffer[m_outPos];
 }
 
-#define WAITIram4 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<10000); wait += m_bitTime; }
+// added wait test to prevent overrunning when Clocks are slower (10000 works ok, 2021-05-05 22:01:29: testing #7000)
+#define WAITIram4 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+#define WAITIram5 { while (wait<7000 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
+
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif
@@ -237,7 +240,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    unsigned long start = getCycleCountIram();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram5; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
@@ -247,11 +250,16 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // wait = wait - 400; // try to play with this time
    // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
    // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
-   WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
+   WAITIram5; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
-   if (next != m_outPos && wait < 10000) {  // abort if wait exceeded the expected readtime
+#ifdef TEST_MODE
+   if (next != m_outPos && wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+#else
+   if (next != m_outPos) {  // this works best in production
+#endif
       if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
       if (rec == '!') m_P1active = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
       m_buffer[m_inPos] = rec;

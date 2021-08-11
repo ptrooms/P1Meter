@@ -1,4 +1,5 @@
 
+// require  core 2.4.1 , NodeMCU 1.0  @ 192.168.1.35, V2 lower memory
 
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
 // see/for git: https://github.com/ptrooms/P1Meter
@@ -13,6 +14,12 @@
 #define P1_STATIC_IP          // if define we use Fixed-IP, else (undefined) we use dhcp
 
 #ifdef TEST_MODE
+  #define P1_BAUDRATE 115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+#else
+  #define P1_BAUDRATE 115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
+#endif
+
+#ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   #define DEF_PROG_VERSION 1131.241 // current version (displayed in mqtt record)
@@ -21,7 +28,7 @@
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2131.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2132.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -578,6 +585,7 @@ bool allowOtherActivities = true; // allow other activities if not reading seria
 bool p1SerialActive   = false;   // start program with inactive P1 port
 bool p1SerialFinish   = false;   // transaction finished (at end of !xxxx )
 
+long p1Baudrate = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
 long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields while tapping water, which may bounce
 long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active with serial communication
 
@@ -914,6 +922,63 @@ void setup()
 #endif
 
 #ifdef TEST_CALCULATE_TIMINGS
+
+  unsigned long start3e = ESP.getCycleCount();  // initialize
+  unsigned long start3f = ESP.getCycleCount();  // initialize
+  unsigned long start3  = ESP.getCycleCount(); 
+  start3  = ESP.getCycleCount()+1; 
+  for (int i = 0; i < 100; i++) {
+    asm(
+      "NOP;"
+    );
+  }
+  start3  = ESP.getCycleCount()+1; 
+  for (int i = 0; i < 1; i++) {
+    asm(
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+    );
+  }
+  start3e = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
+  for (int i = 0; i < 1; i++) {
+    asm(
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+    );
+  }
+  start3f = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
+  // 10.000xnop1 vs nop2 Start3=2109430182, start3e=2109480889(nop1=50707), start3f=2109541239(nop2=60350) .
+  // 10nops vs 20nops Start3=2782556574, start3e=2782556936(nop1=362), start3f=2782557306(nop2=370) . Only 8 cycles difference (compiler optimized?)
+  Serial.println((String)"\n Start3=" + start3 + ", start3e=" + start3e + "(nop1="+ (start3e-start3) + ")" + ", start3f=" + start3f + "(nop2="+ (start3f-start3e) + ") .");
+
+  
+  // serial test timings
   // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
   // 8bitstart TestRead4Rx start4=3405964740, end4=3405970810,  diff4=6070, wait4=6673, bittime4=694  = 72,84 µS =  8.5 bits
   // 4bitSStop TestRead4Rx start4= 668982987, end4= 668987238,  diff4=4251, wait4=4591, bittime4=694
@@ -1227,7 +1292,7 @@ void loop()
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
     loopcnt++ ;
-    Serial.print((String)"-"+(loopcnt%99)+" \b");
+    Serial.print((String)"-"+(loopcnt%10)+" \b");
     test_WdtTime = currentMillis + 1000;  // next interval
   }
 
@@ -1268,7 +1333,7 @@ void loop()
       mySerial.begin  (115200, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
 #else
-      mySerial.begin(115200);    // P1 meter port 115200 baud
+      mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
       mySerial2.begin( 1200);    // GJ meter port   1200 baud     // required during test without P1
 #endif
 
@@ -1285,10 +1350,10 @@ void loop()
 
 #ifdef UseNewSoftSerialLIB
         // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-        // mySerial.begin  (115200,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+        // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
         mySerial2.begin (  1200, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
 #else
-        // mySerial.begin(115200);    // P1 meter port 115200 baud
+        // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
         mySerial2.begin( 1200);    // GJ meter port   1200 baud
 #endif
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
@@ -1606,7 +1671,10 @@ void readTelegram() {
         */
         yield();                    // do background processing required for wifi etc.
         ESP.wdtFeed();              // feed the hungry timer
-        Serial.print((String) "zc");  //here
+        
+        // print zC is check is OK else print Zc (lower case) for debug reasons.
+        if (validCRCFound) Serial.print((String) "zC"); else Serial.print((String) "Zc") ;  //here
+
         p1TriggerTime = millis();   // indicate we have a yield
 
         processGpio() ; // do read and process regular data pins and finish  this with mqtt
@@ -1711,7 +1779,7 @@ void processGpio() {    // Do regular functions of the system
   bool tmpa = processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
   */
   processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
-  processLightRead(digitalRead(LIGHT_READ));        // process LedLightstatus read pin D6
+  processLightRead(LOW);        // process LedLightstatus read pin D6
   processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
 
   GetTemperatures();      // from DS18B20 tempsensors
@@ -1820,6 +1888,13 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           volatile int c = b / a;
           // force a never ending loop        
         } 
+
+    } else  if ((char)payload[0] == 'b') {    // here
+        p1Baudrate = p1Baudrate - 50 ;
+        Serial.print((String)"Decreasing Baudrate to " + p1Baudrate);
+    } else  if ((char)payload[0] == 'B') {    // here
+        p1Baudrate = p1Baudrate + 50 ;
+        Serial.print((String)"Increasing Baudrate to " + p1Baudrate);
         
 /* DNO , leave it to investigate how to force an exception
     } else  if ((char)payload[0] == 'e') {    // here
@@ -2193,6 +2268,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 bool processLightRead(bool myOperation)
 {
   lightReadState   = digitalRead(LIGHT_READ); // read D6
+  if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
   // Process this one-to-one directly to output
   if (outputOnSerial and lightReadState)  Serial.print("lightReadState D6 LOW...");  // debug
   if (outputOnSerial and !lightReadState) Serial.print("lightReadState D6 HIGH...");  // debug

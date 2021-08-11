@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Note: upto V24 we developed on Vxx. starting now we develop on development 
 create stable Versions-Vxx which when stable are merged into master.
 
+## [V21.32] - production
+	- V21.32Fix/ensure Hotwater sensor in inverted LOW at first mqttCNT to prevent ON state
+	-- Done in lightread routine where we simply compare mqttCnt = 0 
+	- SynC & Publish all changes as we have done, things works so let it operate
+	-- not sure if and to whart state everything was developed.
 ## [Unreleased] - Development
 	- V21.31 changed P1-Rxread to ensure that the wait for clock-sync never exceeds 14bits of waitcycles
 	-- Note this is doen by limiting the wait to 10.000 cycles and meant for highspeed connection
@@ -17,7 +22,7 @@ create stable Versions-Vxx which when stable are merged into master.
 	-- The SoftSerialP1 librbay is changed by putting esp.getcyclecnt readRx as GetCycleCntIram into cache.
 	- V21.23_seriallib - testing/adding P1ActiveCnt which correctly tell we have rxRead loop during serial
 	-- we can confirm that rxRead is called per byte.
-## [V21.24
+## [V21.24]
 	- merged to master
 	- tested & verified on test using dummy data
 	- restructered decode-routine and disconnected from readecodepart
