@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Note: upto V24 we developed on Vxx. starting now we develop on development 
 create stable Versions-Vxx which when stable are merged into master.
 
+# Note: [V32 8361d6d] Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
+- as we use email restriction on https://github.com/settings/emails
+-- set mail pafoxp@ubuntuO380:~/code-P1Meter$ git config --global user.email "34420738+ptrooms@users.noreply.github.com"
+-- set author pafoxp@ubuntuO380:~/code-P1Meter$ git commit --amend --reset-author --allow-empty
+-- publish pafoxp@ubuntuO380:~/code-P1Meter$ git push
 ## [V21.32] - production
 	- V21.32Fix/ensure Hotwater sensor in inverted LOW at first mqttCNT to prevent ON state
 	-- Done in lightread routine where we simply compare mqttCnt = 0 
