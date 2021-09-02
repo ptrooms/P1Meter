@@ -6,6 +6,8 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note: upto V24 we developed on Vxx. starting now we develop on development 
 create stable Versions-Vxx which when stable are merged into master.
 
+## [V21.33] - production
+	- V21.33 consmetic, fix line behavior, Terminate debug output line with crlf
 # Note: [V32 8361d6d] Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 - as we use email restriction on https://github.com/settings/emails
 -- set mail pafoxp@ubuntuO380:~/code-P1Meter$ git config --global user.email "34420738+ptrooms@users.noreply.github.com"

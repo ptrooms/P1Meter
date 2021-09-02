@@ -22,13 +22,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1131.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1133.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2132.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2133.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -1602,7 +1602,7 @@ void readTelegram() {
     // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
     
     if (outputOnSerial) {         // do we want/need to print the Telegram
-      Serial.print((String)"\nlT=" + (len-1) + " \t[");
+      Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
       for (int cnt = 0; cnt < len; cnt++) {
           
         if (telegram[cnt] == '\x0D') {
@@ -1613,7 +1613,7 @@ void readTelegram() {
         }
           // Serial.printf("%02x",telegram[cnt-1]);   // hexadecimal formatted
       }
-      Serial.print((String)"]");
+      Serial.println((String)"]");    // v33 debug lines didnot end in newline
     }
 
     /* //debugCRC
