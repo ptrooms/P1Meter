@@ -1,5 +1,10 @@
 
 // require  core 2.4.1 , NodeMCU 1.0  @ 192.168.1.35, V2 lower memory
+//    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
+//      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
+//      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
+
+// Todo1: safegurard routing if P1 expieres often then 10-12 seconds... at 1sec rate routine is not honoured
 
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
 // see/for git: https://github.com/ptrooms/P1Meter
@@ -22,13 +27,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1133.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1134.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2133.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2134.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -36,7 +41,8 @@
 // *
 // * * * * * L O G  B O O K
 // *
-// Compiled on Arduino:
+// Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
+// 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
 // 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
 // 27apr21 23u38: getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
 //  - fixed Ip adress to eliminate iterference (if defined P1_STATIC_IP )
@@ -1380,8 +1386,7 @@ void loop()
       attachWaterInterrupt();
       waterTriggerTime = currentMicros;  // reset our trigger counter
       waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
-    } else
-      // check if we must add a pulse counter
+    } else {  // check if we must add a pulse counter
       if ( (waterTriggerTime != 0) && (debounce_time > waterReadDebounce * 1000) ) { // debounce_time (mSec
         waterTriggerTime = 0;                        // reset counter for next trigger
         // waterTriggerCnt  = 0;                     // reset ISR counter
@@ -1394,21 +1399,22 @@ void loop()
           if (!waterReadState) pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external pull-up
         } // if waterReadState
       } // else waterTriggerCnt = 1
+    }
 
-      if (mqttReceivedCommand[0] != '\x00') {
-          ProcessMqttCommand(mqttReceivedCommand,2); // process incoming Mqtt command (if any)
-          memset(mqttReceivedCommand,0,sizeof(mqttReceivedCommand));
-      }
+    if (mqttReceivedCommand[0] != '\x00') {
+        ProcessMqttCommand(mqttReceivedCommand,2); // process incoming Mqtt command (if any)
+        memset(mqttReceivedCommand,0,sizeof(mqttReceivedCommand));
+    }
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
-    readTelegram2();    // read GJ gpio4-input (if available), write gpio2 output
+    readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output
 
   }   // if allow other activities
 
-  // readTelegram2();    // read GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
+  // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
 
   // (p1SerialActive && !p1SerialFinish) , process Telegram data
-  readTelegram();     // read P1 gpio14 (if serial data available)
+  readTelegram();     // read RX1 P1 gpio14 (if serial data available)
  
   mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
   ESP.wdtFeed();  // as advised by forums
@@ -1426,17 +1432,18 @@ void loop()
       mqttP1Published = false;
     } else {
 
-      // report to error mqtt, //V20 candidate for a callable error routine
+      // report to error mqtt, // V20 candidate for a callable error routine
       char mqttOutput[128];
       String mqttMsg = "{";  // start of Json
-        mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 serial not connected\""); 
-        // String mqttMsg = "Error, "; // build mqtt frame 
-        // mqttMsg.concat("serial not connected ");  
-        // mqttMsg,concat("interval="); // build mqtt frame 
-        // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
-        mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+      mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 serial not connected\""); 
+      // String mqttMsg = "Error, "; // build mqtt frame 
+      // mqttMsg.concat("serial not connected ");  
+      // mqttMsg,concat("interval="); // build mqtt frame 
+      // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
+      mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
       mqttMsg.toCharArray(mqttOutput, 128);
+
       if (client.connected()) {
         client.publish(mqttErrorTopic, mqttOutput); // report to error topic
         if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking" );  // report we have survived this interval
