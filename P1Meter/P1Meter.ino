@@ -14,7 +14,7 @@
 
 #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
 // #define TEST_MODE    // set in PlatformIO; use our file defined confidential wifi/server/mqtt settings
-#define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.0 and use P1serial verion to listen /header & !finish
+#define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.1 and use P1serial verion to listen /header & !finish
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP          // if define we use Fixed-IP, else (undefined) we use dhcp
 
