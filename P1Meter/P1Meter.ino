@@ -1348,6 +1348,8 @@ void loop()
 
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
+        if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." );
+                                                                      
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
         if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
         p1SerialFinish = !p1SerialFinish;   // reverse this

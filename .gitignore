@@ -14,6 +14,11 @@ gitignore*
 
 ## Program related ##
 P1Meter/*.txt
+## do not sync save/copy files
+P1Meter/*.inox
+P1Meter/*.inos
+## do not sync /tmp output copied to here
+*arduino_build_*/
 
 ## Project files ######
 .platformio
