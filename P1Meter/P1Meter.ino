@@ -765,7 +765,7 @@ void setup()
   // prepare wdt
   ESP.wdtDisable();
   // ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S
-  ESP.wdtEnable(22000); // allow two passses missing
+  ESP.wdtEnable(33000); // allow three passses missing
 
   Serial.begin(115200);
   Serial.println("Booting");              // message to serial log
@@ -1339,7 +1339,8 @@ void loop()
       mySerial.begin  (115200, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
 #else
-      mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+      // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+      mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud
       mySerial2.begin( 1200);    // GJ meter port   1200 baud     // required during test without P1
 #endif
 

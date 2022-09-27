@@ -121,7 +121,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long speed) {
    // Use getCycleCount() loop to get as exact timing as possible
-   m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;
+   m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
    m_highSpeed = speed > 9600;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
    if (!m_rxEnabled)
@@ -176,6 +176,7 @@ int SoftwareSerial::available() {
 
 #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
 #define WAITIram { while (SoftwareSerial::getCycleCountIram()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
+// at 115k2 --> m_bittime = 694 cycles
 
 size_t SoftwareSerial::write(uint8_t b) {
    if (!m_txValid) return 0;
@@ -226,10 +227,10 @@ int SoftwareSerial::peek() {
 // added wait test to prevent overrunning when Clocks are slower (10000 works ok, 2021-05-05 22:01:29: testing #7000)
 #define WAITIram4 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
 #define WAITIram5 { while (wait<7000 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
-
+// at 115k2 --> m_bittime = 694 cycles
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
    // Advance the starting point for the samples but compensate for the
    // initial delay which occurs before the interrupt is delivered
@@ -240,7 +241,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    unsigned long start = getCycleCountIram();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram5; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
@@ -251,7 +252,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
    // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
    //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram5; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
