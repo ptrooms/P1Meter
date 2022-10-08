@@ -19,21 +19,23 @@
 #define P1_STATIC_IP          // if define we use Fixed-IP, else (undefined) we use dhcp
 
 #ifdef TEST_MODE
-  #define P1_BAUDRATE 115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+  #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+  #define P1_BAUDRATE2 115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
 #else
-  #define P1_BAUDRATE 115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
+  #define P1_BAUDRATE  115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
+  #define P1_BAUDRATE2 115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
 #endif
 
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1134.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1135.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2134.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2135.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -42,6 +44,8 @@
 // * * * * * L O G  B O O K
 // *
 // Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
+// 03okt22 23u11: v24 serial2 inverted slightly better
+// 30sep22 22u26: v35 p1Baudrate2 115k2 for warmtelink 
 // 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
 // 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
 // 27apr21 23u38: getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
@@ -413,14 +417,15 @@ bool bSERIAL_INVERT = false;  // Simulatated P1 meter is USB interface of a PC t
 bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
 #endif
 
-#define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232
+// #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232  < 03okt22
 // #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
+#define bSERIAL2_INVERT true // GJ meter is as far as we  know normal  serial (FALSE) RS232 @direct p1 03okt22
 
 
 // hardware PIN settings, change accordingly , total esp8266 pins 17
 #define BLUE_LED         D0  // pin GPIO16 output to BLUE signal indcator
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
-#define SERIAL_RX2       D2  // pin GPIO14 input  for SoftwareSerial RX  GJ
+#define SERIAL_RX2       D2  // pin GPIO4  input  for SoftwareSerial RX  GJ
 #define DS18B20_SENSOR   D3  // pin GPIO0 Pin where DS18B20 sensors are mounted (High@Boot)
 #define SERIAL_TX2       D4  // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
 #define SERIAL_RX        D5  // pin GPIO14 input  for SoftwareSerial RX P1 Port
@@ -494,7 +499,6 @@ unsigned long startMicros = 0;   // micros()
 // used to research and find position of wdt resets
 unsigned long test_WdtTime = 0;   // time the mainloop
 unsigned long loopcnt = 0;        // countthe loop
-
 
 // control the informative led within the loop
 unsigned long previousBlinkMillis = 0; // used to shortblink the BLUELED, at serialinput this is set to high value
@@ -577,7 +581,8 @@ const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+
 // Interval is how long we wait for lockup and data was not processed
 // add const if this should never change
 int intervalP1    = 12000;    // mSecs : P1 30 --> 12 seconds response time interval of meter is 10 seconds
-int intervalP1cnt =   360;    // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
+int intervalP1cnt =  360;     // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
+int readTelegram2cnt = 6;     // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
 bool forceCheckData = false;  // force check on data in order to output some essential mqtt (Thermostat & Temprature) functions.
 bool firstRun = true;         // do not use forceCheckData (which might be activated during setup-() or first loop-() )
 
@@ -591,7 +596,8 @@ bool allowOtherActivities = true; // allow other activities if not reading seria
 bool p1SerialActive   = false;   // start program with inactive P1 port
 bool p1SerialFinish   = false;   // transaction finished (at end of !xxxx )
 
-long p1Baudrate = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
+long p1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
+long p1Baudrate2 = P1_BAUDRATE2;   //  V35 2022-09-30 22:25:25: set programmatic speed which can be influenced by teh bB command.
 long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields while tapping water, which may bounce
 long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active with serial communication
 
@@ -689,10 +695,11 @@ bool telegramP1header = false;      // used to trigger/signal Header window /KFM
 //DebugCRC int  testTelegramPos  = 0;          // where are we
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
 
-// RX2 buffer on RX/TX Gpio4/2 , use a small buffer as GJ meter read are on request
-#define MAXLINELENGTH2 64
+// RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
+#define MAXLINELENGTH2 256
 char telegram2[MAXLINELENGTH2];     // telegram maxsize 64bytes for P1 meterMAXLINELENGTH
 char telegramLast2[3];              // overflow used to catch line termination bracket
+char telegramLast2o[19];            // overflow used to catch line termination bracket
 
 // Callback mqtt value which is used to received data
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
@@ -703,20 +710,19 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
 // Note Software serial uses "attachinterrupt" FALLING on pin to calculate BAUD timing
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
 #ifdef UseNewSoftSerialLIB
-//  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+  //  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
 SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
 SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
 #else
-/// @param baud the TX/RX bitrate
-/// @param config sets databits, parity, and stop bit count
-/// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
-/// @param txPin -1 or default: either no TX pin (onewire), or keeps the txPin set in the ctor
-/// @param invert true: uses invert line level logic
-/// @param bufCapacity the capacity for the received bytes buffer
-/// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
-// 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-
-SoftwareSerial mySerial(SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  /// @param baud the TX/RX bitrate
+  /// @param config sets databits, parity, and stop bit count
+  /// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
+  /// @param txPin -1 or default: either no TX pin (onewire), or keeps the txPin set in the ctor
+  /// @param invert true: uses invert line level logic
+  /// @param bufCapacity the capacity for the received bytes buffer
+  /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
+  // 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
 SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
@@ -1303,10 +1309,14 @@ void loop()
   }
 
   // Following will trackdown loops
-  if (currentMillis > previousLoop_Millis + 1000) { // exceeding one second  ?, warn user
-    Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yielding\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+  if (currentMillis > (previousLoop_Millis + 1000) ) { // exceeding one second  ?, warn user
     // yield();
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
+    if (outputOnSerial) {
+      Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yield1500\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+    } else {
+      Serial.print("^");  // signal a yieldloop
+    }
   }
   previousLoop_Millis = currentMillis;  // registrate our loop time
 
@@ -1336,12 +1346,12 @@ void loop()
       // Start secondary serial connection if not yet active
 #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-      mySerial.begin  (115200, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+      mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
 #else
       // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
       mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud
-      mySerial2.begin( 1200);    // GJ meter port   1200 baud     // required during test without P1
+      // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
 #endif
 
     } else {
@@ -1349,22 +1359,24 @@ void loop()
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." );
-                                                                      
+        // --> end of p1 read electricity
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
         if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
         mySerial.flush();  // Clear P1 buffer
+        readTelegram2cnt = 0;  // allow readtelegram2
 
 #ifdef UseNewSoftSerialLIB
         // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
         // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-        mySerial2.begin (  1200, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+        mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
 #else
         // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-        mySerial2.begin( 1200);    // GJ meter port   1200 baud
+        mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
 #endif
+        
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
         previousMillis    = currentMillis;  // initialise our start counter for the overall proces.
       } else {
@@ -1404,14 +1416,10 @@ void loop()
       } // else waterTriggerCnt = 1
     }
 
-    if (mqttReceivedCommand[0] != '\x00') {
-        ProcessMqttCommand(mqttReceivedCommand,2); // process incoming Mqtt command (if any)
-        memset(mqttReceivedCommand,0,sizeof(mqttReceivedCommand));
-    }
+    // old dlocation of  cechking for incoming mqtt  commands
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
-    readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output
-
+    if (readTelegram2cnt < 6) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if allow other activities
 
   // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
@@ -1425,6 +1433,7 @@ void loop()
   p1TriggerTime = millis();   // indicate our mainloop yield
 
   // check and prevail deadlock timeout
+  // executed at no p1-message intervalP1<12 seconds, decrease reliability intervalP1cnt=360 until <1 which restarts; 
   if   ((unsigned long)(currentMillis - previousMillis) >= intervalP1) {  // is our deadlock check interval passed  12secs ?
     //  if (millis() > 600000) {  // autonomous restart every 5 minutes
     intervalP1cnt--;            // decrease reliability
@@ -1433,7 +1442,7 @@ void loop()
       Serial.print("\n #!!# ESP P1 not connected, cnt="); // print message line
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
-    } else {
+    } else {    // reliabilitty intervalP1cnt=360>0
 
       // report to error mqtt, // V20 candidate for a callable error routine
       char mqttOutput[128];
@@ -1461,28 +1470,35 @@ void loop()
       Serial.print(", time2:");
       Serial.print(currentMillis); // print message line
       Serial.println("."); // print message line
-      mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput
+
+      // output on secondary  TX if not already used for loopback
+      if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput
       // }
 
-      forceCheckData = true;  // enforce mqtt publish
-      validCRCFound  = false; // Enforce we (might) have a CRC error
-      processGpio();          // Do regular functions of the system
-      publishP1ToMqtt();      // PUBLISH this mqtt
-      forceCheckData = false;
+      forceCheckData = true;  // enforce  mode active
+      validCRCFound  = false;   // Enforce we (might) have a CRC error
+      processGpio();            // Do regular functions of the system
+      publishP1ToMqtt();        // PUBLISH this mqtt
+      forceCheckData = false; // enforce  mode inactive
 
       mqttP1Published = true;
     } // else millis exceeded intervalP1 hile enforce mqtt for tempsensors
 
     // If no MQTT poublished in this timout interval, whatever the reason, execute a restart to reset
     if (!mqttP1Published) {  // in case no publish energy yet , try restart
-      Serial.println("ESP timeout.restart"); // print message line
+      Serial.println("ESP timeout.mqttP1Published.restart"); // print message line
       if (client.connected()) client.publish(mqttLogTopic, "ESP timeout.restart" );
       ESP.restart();     // if no/yet data published force restart
     }
 
     // if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking" );  // report we have survived this interval
     previousMillis = currentMillis; // Use the snapshot to set track time until next loop event
-    mqttP1Published = false;        // assume we have not yet published procssed data
+    mqttP1Published = false;        // assume we have not yet published processed data
+  }
+
+  if (mqttReceivedCommand[0] != '\x00') {
+      ProcessMqttCommand(mqttReceivedCommand,2); // process incoming Mqtt command (if any)
+      memset(mqttReceivedCommand,0,sizeof(mqttReceivedCommand));
   }
 
   ArduinoOTA.handle();             // check if we must service on the Air update
@@ -1683,7 +1699,7 @@ void readTelegram() {
         ESP.wdtFeed();              // feed the hungry timer
         
         // print zC is check is OK else print Zc (lower case) for debug reasons.
-        if (validCRCFound) Serial.print((String) "zC"); else Serial.print((String) "Zc") ;  //here
+        if (validCRCFound) Serial.print((String) "zC"); else Serial.print((String) "Zc") ;
 
         p1TriggerTime = millis();   // indicate we have a yield
 
@@ -1725,7 +1741,6 @@ void readTelegram2() {
 #ifdef UseP1SoftSerialLIB
   if (mySerial.P1active()) return ;   // return if P1 is active
 #endif  
-
   int lenTelegram2 = 0;
   /*
     if (mySerial2.P1active())   {               // P2 blocked
@@ -1745,8 +1760,10 @@ void readTelegram2() {
     memset(telegram2, 0, sizeof(telegram2));            // initialise telegram array to 0
     memset(telegramLast2, 0, sizeof(telegramLast2));    // initialise array to 0
 
-    while (mySerial2.available())     {
-      int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+    while (mySerial2.available() && readTelegram2cnt < 6 )     {    // number of periodic reads 
+      // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      int len = mySerial2.readBytesUntil(0, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
       lenTelegram2 = lenTelegram2 + len;
       if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
@@ -1758,23 +1775,40 @@ void readTelegram2() {
         telegramLast2[2] = 0;                   // 3byte-telegram lastbyte terminaion variable
         telegram2[len + 1] = '\n';    // string set lastcharacter to \n
         telegram2[len + 2] = 0;       // variable next character before null
+        /*
+         * Check ascii output
+         */
+        for (int i = 0; i <= len; i++) {  // forward
+          if (telegram2[i] == 10) telegram2[i] = '<' ; // translate NL tp <
+          if (telegram2[i] == 13) telegram2[i] = '{' ; // translate CR to {
+          if (telegram2[i] == 00) telegram2[i] = '_' ; // translate CR to {
+          if (telegram2[i] < 32 || telegram2[i] > 127 ) {   // ascii range
+              telegram2[i] = '~';
+            }
+        }
+        
+        if (outputOnSerial) {
+          Serial.print(".2>[")     ; // debug print processing serial data
+          Serial.print(len)     ; // debug print processing serial data
+          Serial.print("]")     ; // debug print processing serial data
+          Serial.println(telegram2); // debug print processing serial data
 
-        if (outputOnSerial) Serial.print("2>")     ; // debug print processing serial data
-        if (outputOnSerial) Serial.print(telegram2); // debug print processing serial data
+        }          
         if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back
 
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
       }
+      readTelegram2cnt++;   /// account this readloop
     } // while data
+
     if (outputOnSerial) {
-      Serial.print(" [");         // debug print transaction length
+      Serial.print(" [l2_total=");         // debug print transaction length
       Serial.print(lenTelegram2);
       Serial.print("].");
       Serial.println("");
     }
-
   }  // if available
 } // void
 

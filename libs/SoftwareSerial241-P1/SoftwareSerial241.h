@@ -54,7 +54,8 @@ public:
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
 
-   void rxRead();
+   void rxRead();		// witp1active detection beween / and !
+   void rxRead2();		// without p1active detection beween / and !
 
    // AVR compatibility methods
    bool listen() { enableRx(true); return true; }

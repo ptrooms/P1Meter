@@ -37,6 +37,12 @@ P1Meter*.map
 platformio_override.ini
 platformio_P1Meter_cenv.ini
 telegram0crlf.txt
+# my local save/play files
+*.ino1
+*.ino2
+*.ino3
+*.ino4
+p1-analyse-*.txt
 
 ## Visual Studio Code specific ######
 .vscode
