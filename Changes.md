@@ -6,13 +6,20 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note: upto V24 we developed on Vxx. starting now we develop on development 
 create stable Versions-Vxx which when stable are merged into master.
 
+## [V22.35] - production/stable
+	- V22.35 - implement secondary RX2 on GPIO4/D2 INVERTED for direct connection to warmtelink pulldown
+    -- impment logging for RX2
+## [V22.34] - production/develope
+	- V22.34 - develop and use  gpio4 for seocndary RX conneted to Liander warmtelink
+    -- solve interrupt overhead and RX2 windowing outside P1 read.
+	-- solve and improve logging reporting
 ## [V21.33] - production
-	- V21.33 consmetic, fix line behavior, Terminate debug output line with crlf
+	- V21.33 cosmetic, fix line behavior, Terminate debug output line with crlf
 # Note: [V32 8361d6d] Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
-- as we use email restriction on https://github.com/settings/emails
--- set mail pafoxp@ubuntuO380:~/code-P1Meter$ git config --global user.email "34420738+ptrooms@users.noreply.github.com"
--- set author pafoxp@ubuntuO380:~/code-P1Meter$ git commit --amend --reset-author --allow-empty
--- publish pafoxp@ubuntuO380:~/code-P1Meter$ git push
+	- as we use email restriction on https://github.com/settings/emails
+	-- set mail pafoxp@ubuntuO380:~/code-P1Meter$ git config --global user.email "34420738+ptrooms@users.noreply.github.com"
+	-- set author pafoxp@ubuntuO380:~/code-P1Meter$ git commit --amend --reset-author --allow-empty
+	-- publish pafoxp@ubuntuO380:~/code-P1Meter$ git push
 ## [V21.32] - production
 	- V21.32Fix/ensure Hotwater sensor in inverted LOW at first mqttCNT to prevent ON state
 	-- Done in lightread routine where we simply compare mqttCnt = 0 
