@@ -44,7 +44,7 @@
 // * * * * * L O G  B O O K
 // *
 // Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
-// 03okt22 23u11: v24 serial2 inverted slightly better
+// 03okt22 23u11: v35 serial2 inverted slightly better
 // 30sep22 22u26: v35 p1Baudrate2 115k2 for warmtelink 
 // 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
 // 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
