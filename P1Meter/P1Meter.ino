@@ -1,27 +1,39 @@
 
+// require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
+//    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
+//      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
+//      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
+
+// Todo1: safegurard routing if P1 expire often then 10-12 seconds... at 1sec rate routine is not honoured
 
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
 // see/for git: https://github.com/ptrooms/P1Meter
-// Update on V20 to check if this works in Visual Studio Code 
-
-// --> use NodeMCU1.0 ESP-12E with LwIp V2 lower memory, BuiltIn led (GPIO)16
+// Update $ git checkout -b v36 on https://github.com/ptrooms/P1Meter.git to correct watercnt errors 
 
 #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
 // #define TEST_MODE    // set in PlatformIO; use our file defined confidential wifi/server/mqtt settings
-#define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.0 and use P1serial verion to listen /header & !finish
+#define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.1 and use P1serial verion to listen /header & !finish
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP          // if define we use Fixed-IP, else (undefined) we use dhcp
 
 #ifdef TEST_MODE
+  #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+  #define P1_BAUDRATE2 115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+#else
+  #define P1_BAUDRATE  115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
+  #define P1_BAUDRATE2 115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
+#endif
+
+#ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1124.240 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1136.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2124.240 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2136.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -29,13 +41,23 @@
 // *
 // * * * * * L O G  B O O K
 // *
-// Compiled on Arduino:
+// 06feb23 13u53: v36 Corrected debounce time *100 to *1000 & restructured mainloop "WaterPulse trigger when debounce " 
+//    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
+//    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
+// 03okt22 23u11: v35 serial2 inverted slightly better
+// 30sep22 22u26: v35 p1Baudrate2 115k2 for "warmtelink" 
+// 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
+// 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
+//  Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
+// 27apr21 23u38: getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
 //  - fixed Ip adress to eliminate iterference (if defined P1_STATIC_IP )
     // Set your Static IP address IPAddress local_IP(192, 168, 1, 125);
     // Set your Gateway IP address IPAddress gateway(192, 168, 1, 1);
     // Subnet IPAddress subnet(255, 255, 255, 0);
     // DNS1 IPAddress primaryDNS(192.168.1.8);   //optional
     // DNS2 IPAddress secondaryDNS(192.168.1.1); //optional
+// ## [V21.25]    
+//  - Using SDK 2.4.1 to investigate stability
 // ## [V21.22]
 //  19apr21 23u39 added ESP.wdtFeed(); in loop ()
 //  - 19apr21 15u22 - added diagnostic information sdk version & emempry use etc.etc.
@@ -389,21 +411,22 @@
 #endif
 
 
-// communication mode settings
+// communication mode settings, is the Startbit RISING edge or (inverted) FALLING edge
 #ifdef TEST_MODE
-bool bSERIAL_INVERT = false;  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+bool bSERIAL_INVERT = false;  // Simulatated P1 meter is USB interface of a PC to GPIO, does not required invert
 #else
-bool bSERIAL_INVERT = true;  // P1 meter require - here - inverted serial levels (TRUE) for RS232
+bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
 #endif
 
-#define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232
+// #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232  < 03okt22
 // #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
+#define bSERIAL2_INVERT true // GJ meter is as far as we  know normal  serial (FALSE) RS232 @direct p1 03okt22
 
 
 // hardware PIN settings, change accordingly , total esp8266 pins 17
 #define BLUE_LED         D0  // pin GPIO16 output to BLUE signal indcator
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
-#define SERIAL_RX2       D2  // pin GPIO14 input  for SoftwareSerial RX  GJ
+#define SERIAL_RX2       D2  // pin GPIO4  input  for SoftwareSerial RX  GJ
 #define DS18B20_SENSOR   D3  // pin GPIO0 Pin where DS18B20 sensors are mounted (High@Boot)
 #define SERIAL_TX2       D4  // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
 #define SERIAL_RX        D5  // pin GPIO14 input  for SoftwareSerial RX P1 Port
@@ -478,7 +501,6 @@ unsigned long startMicros = 0;   // micros()
 unsigned long test_WdtTime = 0;   // time the mainloop
 unsigned long loopcnt = 0;        // countthe loop
 
-
 // control the informative led within the loop
 unsigned long previousBlinkMillis = 0; // used to shortblink the BLUELED, at serialinput this is set to high value
 const long    intervalBlinkMillis = 250;
@@ -486,6 +508,8 @@ const long    intervalBlinkMillis = 250;
 // CRC16/arc redundancy check (data including between / and ! of P1 Telegram )
 unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 #include "CRC16.h"              // CRC-16/ARC
+
+// #include <exception>          // added to allow/throw exceptions 2021-04-28 00:34:20 , not used as I do not know yet how to force an exception
 
 // start regular program soruce segment
 #include <PubSubClient.h>
@@ -558,7 +582,8 @@ const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+
 // Interval is how long we wait for lockup and data was not processed
 // add const if this should never change
 int intervalP1    = 12000;    // mSecs : P1 30 --> 12 seconds response time interval of meter is 10 seconds
-int intervalP1cnt =   360;    // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
+int intervalP1cnt =  360;     // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
+int readTelegram2cnt = 6;     // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
 bool forceCheckData = false;  // force check on data in order to output some essential mqtt (Thermostat & Temprature) functions.
 bool firstRun = true;         // do not use forceCheckData (which might be activated during setup-() or first loop-() )
 
@@ -572,6 +597,8 @@ bool allowOtherActivities = true; // allow other activities if not reading seria
 bool p1SerialActive   = false;   // start program with inactive P1 port
 bool p1SerialFinish   = false;   // transaction finished (at end of !xxxx )
 
+long p1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
+long p1Baudrate2 = P1_BAUDRATE2;   //  V35 2022-09-30 22:25:25: set programmatic speed which can be influenced by teh bB command.
 long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields while tapping water, which may bounce
 long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active with serial communication
 
@@ -669,10 +696,11 @@ bool telegramP1header = false;      // used to trigger/signal Header window /KFM
 //DebugCRC int  testTelegramPos  = 0;          // where are we
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
 
-// RX2 buffer on RX/TX Gpio4/2 , use a small buffer as GJ meter read are on request
-#define MAXLINELENGTH2 64
+// RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
+#define MAXLINELENGTH2 256
 char telegram2[MAXLINELENGTH2];     // telegram maxsize 64bytes for P1 meterMAXLINELENGTH
 char telegramLast2[3];              // overflow used to catch line termination bracket
+char telegramLast2o[19];            // overflow used to catch line termination bracket
 
 // Callback mqtt value which is used to received data
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
@@ -683,20 +711,19 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
 // Note Software serial uses "attachinterrupt" FALLING on pin to calculate BAUD timing
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
 #ifdef UseNewSoftSerialLIB
-//  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+  //  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
 SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
 SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
 #else
-/// @param baud the TX/RX bitrate
-/// @param config sets databits, parity, and stop bit count
-/// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
-/// @param txPin -1 or default: either no TX pin (onewire), or keeps the txPin set in the ctor
-/// @param invert true: uses invert line level logic
-/// @param bufCapacity the capacity for the received bytes buffer
-/// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
-// 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-
-SoftwareSerial mySerial(SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  /// @param baud the TX/RX bitrate
+  /// @param config sets databits, parity, and stop bit count
+  /// @param rxPin -1 or default: either no RX pin, or keeps the rxPin set in the ctor
+  /// @param txPin -1 or default: either no TX pin (onewire), or keeps the txPin set in the ctor
+  /// @param invert true: uses invert line level logic
+  /// @param bufCapacity the capacity for the received bytes buffer
+  /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
+  // 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
 SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
@@ -744,7 +771,8 @@ void setup()
 
   // prepare wdt
   ESP.wdtDisable();
-  ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S
+  // ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S
+  ESP.wdtEnable(33000); // allow three passses missing
 
   Serial.begin(115200);
   Serial.println("Booting");              // message to serial log
@@ -771,6 +799,17 @@ void setup()
     Serial.println(local_IP );
   #endif
 
+  /*
+    Added 2021-04-26 22:06:55 to test/check wifi issues
+  */
+  WiFi.persistent(false); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083)
+  // WiFi.disconnect(true); // Delete SDK wifi config (after is has connected)
+  delay(200);
+  // WiFi.mode(WIFI_STA); // Disable AP mode
+  // WiFi.setSleepMode(WIFI_MODEM_SLEEP); // Disable sleep (Esp8288/Arduino core and sdk default)
+  
+  
+
   Serial.println("Settingup WifiSTAtion.");  // wait 5 seconds before retry
   WiFi.mode(WIFI_STA);            // Client mode
 
@@ -789,7 +828,10 @@ void setup()
     }
     Serial.print((String) "Connection to "+ ssid +", Faild, restartting in 5 seconds..");  // wait 5 seconds before retry
     delay(2000);
+    // WiFi.disconnect(true);   // ToTest 2021-04-26 22:30:51 still not erasing the ssid/pw. Will happily reconnect on next start
+    // WiFi.begin("0","0");     // ToTest 2021-04-26 22:30:51 adding this effectively seems to erase the previous stored SSID/PW
     ESP.restart();
+    // delay(1000);             // ToTest 2021-04-26 22:30:51 (read https://github.com/espressif/arduino-esp32/issues/400)
   }
 
 
@@ -840,15 +882,18 @@ void setup()
   // #define DEF_PROG_VERSION 1123.240
   ArduinoOTA.begin();
   Serial.println("Ready version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
+  Serial.println ("getFullVersion:" + ESP.getFullVersion());   
   Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
   Serial.print   ("IP address: ");
     Serial.println(WiFi.localIP());
+  Serial.println ("ESP8266-ResetReason: "+  String(ESP.getResetReason()));
   Serial.println ("ESP8266-free-space: "+   String(ESP.getFreeSketchSpace()));
   Serial.println ("ESP8266-sketch-size: "+  String(ESP.getSketchSize()));
   Serial.println ("ESP8266-sketch-md5: "+   String(ESP.getSketchMD5()));
   Serial.println ("ESP8266-chip-size: "+    String(ESP.getFlashChipRealSize()));
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
+  Serial.println ("ESP8266-getChipId: "+    ESP.getChipId()); 
 
   WiFi.printDiag(Serial);   // print data  
   client.setServer(mqttServer, mqttPort);
@@ -890,12 +935,181 @@ void setup()
 #endif
 
 #ifdef TEST_CALCULATE_TIMINGS
-  Serial.print((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
 
-  // insert a small loop to stabilize
-  for (int i = 0; i < 1000; i++) {
-    int test = 0;
+  unsigned long start3e = ESP.getCycleCount();  // initialize
+  unsigned long start3f = ESP.getCycleCount();  // initialize
+  unsigned long start3  = ESP.getCycleCount(); 
+  start3  = ESP.getCycleCount()+1; 
+  for (int i = 0; i < 100; i++) {
+    asm(
+      "NOP;"
+    );
   }
+  start3  = ESP.getCycleCount()+1; 
+  for (int i = 0; i < 1; i++) {
+    asm(
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+    );
+  }
+  start3e = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
+  for (int i = 0; i < 1; i++) {
+    asm(
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+      "NOP;"
+    );
+  }
+  start3f = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
+  // 10.000xnop1 vs nop2 Start3=2109430182, start3e=2109480889(nop1=50707), start3f=2109541239(nop2=60350) .
+  // 10nops vs 20nops Start3=2782556574, start3e=2782556936(nop1=362), start3f=2782557306(nop2=370) . Only 8 cycles difference (compiler optimized?)
+  Serial.println((String)"\n Start3=" + start3 + ", start3e=" + start3e + "(nop1="+ (start3e-start3) + ")" + ", start3f=" + start3f + "(nop2="+ (start3f-start3e) + ") .");
+
+  
+  // serial test timings
+  // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
+  // 8bitstart TestRead4Rx start4=3405964740, end4=3405970810,  diff4=6070, wait4=6673, bittime4=694  = 72,84 µS =  8.5 bits
+  // 4bitSStop TestRead4Rx start4= 668982987, end4= 668987238,  diff4=4251, wait4=4591, bittime4=694
+  // 1bitStart TestRead4Rx start4=4090473783, end4=4090475689,  diff4=1906, wait4=2509, bittime4=694
+  // 1bitWait  TestRead4Rx start4=1430700974, end4=1430701833,  diff4=859,  wait4=1121, bittime4=694
+  // 8bitOnly  TestRead4Rx start4=1597461092, end4=1597462357,  diff4=1265, wait4=427,  bittime4=694
+  // 4bitOnly  TestRead4Rx start4=2339998248, end4=2339999243,  diff4=995,  wait4=427,  bittime4=694
+  // 2BitOnly  TestRead4Rx start4=3978366322, end4=3978367168,  diff4=846,  wait4=427,  bittime4=694
+  // 1bitOnly  TestRead4Rx start4=2601377338, end4=2601377762,  diff4=424,  wait4=427,  bittime4=694  (time to read 1 bit = 424 cycles)
+  // noloop:   TestRead4Rx start4= 547644023, end4= 547644025,  diff4=2,    wait4=427,  bittime4=694
+  // waitonly: TestRead4Rx start4= 625878073, end4= 625878512,  diff4=439,  wait4=1121, bittime4=694  (427+694=1121)
+
+  // Setup our test skeleton
+    #define WAITtest4  { while (ESP.getCycleCount()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+    Serial.println((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
+    int m_rxPin4 = SERIAL_RX; 
+    unsigned long speed4 = 115200;
+    unsigned long m_bitTime4 = ESP.getCpuFreqMHz()*1000000/speed4;
+    int m_buffSize4 = 66; // test
+    bool m_overflow4 = false;
+    bool m_P1active4 = false;
+    bool m_highSpeed4 = true;
+    // simulate the serial routine for 1byte   
+    unsigned long wait4 = m_bitTime4 + m_bitTime4/3 - 498;		// offset 501=425 offset 498=427cycles 115k2@80MHz
+    
+    // below a 1:1 copy of the serial routine of plerup
+    unsigned long start4 = ESP.getCycleCount();
+    uint8_t rec = 0;
+    // WAITtest4;    // wait/skip startbit 427 cycles
+    for (int i = 0; i < 8; i++) {  // this routine takes 424 cycles without any wait and for-test-consumes 12cyles
+      WAITtest4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+      rec >>= 1;
+      if (digitalRead(m_rxPin4)) rec |= 0x80;
+    }
+    WAITtest4; // stopbit while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+    if (m_rxPin4) rec = ~rec;   // simulate the invert
+    unsigned int m_inPos4 = 10;
+    unsigned int m_outPos4 = 5;
+    int next4 = (m_inPos4 +1) % m_buffSize4;
+    if (next4 != m_outPos4) {
+        if (rec == '/') m_P1active4 = true ;   // 26mar21 Ptro P1 messageing has started by header
+        if (rec == '!') m_P1active4 = false; // 26mar21 Ptro P1 messageing has ended due valid trailer
+        // m_buffer[m_inPos4] = rec;
+        m_inPos4 = next4;
+    } else {
+        m_P1active4 = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
+        m_overflow4 = true;
+    }
+    unsigned long start4e = ESP.getCycleCount();
+    
+    Serial.println((String)" TestRead4Rx start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+
+
+    // calculate getCycleCnt
+    wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+    start4 = ESP.getCycleCount(); 
+    start4e = ESP.getCycleCount();  // delta between these two = 348 cycles
+    // TestIramWait0 start4=1709979665, end4=1709979667, diff4=2, wait4=427, bittime4=694
+    Serial.println((String)" TestIramWait0 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+    start4 = ESP.getCycleCount();
+    // while loop here takes 91 cycles
+    { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+    start4e = ESP.getCycleCount();
+    // TestIramWait1 start4=594504443, end4=594504882,   diff4=439, wait4=1121, bittime4=694
+    Serial.println((String)" TestIramWait1 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+
+    // Test inline assembled copy of GetCycleCount
+    for (int i = 0; i < 3; i++) {
+      wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+      start4 = getCycleCountIramLocal();
+      // while loop here takes 91 cycles
+      // { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+      start4e = getCycleCountIramLocal();
+      // TestIramWait3 start4=1713581182, end4=1713581184, diff4=2, wait4=427, bittime4=69
+      Serial.println((String)" TestIramWait3 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+      start4 = getCycleCountIramLocal();
+      { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+      start4e = getCycleCountIramLocal();
+      // TestIramWait4 start4=1714171078, end4=1714171510, diff4=432, wait4=1121, bittime4=694
+      Serial.println((String)" TestIramWait4 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+      
+
+      // getCycleCountIramLocal();   // 9 cycles
+      // TestIramWait5 start4=541067741, end4=541068175, diff4=434, wait4=1121, bittime4=694
+      // { while (getCycleCountIramLocal()-start4 < wait4) ; wait4 += m_bitTime4; }
+
+      start4 = getCycleCountIramLocal();
+      wait4 = start4 + (m_bitTime4 + m_bitTime4/3 - 498);
+      { while (getCycleCountIramLocal() < wait4) ; wait4 += m_bitTime4; }
+      start4e = getCycleCountIramLocal();
+      // TestIramWait7 start4=3440482983, end4=3440483418, diff4=435, wait4=3440484104, bittime4=694
+      Serial.println((String)" TestIramWait7 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+     
+    } // for loop
+  
+    wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+    start4 = ESP.getCycleCount();
+    long test4 = 0;
+    for (long i = 0; i < 46; i++) {  // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
+        // long test4 = ESP.getCycleCount(); // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
+        // long test4 = ESP.getCycleCount()+ESP.getCycleCount(); // add/sub@i46=715 , 
+        // long test4 = ESP.getCycleCount()+ESP.getCycleCount()+ESP.getCycleCount(); // triple=808
+        // long test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // quadro46 = 1245    
+        test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // inlinequadro46 = 1245 
+    }
+    start4e = ESP.getCycleCount();
+    // for (int i = 0; i < 1000; i++) = 348
+    // Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test=" + test4 );
+    // TestIramWait9 gc4-1=906115867, gc4-2=906120354, gc4-3=906124820, gc4-4=906128621
+    Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test4=" + test4 );
+
+    // diffs: 3801-4487-4466
+    Serial.println((String)" TestIramWait9 gc4-1=" + ESP.getCycleCount() + ", gc4-2="+ ESP.getCycleCount() + ", gc4-3="+ ESP.getCycleCount() + ", gc4-4="+ ESP.getCycleCount());
+
+    // insert a small loop to stabilize
+    for (int i = 0; i < 100; i++) {
+      int test = 0;
+    }
 
   // #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
   // Checktiming for test only
@@ -1091,15 +1305,19 @@ void loop()
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
     loopcnt++ ;
-    Serial.print((String)"-"+(loopcnt%99)+" \b");
+    Serial.print((String)"-"+(loopcnt%10)+" \b");
     test_WdtTime = currentMillis + 1000;  // next interval
   }
 
   // Following will trackdown loops
-  if (currentMillis > previousLoop_Millis + 1000) { // exceeding one second  ?, warn user
-    Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yielding\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+  if (currentMillis > (previousLoop_Millis + 1000) ) { // exceeding one second  ?, warn user
     // yield();
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
+    if (outputOnSerial) {
+      Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yield1500\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+    } else {
+      Serial.print("^");  // signal a yieldloop
+    }
   }
   previousLoop_Millis = currentMillis;  // registrate our loop time
 
@@ -1129,32 +1347,37 @@ void loop()
       // Start secondary serial connection if not yet active
 #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-      mySerial.begin  (115200, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+      mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
 #else
-      mySerial.begin(115200);    // P1 meter port 115200 baud
-      mySerial2.begin( 1200);    // GJ meter port   1200 baud     // required during test without P1
+      // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+      mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud
+      // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
 #endif
 
     } else {
 
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
+        if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." );
+        // --> end of p1 read electricity
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
         if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
         mySerial.flush();  // Clear P1 buffer
+        readTelegram2cnt = 0;  // allow readtelegram2
 
 #ifdef UseNewSoftSerialLIB
         // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-        // mySerial.begin  (115200,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-        mySerial2.begin (  1200, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+        // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+        mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
 #else
-        // mySerial.begin(115200);    // P1 meter port 115200 baud
-        mySerial2.begin( 1200);    // GJ meter port   1200 baud
+        // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+        mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
 #endif
+        
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
         previousMillis    = currentMillis;  // initialise our start counter for the overall proces.
       } else {
@@ -1172,15 +1395,40 @@ void loop()
 
     ESP.wdtFeed();  // as advised by forums
 
-    // Check for WaterPulse trigger
-    if ( (waterTriggerCnt == 1) && (debounce_time > waterReadDebounce * 100)) {
+    // Check for WaterPulse trigger when debounce has passed
+    if ( debounce_time > (waterReadDebounce * 1000)) {  // check in mS
+      if (waterTriggerCnt == 1) {
+          waterDebounceCnt++;                // administrate usage  for report
+          attachWaterInterrupt();
+          waterTriggerTime = currentMicros;  // reset our trigger counter
+          waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
+      } else {
+        if (waterTriggerTime != 0) {     // debounce_time (mSec
+           waterTriggerTime = 0;                        // reset ISR counter for next trigger
+           if (waterReadState != waterTriggerState) {   // switchsetting) {  // read switch state
+               waterReadState = waterTriggerState ;       // stabilize switch
+               if (!waterReadState) {
+                  waterReadCounter++;                         // count this as pulse if switch went LOW
+                  if (!lightReadState) waterReadHotCounter++; // count this as hotwater
+               }
+               if (waterReadState) {                      // accomodate/enforce stability
+                 pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage external pull-up
+               } else {
+                 pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external if not reading pull-up
+               }
+           }
+        }
+      }
+    }      
+
+    /*
+    if ( (waterTriggerCnt == 1) && (debounce_time > waterReadDebounce * 1000)) {    // was 100 but we must accomodate mS
       // we are in hold read interrupt mode , re-establish interrupts
       waterDebounceCnt++;                // administrate usage  for report
       attachWaterInterrupt();
       waterTriggerTime = currentMicros;  // reset our trigger counter
       waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
-    } else
-      // check if we must add a pulse counter
+    } else {  // check if we must add a pulse counter
       if ( (waterTriggerTime != 0) && (debounce_time > waterReadDebounce * 1000) ) { // debounce_time (mSec
         waterTriggerTime = 0;                        // reset counter for next trigger
         // waterTriggerCnt  = 0;                     // reset ISR counter
@@ -1193,21 +1441,19 @@ void loop()
           if (!waterReadState) pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external pull-up
         } // if waterReadState
       } // else waterTriggerCnt = 1
-
-      if (mqttReceivedCommand[0] != '\x00') {
-          ProcessMqttCommand(mqttReceivedCommand,2); // process incoming Mqtt command (if any)
-          memset(mqttReceivedCommand,0,sizeof(mqttReceivedCommand));
-      }
+    }
+    */
+    
+    // old dlocation of  cechking for incoming mqtt  commands
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
-    readTelegram2();    // read GJ gpio4-input (if available), write gpio2 output
-
+    if (readTelegram2cnt < 6) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if allow other activities
 
-  // readTelegram2();    // read GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
+  // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
 
   // (p1SerialActive && !p1SerialFinish) , process Telegram data
-  readTelegram();     // read P1 gpio14 (if serial data available)
+  readTelegram();     // read RX1 P1 gpio14 (if serial data available)
  
   mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
   ESP.wdtFeed();  // as advised by forums
@@ -1215,6 +1461,7 @@ void loop()
   p1TriggerTime = millis();   // indicate our mainloop yield
 
   // check and prevail deadlock timeout
+  // executed at no p1-message intervalP1<12 seconds, decrease reliability intervalP1cnt=360 until <1 which restarts; 
   if   ((unsigned long)(currentMillis - previousMillis) >= intervalP1) {  // is our deadlock check interval passed  12secs ?
     //  if (millis() > 600000) {  // autonomous restart every 5 minutes
     intervalP1cnt--;            // decrease reliability
@@ -1223,19 +1470,20 @@ void loop()
       Serial.print("\n #!!# ESP P1 not connected, cnt="); // print message line
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
-    } else {
+    } else {    // reliabilitty intervalP1cnt=360>0
 
-      // report to error mqtt, //V20 candidate for a callable error routine
+      // report to error mqtt, // V20 candidate for a callable error routine
       char mqttOutput[128];
       String mqttMsg = "{";  // start of Json
-        mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 serial not connected\""); 
-        // String mqttMsg = "Error, "; // build mqtt frame 
-        // mqttMsg.concat("serial not connected ");  
-        // mqttMsg,concat("interval="); // build mqtt frame 
-        // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
-        mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+      mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 serial not connected\""); 
+      // String mqttMsg = "Error, "; // build mqtt frame 
+      // mqttMsg.concat("serial not connected ");  
+      // mqttMsg,concat("interval="); // build mqtt frame 
+      // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
+      mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
       mqttMsg.toCharArray(mqttOutput, 128);
+
       if (client.connected()) {
         client.publish(mqttErrorTopic, mqttOutput); // report to error topic
         if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking" );  // report we have survived this interval
@@ -1250,28 +1498,35 @@ void loop()
       Serial.print(", time2:");
       Serial.print(currentMillis); // print message line
       Serial.println("."); // print message line
-      mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput
+
+      // output on secondary  TX if not already used for loopback
+      if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput
       // }
 
-      forceCheckData = true;  // enforce mqtt publish
-      validCRCFound  = false; // Enforce we (might) have a CRC error
-      processGpio();          // Do regular functions of the system
-      publishP1ToMqtt();      // PUBLISH this mqtt
-      forceCheckData = false;
+      forceCheckData = true;  // enforce  mode active
+      validCRCFound  = false;   // Enforce we (might) have a CRC error
+      processGpio();            // Do regular functions of the system
+      publishP1ToMqtt();        // PUBLISH this mqtt
+      forceCheckData = false; // enforce  mode inactive
 
       mqttP1Published = true;
     } // else millis exceeded intervalP1 hile enforce mqtt for tempsensors
 
     // If no MQTT poublished in this timout interval, whatever the reason, execute a restart to reset
     if (!mqttP1Published) {  // in case no publish energy yet , try restart
-      Serial.println("ESP timeout.restart"); // print message line
+      Serial.println("ESP timeout.mqttP1Published.restart"); // print message line
       if (client.connected()) client.publish(mqttLogTopic, "ESP timeout.restart" );
       ESP.restart();     // if no/yet data published force restart
     }
 
     // if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking" );  // report we have survived this interval
     previousMillis = currentMillis; // Use the snapshot to set track time until next loop event
-    mqttP1Published = false;        // assume we have not yet published procssed data
+    mqttP1Published = false;        // assume we have not yet published processed data
+  }
+
+  if (mqttReceivedCommand[0] != '\x00') {
+      ProcessMqttCommand(mqttReceivedCommand,2); // process incoming Mqtt command (if any)
+      memset(mqttReceivedCommand,0,sizeof(mqttReceivedCommand));
   }
 
   ArduinoOTA.handle();             // check if we must service on the Air update
@@ -1363,7 +1618,7 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\rDataCnt: %u started at %6.6f \b\b\t", (mqttCnt + 1), ((float) startMicros / 1000000));
+  if (!outputOnSerial) Serial.printf("\r\n Cycle: %02.9f DataCnt: %u started at %06.6f \b\b\t", ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
 
   if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
 
@@ -1401,7 +1656,7 @@ void readTelegram() {
     // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
     
     if (outputOnSerial) {         // do we want/need to print the Telegram
-      Serial.print((String)"\nlT=" + (len-1) + " \t[");
+      Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
       for (int cnt = 0; cnt < len; cnt++) {
           
         if (telegram[cnt] == '\x0D') {
@@ -1412,7 +1667,7 @@ void readTelegram() {
         }
           // Serial.printf("%02x",telegram[cnt-1]);   // hexadecimal formatted
       }
-      Serial.print((String)"]");
+      Serial.println((String)"]");    // v33 debug lines didnot end in newline
     }
 
     /* //debugCRC
@@ -1470,7 +1725,10 @@ void readTelegram() {
         */
         yield();                    // do background processing required for wifi etc.
         ESP.wdtFeed();              // feed the hungry timer
-        Serial.print((String) "zc");  //here
+        
+        // print zC is check is OK else print Zc (lower case) for debug reasons.
+        if (validCRCFound) Serial.print((String) "zC"); else Serial.print((String) "Zc") ;
+
         p1TriggerTime = millis();   // indicate we have a yield
 
         processGpio() ; // do read and process regular data pins and finish  this with mqtt
@@ -1511,7 +1769,6 @@ void readTelegram2() {
 #ifdef UseP1SoftSerialLIB
   if (mySerial.P1active()) return ;   // return if P1 is active
 #endif  
-
   int lenTelegram2 = 0;
   /*
     if (mySerial2.P1active())   {               // P2 blocked
@@ -1531,8 +1788,10 @@ void readTelegram2() {
     memset(telegram2, 0, sizeof(telegram2));            // initialise telegram array to 0
     memset(telegramLast2, 0, sizeof(telegramLast2));    // initialise array to 0
 
-    while (mySerial2.available())     {
-      int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+    while (mySerial2.available() && readTelegram2cnt < 6 )     {    // number of periodic reads 
+      // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      int len = mySerial2.readBytesUntil(0, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
       lenTelegram2 = lenTelegram2 + len;
       if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
@@ -1544,23 +1803,40 @@ void readTelegram2() {
         telegramLast2[2] = 0;                   // 3byte-telegram lastbyte terminaion variable
         telegram2[len + 1] = '\n';    // string set lastcharacter to \n
         telegram2[len + 2] = 0;       // variable next character before null
+        /*
+         * Check ascii output
+         */
+        for (int i = 0; i <= len; i++) {  // forward
+          if (telegram2[i] == 10) telegram2[i] = '<' ; // translate NL tp <
+          if (telegram2[i] == 13) telegram2[i] = '{' ; // translate CR to {
+          if (telegram2[i] == 00) telegram2[i] = '_' ; // translate CR to {
+          if (telegram2[i] < 32 || telegram2[i] > 127 ) {   // ascii range
+              telegram2[i] = '~';
+            }
+        }
+        
+        if (outputOnSerial) {
+          Serial.print(".2>[")     ; // debug print processing serial data
+          Serial.print(len)     ; // debug print processing serial data
+          Serial.print("]")     ; // debug print processing serial data
+          Serial.println(telegram2); // debug print processing serial data
 
-        if (outputOnSerial) Serial.print("2>")     ; // debug print processing serial data
-        if (outputOnSerial) Serial.print(telegram2); // debug print processing serial data
+        }          
         if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back
 
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
       }
+      readTelegram2cnt++;   /// account this readloop
     } // while data
+
     if (outputOnSerial) {
-      Serial.print(" [");         // debug print transaction length
+      Serial.print(" [l2_total=");         // debug print transaction length
       Serial.print(lenTelegram2);
       Serial.print("].");
       Serial.println("");
     }
-
   }  // if available
 } // void
 
@@ -1575,7 +1851,7 @@ void processGpio() {    // Do regular functions of the system
   bool tmpa = processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
   */
   processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
-  processLightRead(digitalRead(LIGHT_READ));        // process LedLightstatus read pin D6
+  processLightRead(LOW);        // process LedLightstatus read pin D6
   processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
 
   GetTemperatures();      // from DS18B20 tempsensors
@@ -1668,7 +1944,38 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       if (outputOnSerial) {
         Serial.print("outputMqttLog now ON.");
       }
+    } else  if ((char)payload[0] == 'e') {    // here
+        Serial.print("forcing infinite loop");
+        while (true) {
+          int a = 0;
+          int b = 10;
+          volatile int c = b / a;
+          // force a never ending loop        
+        } 
+    } else  if ((char)payload[0] == 'E') {    // here
+        Serial.print("forcing infinite loop");
+        while (true) {
+          int a = 0;
+          int b = 10;
+          volatile int c = b / a;
+          // force a never ending loop        
+        } 
 
+    } else  if ((char)payload[0] == 'b') {    // here
+        p1Baudrate = p1Baudrate - 50 ;
+        Serial.print((String)"Decreasing Baudrate to " + p1Baudrate);
+    } else  if ((char)payload[0] == 'B') {    // here
+        p1Baudrate = p1Baudrate + 50 ;
+        Serial.print((String)"Increasing Baudrate to " + p1Baudrate);
+        
+/* DNO , leave it to investigate how to force an exception
+    } else  if ((char)payload[0] == 'e') {    // here
+          try {
+              throwExceptionFunction();
+          } catch (const exception& e) {
+              Serial.print((String) "Exception activated" + e.what() );
+          }
+*/
     } else  if ((char)payload[0] == 'l') {
       outputMqttLog   = false ;       // Do not publish Log
       if (outputOnSerial) {
@@ -2033,6 +2340,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 bool processLightRead(bool myOperation)
 {
   lightReadState   = digitalRead(LIGHT_READ); // read D6
+  if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
   // Process this one-to-one directly to output
   if (outputOnSerial and lightReadState)  Serial.print("lightReadState D6 LOW...");  // debug
   if (outputOnSerial and !lightReadState) Serial.print("lightReadState D6 HIGH...");  // debug
@@ -2724,9 +3032,23 @@ void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubcli
   yield();        // give control to wifi management
   // delay(50);      // delay 50 mSec
   ESP.wdtFeed();  // feed the hungry timer
-  if (client.connected()) client.loop();  // feed the mqtt client
+  if (client.connected()) client.loop();  // feed the mqtt client, required to collect mqtt commands
 }
 
+#ifdef TEST_CALCULATE_TIMINGS
+uint32_t getCycleCountIramLocal() {   // ICACHE_RAM_ATTR does no influence speed wqhen used in program
+    uint32_t ccount;
+    __asm__ __volatile__("esync; rsr %0,ccount":"=a" (ccount));
+    return ccount;
+  }
+#endif
+
+
+/* leave this for leaer to investigate why runtime-error is not found ...
+void throwExceptionFunction(void) {
+    throw runtime_error("exception thrown."); // here2
+}
+*/
 
 
 // useless data to be kept for reference

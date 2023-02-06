@@ -54,13 +54,16 @@ public:
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
 
-   void rxRead();
+   void rxRead();		// witp1active detection beween / and !
+   void rxRead2();		// without p1active detection beween / and !
 
    // AVR compatibility methods
    bool listen() { enableRx(true); return true; }
    void end() { stopListening(); }
    bool isListening() { return m_rxEnabled; }
    bool stopListening() { enableRx(false); return true; }
+
+   inline uint32_t getCycleCountIram();
 
    using Print::write;
 
@@ -74,6 +77,7 @@ private:
    bool m_P1active;                 // Ptro 28mar21 to support P1 messageing
    bool m_overflow;
    unsigned long m_bitTime;
+   volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
@@ -81,6 +85,13 @@ private:
 
 
 };
+
+uint32_t ICACHE_RAM_ATTR SoftwareSerial::getCycleCountIram()
+{
+    uint32_t ccount;
+    __asm__ __volatile__("esync; rsr %0,ccount":"=a" (ccount));
+    return ccount;
+}
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
 #define SW_SERIAL_UNUSED_PIN -1

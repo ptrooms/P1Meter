@@ -1,10 +1,43 @@
 ![ptro logo](/tools/logo/ptro_930x474_longwhite_ends_bg.svg)
 # Changelog
 All notable changes to this project will be documented in this file.
+Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 
+Note: upto V24 we developed on Vxx. starting now we develop on development 
+create stable Versions-Vxx which when stable are merged into master.
+
+## [V22.35] - production/stable
+	- V22.35 - implement secondary RX2 on GPIO4/D2 INVERTED for direct connection to warmtelink pulldown
+    -- impment logging for RX2
+## [V22.34] - production/develope
+	- V22.34 - develop and use  gpio4 for seocndary RX conneted to Liander warmtelink
+    -- solve interrupt overhead and RX2 windowing outside P1 read.
+	-- solve and improve logging reporting
+## [V21.33] - production
+	- V21.33 cosmetic, fix line behavior, Terminate debug output line with crlf
+# Note: [V32 8361d6d] Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
+	- as we use email restriction on https://github.com/settings/emails
+	-- set mail pafoxp@ubuntuO380:~/code-P1Meter$ git config --global user.email "34420738+ptrooms@users.noreply.github.com"
+	-- set author pafoxp@ubuntuO380:~/code-P1Meter$ git commit --amend --reset-author --allow-empty
+	-- publish pafoxp@ubuntuO380:~/code-P1Meter$ git push
+## [V21.32] - production
+	- V21.32Fix/ensure Hotwater sensor in inverted LOW at first mqttCNT to prevent ON state
+	-- Done in lightread routine where we simply compare mqttCnt = 0 
+	- SynC & Publish all changes as we have done, things works so let it operate
+	-- not sure if and to whart state everything was developed.
 ## [Unreleased] - Development
-	- V21.23_seriallib - testing/dding P1ActiveCnt which correctly tell we have rxRead loop during serial
-## [V21.24
+	- V21.31 changed P1-Rxread to ensure that the wait for clock-sync never exceeds 14bits of waitcycles
+	-- Note this is doen by limiting the wait to 10.000 cycles and meant for highspeed connection
+	-- at a later stage we can look at adaptation for lower speeds (either integrate or seperation)
+	- V21.31 test restoreed to work on production servers, local mqtt & wifi has nu influence on quality
+	- V21.31 Do not wait in full for finishing stopbit  at a serial read (hosrten the wait).
+	-- this also limits the risk of an infinite loop is ESP.GetCyleCnt does not pace up.
+	- V21.31 step by step changes to check why volatile changes corrupts the P1 production meter.
+	- V21.25 Core 2.4.1, ESP8266-sdk-version: 2.2.1(cfd48f3) testing stability (wdt reset)
+	-- The SoftSerialP1 librbay is changed by putting esp.getcyclecnt readRx as GetCycleCntIram into cache.
+	- V21.23_seriallib - testing/adding P1ActiveCnt which correctly tell we have rxRead loop during serial
+	-- we can confirm that rxRead is called per byte.
+## [V21.24]
 	- merged to master
 	- tested & verified on test using dummy data
 	- restructered decode-routine and disconnected from readecodepart

@@ -14,6 +14,10 @@ gitignore*
 
 ## Program related ##
 P1Meter/*.txt
+## do not sync save/copy files
+P1Meter/*.ino*
+## do not sync /tmp output copied to here
+*arduino_build_*/
 
 ## Project files ######
 .platformio
@@ -32,6 +36,8 @@ P1Meter*.map
 platformio_override.ini
 platformio_P1Meter_cenv.ini
 telegram0crlf.txt
+# my local save/play files
+p1-analyse-*.txt
 
 ## Visual Studio Code specific ######
 .vscode
