@@ -1,16 +1,14 @@
 
-// require  core 2.4.1 , NodeMCU 1.0  @ 192.168.1.35, V2 lower memory
+// require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
 //    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
 //      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
 //      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
 
-// Todo1: safegurard routing if P1 expieres often then 10-12 seconds... at 1sec rate routine is not honoured
+// Todo1: safegurard routing if P1 expire often then 10-12 seconds... at 1sec rate routine is not honoured
 
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
 // see/for git: https://github.com/ptrooms/P1Meter
-// Update on V20 to check if this works in Visual Studio Code 
-
-// --> use NodeMCU1.0 ESP-12E with LwIp V2 lower memory, BuiltIn led (GPIO)16
+// Update $ git checkout -b v36 on https://github.com/ptrooms/P1Meter.git to correct watercnt errors 
 
 #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
 // #define TEST_MODE    // set in PlatformIO; use our file defined confidential wifi/server/mqtt settings
@@ -29,13 +27,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1135.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1136.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2135.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2136.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -43,11 +41,14 @@
 // *
 // * * * * * L O G  B O O K
 // *
-// Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
+// 06feb23 13u53: v36 Corrected debounce time *100 to *1000 & restructured mainloop "WaterPulse trigger when debounce " 
+//    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
+//    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
 // 03okt22 23u11: v35 serial2 inverted slightly better
-// 30sep22 22u26: v35 p1Baudrate2 115k2 for warmtelink 
+// 30sep22 22u26: v35 p1Baudrate2 115k2 for "warmtelink" 
 // 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
 // 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
+//  Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
 // 27apr21 23u38: getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
 //  - fixed Ip adress to eliminate iterference (if defined P1_STATIC_IP )
     // Set your Static IP address IPAddress local_IP(192, 168, 1, 125);
@@ -1394,8 +1395,34 @@ void loop()
 
     ESP.wdtFeed();  // as advised by forums
 
-    // Check for WaterPulse trigger
-    if ( (waterTriggerCnt == 1) && (debounce_time > waterReadDebounce * 100)) {
+    // Check for WaterPulse trigger when debounce has passed
+    if ( debounce_time > (waterReadDebounce * 1000)) {  // check in mS
+      if (waterTriggerCnt == 1) {
+          waterDebounceCnt++;                // administrate usage  for report
+          attachWaterInterrupt();
+          waterTriggerTime = currentMicros;  // reset our trigger counter
+          waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
+      } else {
+        if (waterTriggerTime != 0) {     // debounce_time (mSec
+           waterTriggerTime = 0;                        // reset ISR counter for next trigger
+           if (waterReadState != waterTriggerState) {   // switchsetting) {  // read switch state
+               waterReadState = waterTriggerState ;       // stabilize switch
+               if (!waterReadState) {
+                  waterReadCounter++;                         // count this as pulse if switch went LOW
+                  if (!lightReadState) waterReadHotCounter++; // count this as hotwater
+               }
+               if (waterReadState) {                      // accomodate/enforce stability
+                 pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage external pull-up
+               } else {
+                 pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external if not reading pull-up
+               }
+           }
+        }
+      }
+    }      
+
+    /*
+    if ( (waterTriggerCnt == 1) && (debounce_time > waterReadDebounce * 1000)) {    // was 100 but we must accomodate mS
       // we are in hold read interrupt mode , re-establish interrupts
       waterDebounceCnt++;                // administrate usage  for report
       attachWaterInterrupt();
@@ -1415,7 +1442,8 @@ void loop()
         } // if waterReadState
       } // else waterTriggerCnt = 1
     }
-
+    */
+    
     // old dlocation of  cechking for incoming mqtt  commands
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
