@@ -757,6 +757,12 @@ void setup()
 {
   asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
+
+#ifdef NoTx2Function
+  pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
+#endif
+
+
   // pinMode(THERMOSTAT_READ, INPUT);      // Declare Pin mode INPUT read always low
   pinMode(THERMOSTAT_READ, INPUT_PULLUP);  // Declare Pin mode INPUT with pullup to Read room thermostate
   pinMode(LIGHT_READ, INPUT_PULLUP);       // Declare Pin mode INPUT with pullup to read HotWater valve
@@ -767,6 +773,9 @@ void setup()
   pinMode(THERMOSTAT_WRITE, OUTPUT);       // Declare Pin mode OUTPUT to control Heat-Valve
 
   digitalWrite(BLUE_LED, LOW);             //Turn the LED ON  (active-low)
+#ifdef NoTx2Function
+  digitalWrite(BLUE_LED2, HIGH);           //Turn the LED OFF  (inactive-high)
+#endif
 
   // Thermostats initialisation
   thermostatReadState   = digitalRead(THERMOSTAT_READ); // read current room state
@@ -1275,7 +1284,7 @@ void setup()
   previousMillis    = millis();           // initialise previous interval
   previousP1_Millis = previousMillis;  // initialise previous interval
   // attachInterrupt(WATERSENSOR_READ, WaterTrigger_ISR, CHANGE); // trigger at every change
-  attachWaterInterrupt();
+  // attachWaterInterrupt();
 
   waterTriggerTime = 0;  // ensure and assum no trigger yet
   test_WdtTime = 0;  // set first loop timer
@@ -1404,11 +1413,11 @@ void loop()
 
     // Check for WaterPulse trigger when debounce has passed
     if ( debounce_time > (waterReadDebounce * 1000)) {  // check in mS
-      if (waterTriggerCnt == 1) {
+      if (waterTriggerCnt == 0) {
           waterDebounceCnt++;                // administrate usage  for report
-          attachWaterInterrupt();
+          attachWaterInterrupt();             //here
           waterTriggerTime = currentMicros;  // reset our trigger counter
-          waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
+          // waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
       } else {
         if (waterTriggerTime != 0) {     // debounce_time (mSec
            waterTriggerTime = 0;                        // reset ISR counter for next trigger
@@ -1418,8 +1427,8 @@ void loop()
                   waterReadCounter++;                         // count this as pulse if switch went LOW
                   if (!lightReadState) waterReadHotCounter++; // count this as hotwater
 #ifdef NoTx2Function
-                  if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, true); // disable Led
-#endif                  
+                  if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH); //Turn the LED OFF  (inactive-high)
+#endif
                }
                if (waterReadState) {                      // accomodate/enforce stability
                  pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage external pull-up
@@ -2020,7 +2029,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       detachWaterInterrupt();
       // detachInterrupt(WATERSENSOR_READ); // disconnect ISR
       waterTriggerTime = micros();       // set our time
-      waterTriggerCnt  = 1;              // indicate we are in detached mode
+      // waterTriggerCnt  = 1;              // indicate we are in detached mode
       if (outputOnSerial) {
         Serial.print("useWaterTrigger1=");
         if (useWaterTrigger1) {
@@ -2965,10 +2974,12 @@ void attachWaterInterrupt() {   //
     attachInterrupt(WATERSENSOR_READ, WaterTrigger_ISR, CHANGE); // establish trigger
     if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger_ISR routine");
   }
+  waterTriggerCnt = 1;          // indicate ISR has been activated
 }
 void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent inteference while doing serial communication
   detachInterrupt(WATERSENSOR_READ); // trigger at every change
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // Prevent calls as per expressif intruction
+  waterTriggerCnt = 0;          // indicate ISR has been withdrawn
 }
 
 
@@ -2985,7 +2996,7 @@ void WaterTrigger_ISR()
 
   if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
     detachWaterInterrupt();
-    waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+    // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
   }
   waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
 #ifdef NoTx2Function
@@ -3007,7 +3018,7 @@ void WaterTrigger1_ISR()
     // Input went or is invibration, disconnect ourselves a couuple a milliseconds
     // detachInterrupt(WATERSENSOR_READ); // trigger at every change
     detachWaterInterrupt();
-    waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+    // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
     // waterTriggerTime  = waterTriggerTime + 10000; // forward our interrupt 10mS (disabled: now done in mainloop)
   }
   waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
