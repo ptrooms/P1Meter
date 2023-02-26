@@ -15,6 +15,7 @@
 #define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.1 and use P1serial verion to listen /header & !finish
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP          // if define we use Fixed-IP, else (undefined) we use dhcp
+#define NoTx2Function         // Do no serial out
 
 #ifdef TEST_MODE
   #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
@@ -27,13 +28,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1136.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1137.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2136.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2137.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -41,6 +42,7 @@
 // *
 // * * * * * L O G  B O O K
 // *
+// 26feb23 22u19: v37 Disable TX2 serial function, , add loop-limit vor WatertriggerISR and defined BLUE_LED2 for Waterpuls
 // 06feb23 13u53: v36 Corrected debounce time *100 to *1000 & restructured mainloop "WaterPulse trigger when debounce " 
 //    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
@@ -428,7 +430,12 @@ bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted seria
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
 #define SERIAL_RX2       D2  // pin GPIO4  input  for SoftwareSerial RX  GJ
 #define DS18B20_SENSOR   D3  // pin GPIO0 Pin where DS18B20 sensors are mounted (High@Boot)
-#define SERIAL_TX2       D4  // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
+#ifdef NoTx2Function
+  #define SERIAL_TX2       -1 // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
+#else
+  #define SERIAL_TX2       D4 // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
+#endif
+#define BLUE_LED2        D4  // pin GPIO2 
 #define SERIAL_RX        D5  // pin GPIO14 input  for SoftwareSerial RX P1 Port
 #define LIGHT_READ       D6  // pin GPIO12 input  for LDR read (passive lowR = LOW)
 #define THERMOSTAT_READ  D7  // pin GPIO13 input  for button read in (via relay)
@@ -1410,6 +1417,9 @@ void loop()
                if (!waterReadState) {
                   waterReadCounter++;                         // count this as pulse if switch went LOW
                   if (!lightReadState) waterReadHotCounter++; // count this as hotwater
+#ifdef NoTx2Function
+                  if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, true); // disable Led
+#endif                  
                }
                if (waterReadState) {                      // accomodate/enforce stability
                  pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage external pull-up
@@ -1500,7 +1510,9 @@ void loop()
       Serial.println("."); // print message line
 
       // output on secondary  TX if not already used for loopback
-      if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput
+#ifndef NoTx2Function
+      if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput , disabled as of v37
+#endif
       // }
 
       forceCheckData = true;  // enforce  mode active
@@ -1821,9 +1833,10 @@ void readTelegram2() {
           Serial.print("]")     ; // debug print processing serial data
           Serial.println(telegram2); // debug print processing serial data
 
-        }          
-        if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back
-
+        }
+#ifndef NoTx2Function
+        if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back , disabled as of v37
+#endif
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
@@ -2970,8 +2983,14 @@ void WaterTrigger_ISR()
   long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
   waterTriggerTime  = time;       // set time of this read
 
+  if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+    detachWaterInterrupt();
+    waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+  }
   waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
-  if (loopbackRx2Tx2) digitalWrite(SERIAL_TX2, waterTriggerState); // here test trigger to find if it is attached
+#ifdef NoTx2Function
+  if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, waterTriggerState); // expected to go have/went low 
+#endif
 }
 
 /*
@@ -2992,8 +3011,9 @@ void WaterTrigger1_ISR()
     // waterTriggerTime  = waterTriggerTime + 10000; // forward our interrupt 10mS (disabled: now done in mainloop)
   }
   waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
-  if (loopbackRx2Tx2) digitalWrite(SERIAL_TX2, waterTriggerState); // here test trigger to find if it is attached
-
+#ifdef NoTx2Function
+  if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, waterTriggerState); // expected to go have/went low 
+#endif
 }
 
 /* 20mar21 ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec */
