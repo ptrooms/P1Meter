@@ -1,3 +1,4 @@
+// v38 testv38_Function false LGTM
 
 // require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
 //    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
@@ -15,6 +16,7 @@
 #define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.1 and use P1serial verion to listen /header & !finish
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP          // if define we use Fixed-IP, else (undefined) we use dhcp
+#define NoTx2Function         // Do no serial out
 
 #ifdef TEST_MODE
   #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
@@ -27,13 +29,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1136.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1138.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2136.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2138.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -41,6 +43,8 @@
 // *
 // * * * * * L O G  B O O K
 // *
+// 27feb23 22u45: v38 Implement reading RX2 Warmelink using 
+// 26feb23 22u19: v37 Disable TX2 serial function, , add loop-limit vor WatertriggerISR and defined BLUE_LED2 for Waterpuls
 // 06feb23 13u53: v36 Corrected debounce time *100 to *1000 & restructured mainloop "WaterPulse trigger when debounce " 
 //    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
@@ -428,7 +432,12 @@ bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted seria
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
 #define SERIAL_RX2       D2  // pin GPIO4  input  for SoftwareSerial RX  GJ
 #define DS18B20_SENSOR   D3  // pin GPIO0 Pin where DS18B20 sensors are mounted (High@Boot)
-#define SERIAL_TX2       D4  // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
+#ifdef NoTx2Function
+  #define SERIAL_TX2       -1 // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
+#else
+  #define SERIAL_TX2       D4 // pin GPIO2 Secondary TX GJ  passive High@Boot (parallel 3k3 with 270R-opto)
+#endif
+#define BLUE_LED2        D4  // pin GPIO2 
 #define SERIAL_RX        D5  // pin GPIO14 input  for SoftwareSerial RX P1 Port
 #define LIGHT_READ       D6  // pin GPIO12 input  for LDR read (passive lowR = LOW)
 #define THERMOSTAT_READ  D7  // pin GPIO13 input  for button read in (via relay)
@@ -593,6 +602,9 @@ unsigned long previousP1_Millis = 0;   // this controls the inner P1_serial loop
 unsigned long previousLoop_Millis = 0; // this tracks the main loop-() < 1000mSec
 
 //for debugging, outputs info to serial port and mqtt
+bool blue_led2_Water = false;    // Use blue_led2 to indicate watertrigger
+bool blue_led2_HotWater = true;  // Use blue_led2 to indicate hotstate
+
 bool allowOtherActivities = true; // allow other activities if not reading serial P1 port
 bool p1SerialActive   = false;   // start program with inactive P1 port
 bool p1SerialFinish   = false;   // transaction finished (at end of !xxxx )
@@ -617,6 +629,7 @@ bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pull
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
 bool outputMqttLog    = false;   // "L" ptro false -> true , output to /log/t0
 bool outputMqttPower  = true;    // "P" ptro false -> true , output to /energy/t0current
+bool testv38_Function = false;   // "F" ptro false -> true , use v38 RX2 processing (27feb23 tested, LGTM)
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to cgheck if we have published
@@ -702,6 +715,10 @@ char telegram2[MAXLINELENGTH2];     // telegram maxsize 64bytes for P1 meterMAXL
 char telegramLast2[3];              // overflow used to catch line termination bracket
 char telegramLast2o[19];            // overflow used to catch line termination bracket
 
+bool bGot_Telegram2Record = false;     // proces serial 2 until we have a outside P1 loop
+char telegram2Record[MAXLINELENGTH2]; // telegram maxsize for P1 RX2 
+
+
 // Callback mqtt value which is used to received data
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
 int new_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
@@ -750,6 +767,12 @@ void setup()
 {
   asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
+
+#ifdef NoTx2Function
+  pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
+#endif
+
+
   // pinMode(THERMOSTAT_READ, INPUT);      // Declare Pin mode INPUT read always low
   pinMode(THERMOSTAT_READ, INPUT_PULLUP);  // Declare Pin mode INPUT with pullup to Read room thermostate
   pinMode(LIGHT_READ, INPUT_PULLUP);       // Declare Pin mode INPUT with pullup to read HotWater valve
@@ -760,6 +783,9 @@ void setup()
   pinMode(THERMOSTAT_WRITE, OUTPUT);       // Declare Pin mode OUTPUT to control Heat-Valve
 
   digitalWrite(BLUE_LED, LOW);             //Turn the LED ON  (active-low)
+#ifdef NoTx2Function
+  digitalWrite(BLUE_LED2, HIGH);           //Turn the LED OFF  (inactive-high)
+#endif
 
   // Thermostats initialisation
   thermostatReadState   = digitalRead(THERMOSTAT_READ); // read current room state
@@ -768,6 +794,9 @@ void setup()
 
   // Lightread initialisation
   lightReadState   = digitalRead(LIGHT_READ); // read Hotwater valve state
+  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, !lightReadState);  // debug readstate
+  
+  
 
   // prepare wdt
   ESP.wdtDisable();
@@ -1268,7 +1297,7 @@ void setup()
   previousMillis    = millis();           // initialise previous interval
   previousP1_Millis = previousMillis;  // initialise previous interval
   // attachInterrupt(WATERSENSOR_READ, WaterTrigger_ISR, CHANGE); // trigger at every change
-  attachWaterInterrupt();
+  // attachWaterInterrupt();
 
   waterTriggerTime = 0;  // ensure and assum no trigger yet
   test_WdtTime = 0;  // set first loop timer
@@ -1300,7 +1329,7 @@ void loop()
    // declare global timers loop(s)
   currentMillis = millis(); // Get snapshot of runtime
   currentMicros = micros(); // get current cycle time
-  unsigned long debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by ISR waterTrigger
+  unsigned long debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by last ISR waterTrigger
 
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
@@ -1334,8 +1363,10 @@ void loop()
 
   mqtt_local_yield();      //   client.loop(); // handle mqtt
 
-  if (allowOtherActivities) {     // are we outside P1 Telegram processing (which require serial time resources)
-
+  //  ------------------------------------------------------------------------------------------------------------------------- START allowOtherActivities
+  if (!allowOtherActivities) {     // are we outside P1 Telegram processing (which require serial-timed resources)
+    if (waterTriggerCnt != 0) detachWaterInterrupt();
+  } else {     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
       if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial started at " + currentMillis);
       p1SerialActive = !p1SerialActive ; // indicate we have started
@@ -1343,7 +1374,6 @@ void loop()
       mySerial2.end();          // Stop- if any - GJ communication
       mySerial2.flush();        // Clear GJ buffer
       telegramError = 0;        // start with no errors
-
       // Start secondary serial connection if not yet active
 #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
@@ -1355,7 +1385,7 @@ void loop()
       // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
 #endif
 
-    } else {
+    } else {    // if (!p1SerialActive)
 
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
@@ -1369,14 +1399,19 @@ void loop()
         mySerial.flush();  // Clear P1 buffer
         readTelegram2cnt = 0;  // allow readtelegram2
 
+        // Only activate myserial2  atdesignated times
+        // int checkIntervalRx2 = mqttCnt % 7;
+        if ( testv38_Function && (mqttCnt == 2  || (mqttCnt > 0 && ((mqttCnt % 7) == 0)) ) ) {  // only use RX2 port at these intervals
+        // Start secondary serial connection if not yet active
 #ifdef UseNewSoftSerialLIB
-        // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-        // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-        mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+          // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+          // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+          mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
 #else
-        // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-        mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
+          // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+          mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
 #endif
+        }
         
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
         previousMillis    = currentMillis;  // initialise our start counter for the overall proces.
@@ -1395,13 +1430,13 @@ void loop()
 
     ESP.wdtFeed();  // as advised by forums
 
-    // Check for WaterPulse trigger when debounce has passed
+    // Check for WaterPulse triggerstate interrupt when debounce has passed
     if ( debounce_time > (waterReadDebounce * 1000)) {  // check in mS
-      if (waterTriggerCnt == 1) {
+      if (waterTriggerCnt == 0) {
           waterDebounceCnt++;                // administrate usage  for report
-          attachWaterInterrupt();
+          attachWaterInterrupt();            
           waterTriggerTime = currentMicros;  // reset our trigger counter
-          waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
+          // waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
       } else {
         if (waterTriggerTime != 0) {     // debounce_time (mSec
            waterTriggerTime = 0;                        // reset ISR counter for next trigger
@@ -1409,7 +1444,14 @@ void loop()
                waterReadState = waterTriggerState ;       // stabilize switch
                if (!waterReadState) {
                   waterReadCounter++;                         // count this as pulse if switch went LOW
-                  if (!lightReadState) waterReadHotCounter++; // count this as hotwater
+                  // lightReadState   = digitalRead(LIGHT_READ); // read D6
+                  // if (!lightReadState) waterReadHotCounter++; // count this as hotwater
+                  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, !(digitalRead(LIGHT_READ)));  // debug readstate
+                  if (!digitalRead(LIGHT_READ)) waterReadHotCounter++; // count this as hotwater
+#ifdef NoTx2Function
+
+                  if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, HIGH); //Turn the LED OFF  (inactive-high)
+#endif
                }
                if (waterReadState) {                      // accomodate/enforce stability
                  pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage external pull-up
@@ -1449,6 +1491,7 @@ void loop()
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
     if (readTelegram2cnt < 6) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if allow other activities
+  //  ------------------------------------------------------------------------------------------------------------------------- END of allowOtherActivities
 
   // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
 
@@ -1491,7 +1534,7 @@ void loop()
 
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
-      Serial.print("\n#!!# ESP P1 Active interval checking ");
+      Serial.print("\n# !!# ESP P1 Active interval checking ");
       Serial.print(intervalP1cnt );
       Serial.print(", timeP:");
       Serial.print(previousMillis);
@@ -1500,7 +1543,9 @@ void loop()
       Serial.println("."); // print message line
 
       // output on secondary  TX if not already used for loopback
-      if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput
+#ifndef NoTx2Function
+      if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput , disabled as of v37
+#endif
       // }
 
       forceCheckData = true;  // enforce  mode active
@@ -1606,9 +1651,8 @@ void readTelegram() {
     p1TriggerTime = millis();
   }
 
-
 #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
-  if ( mySerial.P1active())  return ;  // quick return if serial is receiving, fucntion of SoftwareSerial for P1
+  if ( mySerial.P1active())  return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
 #endif  
   if (!mySerial.available()) return ;  // quick return if no data
 
@@ -1769,6 +1813,9 @@ void readTelegram2() {
 #ifdef UseP1SoftSerialLIB
   if (mySerial.P1active()) return ;   // return if P1 is active
 #endif  
+
+  bGot_Telegram2Record  = false;      // v38 check RX2 seen
+
   int lenTelegram2 = 0;
   /*
     if (mySerial2.P1active())   {               // P2 blocked
@@ -1785,18 +1832,26 @@ void readTelegram2() {
       Serial.print("\n\r Rx2N= "); // print message line
     }
 
-    memset(telegram2, 0, sizeof(telegram2));            // initialise telegram array to 0
-    memset(telegramLast2, 0, sizeof(telegramLast2));    // initialise array to 0
+    memset(telegram2, 0,       sizeof(telegram2));        // initialise telegram array to 0
+    memset(telegramLast2, 0,   sizeof(telegramLast2));    // initialise array to 0
+    memset(telegram2Record, 0, sizeof(telegram2Record));  // initialise telegram array to 0
 
-    while (mySerial2.available() && readTelegram2cnt < 6 )     {    // number of periodic reads 
+    // initialise positions
+    int telegram2_Start = 0;
+    int telegram2_End   = 0;
+    int telegram2_Pos   = 0;  //here v38
+
+    while (mySerial2.available() && readTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
+       
       // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      
       int len = mySerial2.readBytesUntil(0, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
       lenTelegram2 = lenTelegram2 + len;
       if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
 
-      if (len > 0)  {
+      if (len > 0)  {   // do we have bytes in buffer
         // remember  last character
         telegramLast2[0] = telegram2[len - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
         telegramLast2[1] = '\n';                // 3byte telegram lastbyte termination string
@@ -1806,24 +1861,134 @@ void readTelegram2() {
         /*
          * Check ascii output
          */
-        for (int i = 0; i <= len; i++) {  // forward
-          if (telegram2[i] == 10) telegram2[i] = '<' ; // translate NL tp <
-          if (telegram2[i] == 13) telegram2[i] = '{' ; // translate CR to {
-          if (telegram2[i] == 00) telegram2[i] = '_' ; // translate CR to {
-          if (telegram2[i] < 32 || telegram2[i] > 127 ) {   // ascii range
-              telegram2[i] = '~';
-            }
+
+        if (!bGot_Telegram2Record) {   // reset numbers if not yet a record from WarmteLink 
+          telegram2_Start = 0;
+          telegram2_End   = 0;
+          telegram2_Pos   = 0;  //here v38
         }
         
+        for (int i = 0; (i <= len && !bGot_Telegram2Record); i++) {  // forward
+
+            // if (testv38_Function && !bGot_Telegram2Record ) { // v38 testv38_Function
+            if (testv38_Function && !bGot_Telegram2Record ) { // v38 testv38_Function
+              //  v38 copy/extract proces a single RX2 record
+              /* debug
+                if (outputOnSerial && telegram2_Start == 0)   Serial.print("s");
+                if (outputOnSerial && telegram2_Start > 0) Serial.print(telegram2_Pos == 0 ? (String) "-" : (String) telegram2[i] );
+                if (outputOnSerial && !(telegram2_End == 0) ) Serial.print("e");
+              */ 
+              if ( telegram2_Pos < MAXLINELENGTH2 && (telegram2_Start == 0 || telegram2_Pos > 0 || i < telegram2_End ) ) {
+                if (telegram2[i] == '/')  {
+                  telegram2_Start = i;  // position input slash-/
+                  telegram2_Pos = 0;    // reset output buffer
+                  telegram2Record[telegram2_Pos] = 0;   // initialise first position
+                  telegram2_End = 0;    // reset to find excmamation-!
+
+                }
+                if (telegram2[i] == '!')  {
+                    if (telegram2_End   == 0 && (i < (len - 6)) ) telegram2_End = i + 6;  // anticiptae after checksum position !1234.6
+                    if (telegram2_Start == 0 ) telegram2_End = 0;  // reset if not yet started
+                } 
+                
+                if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) ) {   
+
+                  // check translated contents  for debug
+                  if (telegram2[i] == 10) telegram2[i] = '<' ;                      // translate NL tp <
+                  if (telegram2[i] == 13) telegram2[i] = '{' ;                      // translate CR to {
+                  if (telegram2[i] == 00) telegram2[i] = '_' ;                      // translate CR to {
+                  if (telegram2[i] < 32 || telegram2[i] > 127 ) telegram2[i] = '~'; // translate unprintable
+
+                  telegram2Record[telegram2_Pos] = telegram2[i];    // move value to output
+
+                  telegram2_Pos++;
+                  telegram2Record[telegram2_Pos] = 0;     // initialize 
+                }
+              }
+              if (telegram2_Pos > 4) {      // check for length start2finish before Checksum
+                if (telegram2Record[0] == '/' && telegram2Record[telegram2_Pos - 5] == '!')  {
+                   bGot_Telegram2Record = true;
+                   mySerial2.end();          // v38 Stop- if any - GJ communication
+                   mySerial2.flush();        // v38 Clear GJ buffer
+                   if (outputOnSerial) {
+                       // debug print positions
+                       Serial.print("\ns1=")           ; // debug v38 print processing
+                       Serial.print(telegram2_Start)   ; // debug v38 print processing serial /start
+                       Serial.print(", ne1=")          ; // debug v38 print processing
+                       Serial.print((telegram2_End))   ; // debug v38 print processing serial !End
+                       Serial.print(", np1=")          ; // debug v38 print processing
+                       Serial.println(telegram2_Pos)   ; // debug v38 print last record positition                      
+                   }
+                 }
+              }
+            } // testv38_Function && !bGot_Telegram2Record
+            
+            // modify our work buffer for v38 printing
+            if (telegram2[i] == 10) telegram2[i] = '<' ;                      // translate NL tp <
+            if (telegram2[i] == 13) telegram2[i] = '{' ;                      // translate CR to {
+            if (telegram2[i] == 00) telegram2[i] = '_' ;                      // translate CR to {
+            if (telegram2[i] < 32 || telegram2[i] > 127 ) telegram2[i] = '~'; // translate unprintable
+
+        } // end for loop scanning serialbuffer
+
+        // if (outputOnSerial && !bGot_Telegram2Record) {    // v38 debug print if we catched a record
         if (outputOnSerial) {
-          Serial.print(".2>[")     ; // debug print processing serial data
-          Serial.print(len)     ; // debug print processing serial data
-          Serial.print("]")     ; // debug print processing serial data
+          Serial.print("\n.s2>[");   // debug print processing serial data
+          Serial.print(len);         // debug print processing serial data
+          Serial.print("]");         // debug print processing serial data
           Serial.println(telegram2); // debug print processing serial data
+        }
 
-        }          
-        if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back
+        // if (testv38_Function) { // do we want to execute v38 testv38_Function (superfluous , as routine her eis v38)
+        if (bGot_Telegram2Record) {   // v38 print record serial2 if we have catched a record
+          // if (outputOnSerial && ((telegram2_Start > 0 && telegram2_End > 0) || bGot_Telegram2Record) ) {   // v38 print record serial2
+          /* sample data record
+              .3>[220-58=162]/ISk5\2MT382-1000
+              
+              1-3:0.2.8(50)
+              0-0:1.1.0(230227190235W)
+              0-1:24.1.0(012)
+              0-1:96.1.0(303030304B414D363435343632)
+              0-1:24.2.1(230227190235W)(84.108*m3)
+              !5EAE
 
+              WL>[237-74=163:163,s=0,e=157,v=151]ISk5\2]T382-1000{<{<1-3:0.2.8(50){<0-0:1.1.0(230227211500W){<0-1:24.1.0(012){<0-1:96.1.0(303030304B494C373236323534){<0-1:24.2.1(230227211500W)(84.188*m3){<!C17F{
+              84.188*m3){<!C17F{
+              
+          */
+          int startChar = FindCharInArrayRev(telegram2Record, '/',  sizeof(telegram2Record));  // 0-offset "/ISk5\2MT382-1000" , -1 not found
+          int endChar   = FindCharInArrayRev(telegram2Record, '!',  sizeof(telegram2Record));  // 0-offset "!769A" , -1 not found
+          int valChar   = FindCharInArrayRev(telegram2Record, '*',  sizeof(telegram2Record));  // 0-offset "(84.108*m3)" , -1 not found
+          if (outputOnSerial) {
+            Serial.print("\nWL>");       // v38 debug print processing serial data
+            Serial.print(telegram2_End); 
+            Serial.print("-");            // print minus
+            Serial.print(telegram2_Start); 
+            Serial.print("=");            // debug print processing
+            Serial.print((telegram2_End - telegram2_Start)); // debug print processing serial data length
+            Serial.print(":");            // debug print processing
+            Serial.print(telegram2_Pos);  // debug print processing last record positition
+            Serial.print(",s=");          // debug print processing
+            Serial.print(startChar);      // debug print processing position of / start
+            Serial.print(",e=");          // debug print processing
+            Serial.print(endChar);        // debug print processing position of !  end
+            Serial.print(",v=");          // debug print processing 
+            Serial.print(valChar);        // debug print processing position of * value
+            Serial.print("]");            // debug print processing
+            Serial.println(telegram2Record); // debug print processing
+            Serial.print("");             // debug print processing serial data
+          }
+          if (valChar >= 0) {
+            Serial.print("\n\r\t WL data:"); //  print value unconditionally on new line
+            Serial.print(telegram2Record+(valChar - 7) ); //  print value unconditionally string
+            Serial.print("\t");             //  print value unconditionally on new line
+          }
+        }
+        // }  // check testv38_Function
+        
+#ifndef NoTx2Function
+        if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back , disabled as of v37
+#endif
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
@@ -1858,19 +2023,31 @@ void processGpio() {    // Do regular functions of the system
 
   // debug pin status 
   if (outputOnSerial) {
-    bool tmpd = digitalRead(WATERSENSOR_READ); // read watersensor pin
-    Serial.print((String) "\nM#@t=" + (mqttCnt+1) + " @" + (millis() / 1000) + ", TimeP1="  + currentTimeS);  // as - including any errors -  extracted from P1 read
-    if (validCRCFound) Serial.print((String) " (E#="          + telegramError + ")"); // data contains errors
-    else               Serial.print((String) " (e#="          + telegramError + ")"); // data contains errors;
 
-    Serial.print( "\tGpio5:" );
-    if ( tmpd) Serial.print( "1" );
-    if (!tmpd) Serial.print( "0" );
+    // cleaner code:
+    //  condition ? expression-true : expression-false
+    //  printf(i < 0 ? "i is below 0" : i == 0 ? "i equal 0" : "i is over 0");
+    
+    Serial.print((String) "\nM#@t=" + (mqttCnt+1) + " @" + (millis() / 1000) + ", TimeP1="  + currentTimeS);  // as - including any errors -  extracted from P1 read
+
+    Serial.print((String) ((validCRCFound) ? " (E#=" : " (e#=") + + telegramError + ")" );  // cleaner code; display errors
+    // if (validCRCFound) Serial.print((String) " (E#="          + telegramError + ")"); // data contains errors
+    // else               Serial.print((String) " (e#="          + telegramError + ")"); // data contains errors;
+
+    Serial.print((String) "\tGpio5:" + (digitalRead(WATERSENSOR_READ) ? "1" : "0") ); // cleaner code; display sensor state
+    // bool tmpd = digitalRead(WATERSENSOR_READ); // read watersensor pin    
+    // Serial.print( "\tGpio5:" );
+    // if ( tmpd) Serial.print( "1" );
+    // if (!tmpd) Serial.print( "0" );
+    
     Serial.print( (String)", Water#:"   + waterReadCounter);
     Serial.print( (String)", Hot#:" + waterReadHotCounter);
-    Serial.print( ", WaterState:" );
-    if ( waterReadState) Serial.print( "1" );
-    if (!waterReadState) Serial.print( "0" );
+
+    Serial.print((String) ", WaterState:" + (waterReadState ? "1" : "0") ); // cleaner code; display state
+    // Serial.print( ", WaterState:" );
+    // if ( waterReadState) Serial.print( "1" );
+    // if (!waterReadState) Serial.print( "0" );
+    
     Serial.print( (String) ", Trg#:" + waterTriggerCnt);    // print ISR call counter
     Serial.print( (String) ", DbC#:" + waterDebounceCnt);   // print Debounce counter
     Serial.print( (String) ", Int#:" + intervalP1cnt);      // print Interval checking counter
@@ -1982,6 +2159,13 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         Serial.print("outputMqttLog now OFF");
       }
 
+    } else  if ((char)payload[0] == 'F') {
+      testv38_Function = !testv38_Function ; // swith on/off testing newFunction
+      if (outputOnSerial) {
+          Serial.print("testv38_Function=");
+          Serial.print(testv38_Function == true ? "ON" : "OFF");
+      }
+
     } else  if ((char)payload[0] == 'T') {
       loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
       // mySerial2.begin( 1200);    // GJ meter port   1200 baud
@@ -2007,7 +2191,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       detachWaterInterrupt();
       // detachInterrupt(WATERSENSOR_READ); // disconnect ISR
       waterTriggerTime = micros();       // set our time
-      waterTriggerCnt  = 1;              // indicate we are in detached mode
+      // waterTriggerCnt  = 1;              // indicate we are in detached mode
       if (outputOnSerial) {
         Serial.print("useWaterTrigger1=");
         if (useWaterTrigger1) {
@@ -2150,8 +2334,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       msg.concat(", \"WaterHotCnt\":%u");    // as of 26mar21 Use this Json to indicate Normal Mode for HotWater
     }
 
-    if (useWaterTrigger1) msg.concat(", \"Trigger1:\"1");  // show triggernumber
-    if (useWaterPullUp)   msg.concat(", \"PullUp:\"1");    // show pullupmode
+    if (useWaterTrigger1) msg.concat(", \"Trigger1\":1");  // show triggernumber
+    if (useWaterPullUp)   msg.concat(", \"PullUp\":1");    // show pullupmode
 
     if (forceCheckData) {
       // no clock time, use our runtine active
@@ -2228,7 +2412,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 }
 
 /* 
-    If output = input then false changed
+    if output = input then false changed
     bool thermostatChanged = processThermostat(LOW) || thermostatReadState = processThermostat(HIGH) || processThermostat(thermostatWriteState)
     true state was changed , false state was already as instructed
 
@@ -2340,6 +2524,9 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 bool processLightRead(bool myOperation)
 {
   lightReadState   = digitalRead(LIGHT_READ); // read D6
+  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, !lightReadState); // debug readsate
+
+  
   if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
   // Process this one-to-one directly to output
   if (outputOnSerial and lightReadState)  Serial.print("lightReadState D6 LOW...");  // debug
@@ -2361,6 +2548,11 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
   bool endOfMessage = false;    // led on during long message transfer
 
   if (startChar >= 0) {        // We are at start/first line of Meter reading
+    // digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off
+    // digitalWrite(BLUE_LED, LOW);       // Turn the ESPLED on to inform user
+    digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
+    allowOtherActivities = false;      // hold off other serial/interrupt acvities
+
     // DebugCRC telegramP1header = false;
     // DebugCRC testTelegramPos = 0;     // initialise array
 
@@ -2391,12 +2583,6 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
     }
     */
 
-
-
-    // digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off
-    // digitalWrite(BLUE_LED, LOW);       // Turn the ESPLED on to inform user
-    digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
-    allowOtherActivities = false;      // hold off other serial/interrupt acvities
     /*
          if (outputOnSerial)  {     // Printing /KFM5KAIFA-METER
              // Serial.println("soh>\n\r");
@@ -2952,10 +3138,12 @@ void attachWaterInterrupt() {   //
     attachInterrupt(WATERSENSOR_READ, WaterTrigger_ISR, CHANGE); // establish trigger
     if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger_ISR routine");
   }
+  waterTriggerCnt = 1;          // indicate ISR has been activated
 }
 void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent inteference while doing serial communication
   detachInterrupt(WATERSENSOR_READ); // trigger at every change
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // Prevent calls as per expressif intruction
+  waterTriggerCnt = 0;          // indicate ISR has been withdrawn
 }
 
 
@@ -2968,10 +3156,16 @@ void WaterTrigger_ISR()
   digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
   waterTriggerCnt++ ;             // increase our call counter
   long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-  waterTriggerTime  = time;       // set time of this read
+  waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
 
+  if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+    detachWaterInterrupt();
+    // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+  }
   waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
-  if (loopbackRx2Tx2) digitalWrite(SERIAL_TX2, waterTriggerState); // here test trigger to find if it is attached
+#ifdef NoTx2Function
+  if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // expected to go have/went low 
+#endif
 }
 
 /*
@@ -2982,18 +3176,19 @@ void WaterTrigger1_ISR()
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
   waterTriggerCnt++ ;             // increase call counter
   long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-  waterTriggerTime  = time;       // set time of this read
+  waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
 
   if ( (waterTriggerCnt) > 200 ) {
-    // Input went or is invibration, disconnect ourselves a couuple a milliseconds
+    // Input went or is in vibration, disconnect ourselves a couuple a milliseconds
     // detachInterrupt(WATERSENSOR_READ); // trigger at every change
     detachWaterInterrupt();
-    waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+    // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
     // waterTriggerTime  = waterTriggerTime + 10000; // forward our interrupt 10mS (disabled: now done in mainloop)
   }
   waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
-  if (loopbackRx2Tx2) digitalWrite(SERIAL_TX2, waterTriggerState); // here test trigger to find if it is attached
-
+#ifdef NoTx2Function
+  if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // expected to go have/went low 
+#endif
 }
 
 /* 20mar21 ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec */
