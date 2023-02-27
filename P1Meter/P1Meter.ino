@@ -1425,7 +1425,9 @@ void loop()
                waterReadState = waterTriggerState ;       // stabilize switch
                if (!waterReadState) {
                   waterReadCounter++;                         // count this as pulse if switch went LOW
-                  if (!lightReadState) waterReadHotCounter++; // count this as hotwater
+                  // lightReadState   = digitalRead(LIGHT_READ); // read D6
+                  // if (!lightReadState) waterReadHotCounter++; // count this as hotwater
+                  if (!digitalRead(LIGHT_READ)) waterReadHotCounter++; // count this as hotwater
 #ifdef NoTx2Function
                   if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH); //Turn the LED OFF  (inactive-high)
 #endif
@@ -1627,9 +1629,8 @@ void readTelegram() {
     p1TriggerTime = millis();
   }
 
-
 #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
-  if ( mySerial.P1active())  return ;  // quick return if serial is receiving, fucntion of SoftwareSerial for P1
+  if ( mySerial.P1active())  return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
 #endif  
   if (!mySerial.available()) return ;  // quick return if no data
 
@@ -2172,8 +2173,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       msg.concat(", \"WaterHotCnt\":%u");    // as of 26mar21 Use this Json to indicate Normal Mode for HotWater
     }
 
-    if (useWaterTrigger1) msg.concat(", \"Trigger1:\"1");  // show triggernumber
-    if (useWaterPullUp)   msg.concat(", \"PullUp:\"1");    // show pullupmode
+    if (useWaterTrigger1) msg.concat(", \"Trigger1\":1");  // show triggernumber
+    if (useWaterPullUp)   msg.concat(", \"PullUp\":1");    // show pullupmode
 
     if (forceCheckData) {
       // no clock time, use our runtine active
