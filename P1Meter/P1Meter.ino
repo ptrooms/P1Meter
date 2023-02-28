@@ -1,4 +1,4 @@
-// v38 testv38_Function false LGTM
+// v38 testv38_Function false LGTM stablelized by interbytes
 
 // require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
 //    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
@@ -43,7 +43,12 @@
 // *
 // * * * * * L O G  B O O K
 // *
-// 27feb23 22u45: v38 Implement reading RX2 Warmelink using 
+// 28feb23 03u29: v38 BLueLed re-assignment via command 'f' cycle: Waterpulse, HotWaterState, Off & P1-CrcFault
+//    Sketch uses 303740 bytes (29%) of program storage space. Maximum is 1044464 bytes.
+//    Global variables use 41500 bytes (50%) of dynamic memory, leaving 40420 bytes for local variables. Maximum is 81920 bytes
+// 28feb23 02u45: v38 Reandomlty added slack bytes (dummyxx) to check if this stabelize RX1/Crc (not sure)
+// 28feb23 01u55: v38 Added 3mS during loop to allow for  yield time delay if RX2 is used
+// 27feb23 22u45: v38 Implement reading RX2 Warmelink using gpio4 attached to mySerial2/115K2-8N1
 // 26feb23 22u19: v37 Disable TX2 serial function, , add loop-limit vor WatertriggerISR and defined BLUE_LED2 for Waterpuls
 // 06feb23 13u53: v36 Corrected debounce time *100 to *1000 & restructured mainloop "WaterPulse trigger when debounce " 
 //    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
@@ -601,9 +606,10 @@ unsigned long previousMillis = 0;      // this controls the functional loop
 unsigned long previousP1_Millis = 0;   // this controls the inner P1_serial loop
 unsigned long previousLoop_Millis = 0; // this tracks the main loop-() < 1000mSec
 
-//for debugging, outputs info to serial port and mqtt
+//for debugging, outputs info to serial port and mqtt function 'f' will cycle
 bool blue_led2_Water = false;    // Use blue_led2 to indicate watertrigger
-bool blue_led2_HotWater = true;  // Use blue_led2 to indicate hotstate
+bool blue_led2_HotWater = false; // Use blue_led2 to indicate hotstate
+bool blue_led2_Crc = true;       // Use blue_led2 to indicate hotstate
 
 bool allowOtherActivities = true; // allow other activities if not reading serial P1 port
 bool p1SerialActive   = false;   // start program with inactive P1 port
@@ -628,8 +634,8 @@ bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterT
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
 bool outputMqttLog    = false;   // "L" ptro false -> true , output to /log/t0
-bool outputMqttPower  = true;    // "P" ptro false -> true , output to /energy/t0current
-bool testv38_Function = false;   // "F" ptro false -> true , use v38 RX2 processing (27feb23 tested, LGTM)
+bool outputMqttPower  = true;    // "P" ptro true  -> false , output to /energy/t0current
+bool testv38_Function = true;    // "F" ptro true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to cgheck if we have published
@@ -638,7 +644,7 @@ bool validCRCFound = false;          // Set by DdecodeTelegram if Message CRC = 
 // P1smartmeter timestate messages
 long currentTime   =  210402;        // Meter reading Electrics - datetime  0-0:1.0.0(180611210402S)
 char currentTimeS[] = "210401";      // same in String format time, will be overriden by Telegrams
-const char dummy1[] = {0x0000};      // prevent overwrite
+const char dummy1[] = {0x0000};    // prevent overwrite
 
 long powerConsumptionLowTariff = 0;  // Meter reading Electrics - consumption low tariff in watt hours
 long powerConsumptionHighTariff = 0; // Meter reading Electrics - consumption high tariff  in watt hours
@@ -703,7 +709,8 @@ int filteredValueAdc = 0; // average between previous and and published
 
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 char dummy2[17];       // add some spare bytes
-char telegram[MAXLINELENGTH];       // telegram maxsize 64bytes for P1 meter
+const char dummy2a[] = {0x0000};      // prevent overwrite
+char telegram[MAXLINELENGTH];       // telegram maxsize bytes for P1 meter
 char telegramLast[3];               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
 //DebugCRC int  testTelegramPos  = 0;          // where are we
@@ -716,7 +723,9 @@ char telegramLast2[3];              // overflow used to catch line termination b
 char telegramLast2o[19];            // overflow used to catch line termination bracket
 
 bool bGot_Telegram2Record = false;     // proces serial 2 until we have a outside P1 loop
+const char dummy3a[] = {0x0000};      // prevent overwrite
 char telegram2Record[MAXLINELENGTH2]; // telegram maxsize for P1 RX2 
+const char dummy4a[] = {0x0000};      // prevent overwrite
 
 
 // Callback mqtt value which is used to received data
@@ -794,7 +803,7 @@ void setup()
 
   // Lightread initialisation
   lightReadState   = digitalRead(LIGHT_READ); // read Hotwater valve state
-  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, !lightReadState);  // debug readstate
+  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState);  // debug readstate1
   
   
 
@@ -1339,7 +1348,7 @@ void loop()
   }
 
   // Following will trackdown loops
-  if (currentMillis > (previousLoop_Millis + 1000) ) { // exceeding one second  ?, warn user
+  if (currentMillis > (previousLoop_Millis + 1030) ) { // exceeding one second  ?, warn user
     // yield();
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
     if (outputOnSerial) {
@@ -1446,7 +1455,7 @@ void loop()
                   waterReadCounter++;                         // count this as pulse if switch went LOW
                   // lightReadState   = digitalRead(LIGHT_READ); // read D6
                   // if (!lightReadState) waterReadHotCounter++; // count this as hotwater
-                  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, !(digitalRead(LIGHT_READ)));  // debug readstate
+                  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, (digitalRead(LIGHT_READ)));  // debug readstate0
                   if (!digitalRead(LIGHT_READ)) waterReadHotCounter++; // count this as hotwater
 #ifdef NoTx2Function
 
@@ -1771,7 +1780,8 @@ void readTelegram() {
         ESP.wdtFeed();              // feed the hungry timer
         
         // print zC is check is OK else print Zc (lower case) for debug reasons.
-        if (validCRCFound) Serial.print((String) "zC"); else Serial.print((String) "Zc") ;
+        if (validCRCFound) Serial.print((String) "_C"); else Serial.print((String) "Z_") ;
+        if (blue_led2_Crc) validCRCFound ? digitalWrite(BLUE_LED2, HIGH) : digitalWrite(BLUE_LED2, LOW) ; // v38 monitoring
 
         p1TriggerTime = millis();   // indicate we have a yield
 
@@ -1784,6 +1794,7 @@ void readTelegram() {
         if (intervalP1cnt < 1140) intervalP1cnt++ ; // increase survived read count
 
         p1SerialFinish = true; // indicate mainloop we can stop P1 serial for a while
+        mySerial.end();      // flush the buffer (if any) v38
         mySerial.flush();      // flush the buffer (if any)
 
       }
@@ -1839,7 +1850,7 @@ void readTelegram2() {
     // initialise positions
     int telegram2_Start = 0;
     int telegram2_End   = 0;
-    int telegram2_Pos   = 0;  //here v38
+    int telegram2_Pos   = 0;
 
     while (mySerial2.available() && readTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
        
@@ -1865,7 +1876,7 @@ void readTelegram2() {
         if (!bGot_Telegram2Record) {   // reset numbers if not yet a record from WarmteLink 
           telegram2_Start = 0;
           telegram2_End   = 0;
-          telegram2_Pos   = 0;  //here v38
+          telegram2_Pos   = 0;
         }
         
         for (int i = 0; (i <= len && !bGot_Telegram2Record); i++) {  // forward
@@ -2121,7 +2132,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       if (outputOnSerial) {
         Serial.print("outputMqttLog now ON.");
       }
-    } else  if ((char)payload[0] == 'e') {    // here
+    } else  if ((char)payload[0] == 'e') {
         Serial.print("forcing infinite loop");
         while (true) {
           int a = 0;
@@ -2161,10 +2172,31 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 
     } else  if ((char)payload[0] == 'F') {
       testv38_Function = !testv38_Function ; // swith on/off testing newFunction
-      if (outputOnSerial) {
+      // if (outputOnSerial) {
           Serial.print("testv38_Function=");
           Serial.print(testv38_Function == true ? "ON" : "OFF");
-      }
+      // }
+
+    } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //here
+                if (blue_led2_Water) {
+                    blue_led2_Water = !blue_led2_Water;
+                    blue_led2_HotWater = !blue_led2_HotWater;          
+                    digitalWrite(BLUE_LED2, HIGH);
+                    Serial.print("BlueLed2 = HotWater");       // monitor HotWater to BleuLed2, initial  OFF
+                    Serial.print(""); // stabilize test        // stable 
+                    Serial.print("."); // stabilize test        // stable 
+                } else if (blue_led2_HotWater) {
+                    blue_led2_HotWater = !blue_led2_HotWater;
+                    blue_led2_Crc = !blue_led2_Crc;
+                    Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Ctc to BleuLed2
+                } else if (blue_led2_Crc) {
+                    blue_led2_Crc = !blue_led2_Crc;
+                    Serial.print("BlueLed2 = Off");            // BlueLed2 Off
+                } else {
+                   blue_led2_Water = !blue_led2_Water;
+                   digitalWrite(BLUE_LED2, LOW);
+                   Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
+                }
 
     } else  if ((char)payload[0] == 'T') {
       loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
@@ -2524,7 +2556,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 bool processLightRead(bool myOperation)
 {
   lightReadState   = digitalRead(LIGHT_READ); // read D6
-  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, !lightReadState); // debug readsate
+  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
 
   
   if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
