@@ -1,6 +1,6 @@
 
-// v39 collect data value from RX2/P1
-// v38 testv38_Function false LGTM stablelized by interbytes
+// v39 LGTM collect data value from RX2/P1 & output to mqtt
+// v38 testv38_Function false LGTM stabilized by inter/procedure bytes
 
 // require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
 //    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
@@ -31,13 +31,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1138.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1139.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2138.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2139.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -45,6 +45,9 @@
 // *
 // * * * * * L O G  B O O K
 // *
+// 28feb23 22u00: v39 stabilize bytes and output retrieved P2 code to mqtt
+//    Sketch uses 303800 bytes (29%) of program storage space. Maximum is 1044464 bytes.
+//    Global variables use 41504 bytes (50%) of dynamic memory, leaving 40416 bytes for local variables. Maximum is 81920 bytes.
 // 28feb23 03u29: v38 BLueLed re-assignment via command 'f' cycle: Waterpulse, HotWaterState, Off & P1-CrcFault
 //    Sketch uses 303740 bytes (29%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 41500 bytes (50%) of dynamic memory, leaving 40420 bytes for local variables. Maximum is 81920 bytes
@@ -2893,7 +2896,7 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
 
 /* 
   get string to long value in numeric (...* strings)
-*/ //herev39
+*/ 
 long getValue(char *buffer, int maxlen)
 {
   // 1234567890123456789012345678901234567890   = 40    18061   000   // countlist 1
