@@ -1,3 +1,5 @@
+
+// v39 collect data value from RX2/P1
 // v38 testv38_Function false LGTM stablelized by interbytes
 
 // require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
@@ -653,7 +655,8 @@ long powerProductionHighTariff = 0;  // Meter reading Electrics - return high ta
 long CurrentPowerConsumption = 0;    // Meter reading Electrics - Actual consumption in watts
 long CurrentPowerProduction = 0;     // Meter reading Electrics - Actual return in watts
 long GasConsumption = 0;             // Meter reading Gas in m3
-
+long HeatFlowConsumption = 0;        // v39 Meter reading P2 in m3 - value from RX2 Warmtelinkl
+long HeatConsumption = 0;            // v39 Meter reading P2 in GJ - tbd value from RX2 Warmtelinkl
 long OldPowerConsumptionLowTariff = 0;  // previous reading
 long OldPowerConsumptionHighTariff = 0; // previous reading
 long OldPowerProductionLowTariff = 0;   // previous reading
@@ -1967,9 +1970,31 @@ void readTelegram2() {
               84.188*m3){<!C17F{
               
           */
+          
           int startChar = FindCharInArrayRev(telegram2Record, '/',  sizeof(telegram2Record));  // 0-offset "/ISk5\2MT382-1000" , -1 not found
           int endChar   = FindCharInArrayRev(telegram2Record, '!',  sizeof(telegram2Record));  // 0-offset "!769A" , -1 not found
           int valChar   = FindCharInArrayRev(telegram2Record, '*',  sizeof(telegram2Record));  // 0-offset "(84.108*m3)" , -1 not found
+
+          // .s2>[238]303030304B414D363435343632){<0-1:24.2.1(230228155651W)(84.707*m3){<!8945
+          //          {</ISk5\2MT382-1000{<{<1-3:0.2.8(50){<0-0:1.1.0(230228155652W)
+          //          {<0-1:24.1.0(012){<0-1:96.1.0(303030304B414D363435343632){<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C
+          // [ telegram2_End-telegram2_Start=telegram2_Pos,startChar,endChar,valChar ]
+          //  WL>237-74=163:162,s=0,e=157,v=151  telegram2Record 
+          //  /....+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9....+....0....+....1....+.
+          //  /ISk5\2MT382-1000{<{<1-3:0.2.8(50){<0-0:1.1.0(230228155652W){<0-1:24.1.0(012){<0-1:96.1.0(303030304B414D363435343632)
+          //  ...2....+....3....+....4....+....5....+....6..
+          //  {<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C
+          //    ....+....1....+....2....+....3....+..
+          // const char * strstr ( const char * str1, const char * str2 );      char * strstr (       char * str1, const char * str2 ); 
+          // Locate substring Returns a pointer to the first occurrence of str2 in str1, or a null pointer if str2 is not part of str1.
+
+          HeatFlowConsumption = 0; // initialise v39
+          // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) { // total HeatFlow
+          if ( strstr(telegram2Record,"0-1:24.2.1(") && endChar > 0 && valChar > 0) { // if string found, total HeatFlow
+              if (outputOnSerial) Serial.print(telegram2Record+(valChar - 7) ); //  print value unconditionally string
+              HeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), (endChar - 37) );
+          }
+          
           if (outputOnSerial) {
             Serial.print("\nWL>");       // v38 debug print processing serial data
             Serial.print(telegram2_End); 
@@ -1989,10 +2014,11 @@ void readTelegram2() {
             Serial.println(telegram2Record); // debug print processing
             Serial.print("");             // debug print processing serial data
           }
-          if (valChar >= 0) {
-            Serial.print("\n\r\t WL data:"); //  print value unconditionally on new line
-            Serial.print(telegram2Record+(valChar - 7) ); //  print value unconditionally string
-            Serial.print("\t");             //  print value unconditionally on new line
+          if (HeatFlowConsumption >= 0) {
+            // Serial.print("\n\r\t WL-m3=");     //  v39 print value unconditionally on new line
+            Serial.print("\t WL-m3=");     //  v39 print value unconditionally on new line
+            Serial.print(HeatFlowConsumption); //  print value unconditionally string
+            Serial.print("\t");           //  print value unconditionally on new line
           }
         }
         // }  // check testv38_Function
@@ -2177,7 +2203,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.print(testv38_Function == true ? "ON" : "OFF");
       // }
 
-    } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //here
+    } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //herev38
                 if (blue_led2_Water) {
                     blue_led2_Water = !blue_led2_Water;
                     blue_led2_HotWater = !blue_led2_HotWater;          
@@ -2358,6 +2384,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(", \"mqttCnt\":%u");                     // as of 19nov19 include our message counter
 
     msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
+
     if (loopbackRx2Tx2) {
       msg.concat(", \"WaterTst\":%u");       // as of 25mar21 Use this Json to indicate Testmode
       msg.concat(", \"WaterHotTst\":%u");    // as of 26mar21 Use this Json to indicate Testmode for HotWater
@@ -2365,9 +2392,12 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       msg.concat(", \"WaterCnt\":%u");       // as of 25mar21 Use this Json to indicate Normal Mode
       msg.concat(", \"WaterHotCnt\":%u");    // as of 26mar21 Use this Json to indicate Normal Mode for HotWater
     }
+    msg.concat(", \"HeatM3\":%u");           // v39 as of 28feb23 show HeatFlowConsumption
 
     if (useWaterTrigger1) msg.concat(", \"Trigger1\":1");  // show triggernumber
     if (useWaterPullUp)   msg.concat(", \"PullUp\":1");    // show pullupmode
+
+
 
     if (forceCheckData) {
       // no clock time, use our runtine active
@@ -2430,7 +2460,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
             waterReadCounter,           // Watersensor state 21mar21 number falldowns
             waterReadHotCounter,        // Watersensor state 26mar21 number during Hotwater
-
+            HeatFlowConsumption,        // v39 28feb23 show HeatFlowConsumption
+            
             prog_Version );             // (fixed) Version from program , see top
 
     if (client.connected()) {
@@ -2862,7 +2893,7 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
 
 /* 
   get string to long value in numeric (...* strings)
-*/
+*/ //herev39
 long getValue(char *buffer, int maxlen)
 {
   // 1234567890123456789012345678901234567890   = 40    18061   000   // countlist 1
@@ -2871,7 +2902,8 @@ long getValue(char *buffer, int maxlen)
   // 0-0:1.0.0(180611014816S)                   = data record len=25, string length datalen 12
   // 0-1:24.2.1(150531200000S)(00811.923*m3)    = gaz date record which we do not have at our P1
   // 1-0:1.8.2(010707.720*kWh)                  = power consumption record len=26 datalen 10
-  //  .........1.........2.........3.........4
+  // /ISk5\2MT382-1000...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record 0-162bytes
+  //  .........1.........2.........3.........4.........5
 
   int s = FindCharInArrayRev(buffer, '(', maxlen - 2);  // search buffer fro bracket (s=25)
   if (s < 8) return 0;    // no valid string
@@ -2914,6 +2946,8 @@ int FindCharInArrayRev(char array[], char c, int len)               // Find char
   // 1234567890123456789012345678901234567890  = 40
   // 0-0:1.0.0(180611014816S)                  = sublen12 len=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
+  // ...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record
+  
 
   for (int i = len - 1; i >= 0; i--)   // backward
   {
