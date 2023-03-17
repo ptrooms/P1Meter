@@ -1908,11 +1908,11 @@ void readTelegram2() {
                     if (telegram2_Start == 0 ) telegram2_End = 0;  // reset if not yet started
                 } 
                 
-                if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) ) {   
+                if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) ) {
 
                   // check translated contents  for debug
                   if (telegram2[i] == 10) telegram2[i] = '<' ;                      // translate NL tp <
-                  if (telegram2[i] == 13) telegram2[i] = '{' ;                      // translate CR to {
+                  if (telegram2[i] == 13) telegram2[i] = '@' ;                      // translate CR to {
                   if (telegram2[i] == 00) telegram2[i] = '_' ;                      // translate CR to {
                   if (telegram2[i] < 32 || telegram2[i] > 127 ) telegram2[i] = '~'; // translate unprintable
 
@@ -1920,29 +1920,29 @@ void readTelegram2() {
 
                   telegram2_Pos++;
                   telegram2Record[telegram2_Pos] = 0;     // initialize 
-                }
-              }
+                } // if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) 
+              } // if ( telegram2_Pos < MAXLINELENGTH2 && (telegram2_Start == 0 || telegram2_Pos > 0 || i < telegram2_End ) )
               if (telegram2_Pos > 4) {      // check for length start2finish before Checksum
                 if (telegram2Record[0] == '/' && telegram2Record[telegram2_Pos - 5] == '!')  {
-                   bGot_Telegram2Record = true;
-                   mySerial2.end();          // v38 Stop- if any - GJ communication
-                   mySerial2.flush();        // v38 Clear GJ buffer
-                   if (outputOnSerial) {
-                       // debug print positions
-                       Serial.print("\ns1=")           ; // debug v38 print processing
-                       Serial.print(telegram2_Start)   ; // debug v38 print processing serial /start
-                       Serial.print(", ne1=")          ; // debug v38 print processing
-                       Serial.print((telegram2_End))   ; // debug v38 print processing serial !End
-                       Serial.print(", np1=")          ; // debug v38 print processing
-                       Serial.println(telegram2_Pos)   ; // debug v38 print last record positition                      
-                   }
-                 }
+                  bGot_Telegram2Record = true;
+                  mySerial2.end();          // v38 Stop- if any - GJ communication
+                  mySerial2.flush();        // v38 Clear GJ buffer
+                  if (outputOnSerial) {
+                      // debug print positions
+                      Serial.print("\ns1=")           ; // debug v38 print processing
+                      Serial.print(telegram2_Start)   ; // debug v38 print processing serial /start
+                      Serial.print(", ne1=")          ; // debug v38 print processing
+                      Serial.print((telegram2_End))   ; // debug v38 print processing serial !End
+                      Serial.print(", np1=")          ; // debug v38 print processing
+                      Serial.println(telegram2_Pos)   ; // debug v38 print last record positition                      
+                  }
+                }
               }
-            } // testv38_Function && !bGot_Telegram2Record
+            } // if (testv38_Function && !bGot_Telegram2Record )
             
             // modify our work buffer for v38 printing
             if (telegram2[i] == 10) telegram2[i] = '<' ;                      // translate NL tp <
-            if (telegram2[i] == 13) telegram2[i] = '{' ;                      // translate CR to {
+            if (telegram2[i] == 13) telegram2[i] = '@' ;                      // translate CR to {
             if (telegram2[i] == 00) telegram2[i] = '_' ;                      // translate CR to {
             if (telegram2[i] < 32 || telegram2[i] > 127 ) telegram2[i] = '~'; // translate unprintable
 
@@ -1958,6 +1958,8 @@ void readTelegram2() {
 
         // if (testv38_Function) { // do we want to execute v38 testv38_Function (superfluous , as routine her eis v38)
         if (bGot_Telegram2Record) {   // v38 print record serial2 if we have catched a record
+          Serial.print("&&&&");     //  v39 print indicator // added 14mar22 to show activeness
+          Serial.print("\b\b\b\b.");     //  v39 print indicator // added 14mar22 to get it stable
           // if (outputOnSerial && ((telegram2_Start > 0 && telegram2_End > 0) || bGot_Telegram2Record) ) {   // v38 print record serial2
           /* sample data record
               .3>[220-58=162]/ISk5\2MT382-1000
@@ -2032,7 +2034,7 @@ void readTelegram2() {
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
-      }
+      } // if (len > 0)  {   // do we have bytes in buffer
       readTelegram2cnt++;   /// account this readloop
     } // while data
 
