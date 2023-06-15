@@ -1,5 +1,6 @@
 
-// v39 LGTM collect data value from RX2/P1 & output to mqtt
+// v40 improve WarmteLink detection, sometimes skipped....
+// v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
 // v38 testv38_Function false LGTM stabilized by inter/procedure bytes
 
 // require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
@@ -31,13 +32,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1139.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1140.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2139.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2140.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -45,6 +46,8 @@
 // *
 // * * * * * L O G  B O O K
 // *
+// 17mar23 15u37: v40 improve WL value detection as value is sometimes missed when OK record is on position 1
+//    added char TranslateForPrint(char c); // to translate unprintable values <null>00_ nl=10| cr=13 val>127~
 // 28feb23 22u00: v39 stabilize bytes and output retrieved P2 code to mqtt
 //    Sketch uses 303800 bytes (29%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 41504 bytes (50%) of dynamic memory, leaving 40416 bytes for local variables. Maximum is 81920 bytes.
@@ -1854,8 +1857,8 @@ void readTelegram2() {
     memset(telegram2Record, 0, sizeof(telegram2Record));  // initialise telegram array to 0
 
     // initialise positions
-    int telegram2_Start = 0;
-    int telegram2_End   = 0;
+    int telegram2_Start = -1;
+    int telegram2_End   = -1;
     int telegram2_Pos   = 0;
 
     while (mySerial2.available() && readTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
@@ -1880,8 +1883,8 @@ void readTelegram2() {
          */
 
         if (!bGot_Telegram2Record) {   // reset numbers if not yet a record from WarmteLink 
-          telegram2_Start = 0;
-          telegram2_End   = 0;
+          telegram2_Start = -1;
+          telegram2_End   = -1;
           telegram2_Pos   = 0;
         }
         
@@ -1891,35 +1894,27 @@ void readTelegram2() {
             if (testv38_Function && !bGot_Telegram2Record ) { // v38 testv38_Function
               //  v38 copy/extract proces a single RX2 record
               /* debug
-                if (outputOnSerial && telegram2_Start == 0)   Serial.print("s");
-                if (outputOnSerial && telegram2_Start > 0) Serial.print(telegram2_Pos == 0 ? (String) "-" : (String) telegram2[i] );
-                if (outputOnSerial && !(telegram2_End == 0) ) Serial.print("e");
+                if (outputOnSerial && telegram2_Start < 0)   Serial.print("s");
+                if (outputOnSerial && telegram2_Start >= 0) Serial.print(telegram2_Pos == 0 ? (String) "-" : (String) telegram2[i] );
+                if (outputOnSerial && !(telegram2_End < 0) ) Serial.print("e");
               */ 
-              if ( telegram2_Pos < MAXLINELENGTH2 && (telegram2_Start == 0 || telegram2_Pos > 0 || i < telegram2_End ) ) {
+              if ( telegram2_Pos < MAXLINELENGTH2 && (telegram2_Start < 0 || telegram2_Pos > 0 || i < telegram2_End ) ) {
                 if (telegram2[i] == '/')  {
                   telegram2_Start = i;  // position input slash-/
                   telegram2_Pos = 0;    // reset output buffer
                   telegram2Record[telegram2_Pos] = 0;   // initialise first position
-                  telegram2_End = 0;    // reset to find excmamation-!
+                  telegram2_End = -1;    // reset to find excmamation-!
 
                 }
                 if (telegram2[i] == '!')  {
-                    if (telegram2_End   == 0 && (i < (len - 6)) ) telegram2_End = i + 6;  // anticiptae after checksum position !1234.6
-                    if (telegram2_Start == 0 ) telegram2_End = 0;  // reset if not yet started
+                    if (telegram2_End   < 0 && (i < (len - 6)) ) telegram2_End = i + 6;  // anticiptae after checksum position !1234.6
+                    if (telegram2_Start < 0 ) telegram2_End = -1;  // reset if not yet started
                 } 
                 
-                if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) ) {
-
-                  // check translated contents  for debug
-                  if (telegram2[i] == 10) telegram2[i] = '<' ;                      // translate NL tp <
-                  if (telegram2[i] == 13) telegram2[i] = '@' ;                      // translate CR to {
-                  if (telegram2[i] == 00) telegram2[i] = '_' ;                      // translate CR to {
-                  if (telegram2[i] < 32 || telegram2[i] > 127 ) telegram2[i] = '~'; // translate unprintable
-
-                  telegram2Record[telegram2_Pos] = telegram2[i];    // move value to output
-
+                if (telegram2_Start >= 0  && (telegram2_End < 0 || i < telegram2_End) ) {
+                  telegram2Record[telegram2_Pos] = TranslateForPrint(telegram2[i]); // move value as translated output
                   telegram2_Pos++;
-                  telegram2Record[telegram2_Pos] = 0;     // initialize 
+                  telegram2Record[telegram2_Pos] = 0;     // initialize next position
                 } // if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) 
               } // if ( telegram2_Pos < MAXLINELENGTH2 && (telegram2_Start == 0 || telegram2_Pos > 0 || i < telegram2_End ) )
               if (telegram2_Pos > 4) {      // check for length start2finish before Checksum
@@ -1940,11 +1935,8 @@ void readTelegram2() {
               }
             } // if (testv38_Function && !bGot_Telegram2Record )
             
-            // modify our work buffer for v38 printing
-            if (telegram2[i] == 10) telegram2[i] = '<' ;                      // translate NL tp <
-            if (telegram2[i] == 13) telegram2[i] = '@' ;                      // translate CR to {
-            if (telegram2[i] == 00) telegram2[i] = '_' ;                      // translate CR to {
-            if (telegram2[i] < 32 || telegram2[i] > 127 ) telegram2[i] = '~'; // translate unprintable
+            // modify our work buffer for v38 printing (contents may already have been translated)
+            telegram2[i] = TranslateForPrint(telegram2[i]);    // move value to  translated output
 
         } // end for loop scanning serialbuffer
 
@@ -1959,8 +1951,8 @@ void readTelegram2() {
         // if (testv38_Function) { // do we want to execute v38 testv38_Function (superfluous , as routine her eis v38)
         if (bGot_Telegram2Record) {   // v38 print record serial2 if we have catched a record
           Serial.print("&&&&");     //  v39 print indicator // added 14mar22 to show activeness
-          Serial.print("\b\b\b\b.");     //  v39 print indicator // added 14mar22 to get it stable
-          // if (outputOnSerial && ((telegram2_Start > 0 && telegram2_End > 0) || bGot_Telegram2Record) ) {   // v38 print record serial2
+          Serial.print("\b\b\b.");     //  v39 print indicator // added 14mar22 to get it stable
+          // if (outputOnSerial && ((telegram2_Start >= 0 && telegram2_End > telegram2_Start) || bGot_Telegram2Record) ) {   // v38 print record serial2
           /* sample data record
               .3>[220-58=162]/ISk5\2MT382-1000
               
@@ -2941,6 +2933,17 @@ long getValue(char *buffer, int maxlen)
   return 0;
 }
 
+/*
+ * translate to printable
+ */
+char TranslateForPrint(char c)
+{
+  if (c == 10) c = '|' ;                 // translate NL to |
+  if (c == 13) c = '<' ;                 // translate NL to <
+  if (c == 00) c = '_' ;                 // translate NL to _
+  if (c < 32 || c > 127 ) c = '~' ;    // translate unprintable
+  return c;
+}  
 
 /* 
   generic subroutine to find a character in reverse , return position as offset to 0
