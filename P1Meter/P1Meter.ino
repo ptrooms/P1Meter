@@ -1,9 +1,10 @@
-
+// v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count
 // v40 improve WarmteLink detection, sometimes skipped....
 // v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
 // v38 testv38_Function false LGTM stabilized by inter/procedure bytes
 
 // require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
+//          -- Arduino BoardsManager --> esp8266 --> ensure it has 2.4.1
 //    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
 //      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
 //      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
@@ -32,13 +33,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1140.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1141.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2140.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2141.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -1658,7 +1659,7 @@ void doCritical() {
 */
 void readTelegram() {
 
-  unsigned long p1Debounce_time = millis() - p1TriggerTime; // mSec - waterTriggerTime in micro seconds set by ISR waterTrigger
+  unsigned long p1Debounce_time = millis() - p1TriggerTime;		// mSec - p1TriggerTime  set by this() and updated while reading P1 data
   // if (p1SerialActive && p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
   if (p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
     // yield();                // allow time to others
@@ -3251,15 +3252,15 @@ void WaterTrigger1_ISR()
   waterTriggerCnt++ ;             // increase call counter
   long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
   waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
-
+  waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
   if ( (waterTriggerCnt) > 200 ) {
     // Input went or is in vibration, disconnect ourselves a couuple a milliseconds
     // detachInterrupt(WATERSENSOR_READ); // trigger at every change
     detachWaterInterrupt();
     // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
     // waterTriggerTime  = waterTriggerTime + 10000; // forward our interrupt 10mS (disabled: now done in mainloop)
+    waterTriggerState = LOW;         // v41 force to low to ease things
   }
-  waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
 #ifdef NoTx2Function
   if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // expected to go have/went low 
 #endif
