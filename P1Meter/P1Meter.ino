@@ -1154,7 +1154,7 @@ void setup()
     // diffs: 3801-4487-4466
     Serial.println((String)" TestIramWait9 gc4-1=" + ESP.getCycleCount() + ", gc4-2="+ ESP.getCycleCount() + ", gc4-3="+ ESP.getCycleCount() + ", gc4-4="+ ESP.getCycleCount());
 
-    // insert a small loop to stabilize
+    // insert a small loop to stabilize-routine
     for (int i = 0; i < 100; i++) {
       int test = 0;
     }
@@ -1952,7 +1952,9 @@ void readTelegram2() {
         // if (testv38_Function) { // do we want to execute v38 testv38_Function (superfluous , as routine her eis v38)
         if (bGot_Telegram2Record) {   // v38 print record serial2 if we have catched a record
           Serial.print("&&&&");     //  v39 print indicator // added 14mar22 to show activeness
-          Serial.print("\b\b\b.");     //  v39 print indicator // added 14mar22 to get it stable
+          Serial.print("\b\b\b+3.");     //  v41 print indicator // added 21jun23 to get it stable: Serial.print("\b\b\b+3."); 
+          // 21jun23 Global variables use 41516 bytes (50%) of dynamic memory, leaving 40404 bytes for local variables. Maximum is 81920 bytes
+                                         //  v39 print indicator // added 14mar22 to get it stable: Serial.print("\b\b\b.");
           // if (outputOnSerial && ((telegram2_Start >= 0 && telegram2_End > telegram2_Start) || bGot_Telegram2Record) ) {   // v38 print record serial2
           /* sample data record
               .3>[220-58=162]/ISk5\2MT382-1000
