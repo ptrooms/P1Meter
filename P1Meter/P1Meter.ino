@@ -2154,7 +2154,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       if (!outputOnSerial)  Serial.print("Inactive\n\r");
       if (outputOnSerial) Serial.println("\nActive.");
     } else  if ((char)payload[0] == 'L') {
-      outputMqttLog   = true ;         // Do not log
+      outputMqttLog   = true ;         // Do log to mqtt 
       if (outputOnSerial) {
         Serial.print("outputMqttLog now ON.");
       }
@@ -2190,7 +2190,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
               Serial.print((String) "Exception activated" + e.what() );
           }
 */
-    } else  if ((char)payload[0] == 'l') {
+    } else  if ((char)payload[0] == 'l') {  // stop logging to mqtt
       outputMqttLog   = false ;       // Do not publish Log
       if (outputOnSerial) {
         Serial.print("outputMqttLog now OFF");
