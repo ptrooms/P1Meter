@@ -1,3 +1,4 @@
+// v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to hget wifi stable see https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html
 // v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count
 // v40 improve WarmteLink detection, sometimes skipped....
 // v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
@@ -33,13 +34,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1141.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1142.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2141.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2142.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -47,6 +48,7 @@
 // *
 // * * * * * L O G  B O O K
 // *
+// 09jul23 14u53: v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to get wifi more stable
 // 17mar23 15u37: v40 improve WL value detection as value is sometimes missed when OK record is on position 1
 //    added char TranslateForPrint(char c); // to translate unprintable values <null>00_ nl=10| cr=13 val>127~
 // 28feb23 22u00: v39 stabilize bytes and output retrieved P2 code to mqtt
@@ -855,11 +857,10 @@ void setup()
   delay(200);
   // WiFi.mode(WIFI_STA); // Disable AP mode
   // WiFi.setSleepMode(WIFI_MODEM_SLEEP); // Disable sleep (Esp8288/Arduino core and sdk default)
-  
-  
-
+      
   Serial.println("Settingup WifiSTAtion.");  // wait 5 seconds before retry
   WiFi.mode(WIFI_STA);            // Client mode
+  WiFi.setSleepMode(WIFI_NONE_SLEEP); // 09jul23 try to get Wifi stable disable sleep
 
   Serial.println((String) "Connecting to " + ssid);  // wait 5 seconds before retry
   WiFi.begin(ssid, password);     // login to AP
