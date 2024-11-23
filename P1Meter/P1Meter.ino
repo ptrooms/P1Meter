@@ -1037,9 +1037,8 @@ void setup()
   start3f = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
   // 10.000xnop1 vs nop2 Start3=2109430182, start3e=2109480889(nop1=50707), start3f=2109541239(nop2=60350) .
   // 10nops vs 20nops Start3=2782556574, start3e=2782556936(nop1=362), start3f=2782557306(nop2=370) . Only 8 cycles difference (compiler optimized?)
-  Serial.println((String)"\n Start3=" + start3 + ", start3e=" + start3e + "(nop1="+ (start3e-start3) + ")" + ", start3f=" + start3f + "(nop2="+ (start3f-start3e) + ") .");
+  Serial.println((String) "\n Start3=" + start3 + ", start3e=" + start3e + "(nop1=" + (start3e - start3) + ")" + ", start3f=" + start3f + "(nop2=" + (start3f - start3e) + ") .");
 
-  
   // serial test timings
   // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
   // 8bitstart TestRead4Rx start4=3405964740, end4=3405970810,  diff4=6070, wait4=6673, bittime4=694  = 72,84 µS =  8.5 bits

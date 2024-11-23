@@ -6,6 +6,13 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note: upto V24 we developed on Vxx. starting now we develop on development 
 create stable Versions-Vxx which when stable are merged into master.
 
+## [v21.42] - redo production stable PlatformIO
+	- v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to hget wifi stable see https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html
+	- v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count
+	- v40 improve WarmteLink detection, sometimes skipped....
+	- v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
+	- v38 testv38_Function false LGTM stabilized by inter/procedure bytes
+	- v36 Corrected debounce WaterPulse 100 to 1000mS
 ## [V22.35] - production/stable
 	- V22.35 - implement secondary RX2 on GPIO4/D2 INVERTED for direct connection to warmtelink pulldown
     -- impment logging for RX2
