@@ -302,7 +302,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
-   rec = 'z'; 
+   // rec = 'z'; // nty sure why we define this as
 #ifdef TEST_MODE
    if (next != m_outPos && wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
 #else

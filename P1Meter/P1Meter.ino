@@ -40,7 +40,7 @@
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2142.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2143.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -608,7 +608,7 @@ const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+
 // add const if this should never change
 int intervalP1    = 12000;    // mSecs : P1 30 --> 12 seconds response time interval of meter is 10 seconds
 int intervalP1cnt =  360;     // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
-int readTelegram2cnt = 6;     // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
+int readTelegram2cnt = 6;     // Maximum of readtelegram2 on 2nd RX port before we flush read Serial2 and return to regular p1 again.
 bool forceCheckData = false;  // force check on data in order to output some essential mqtt (Thermostat & Temprature) functions.
 bool firstRun = true;         // do not use forceCheckData (which might be activated during setup-() or first loop-() )
 
@@ -734,7 +734,7 @@ char telegram2[MAXLINELENGTH2];     // telegram maxsize 64bytes for P1 meterMAXL
 char telegramLast2[3];              // overflow used to catch line termination bracket
 char telegramLast2o[19];            // overflow used to catch line termination bracket
 
-bool bGot_Telegram2Record = false;     // proces serial 2 until we have a outside P1 loop
+bool bGot_Telegram2Record = false;    // proces serial 2 outside the P1 loop
 const char dummy3a[] = {0x0000};      // prevent overwrite
 char telegram2Record[MAXLINELENGTH2]; // telegram maxsize for P1 RX2 
 const char dummy4a[] = {0x0000};      // prevent overwrite
