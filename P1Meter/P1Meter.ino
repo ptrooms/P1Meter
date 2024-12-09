@@ -1985,7 +1985,7 @@ void readTelegram2() {
               
           */
           
-          int startChar = FindCharInArrayFwd(telegram2Record, '/',  sizeof(telegram2Record));  // 0-offset "/ISk5\2MT382-1000" , -1 not found
+          int startChar = FindCharInArrayRev(telegram2Record, '/',  sizeof(telegram2Record));  // 0-offset "/ISk5\2MT382-1000" , -1 not found
           int endChar   = FindCharInArrayRev(telegram2Record, '!',  sizeof(telegram2Record));  // 0-offset "!769A" , -1 not found
           int valChar   = FindCharInArrayRev(telegram2Record, '*',  sizeof(telegram2Record));  // 0-offset "(84.108*m3)" , -1 not found
 
@@ -2635,7 +2635,7 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
   //need to check for start
   validCRCFound = false;  // bool Global defined
 
-  int startChar = FindCharInArrayFwd(telegram, '/', len);  // 0-offset "/KFM5KAIFA-METER" , -1 not found
+  int startChar = FindCharInArrayRev(telegram, '/', len);  // 0-offset "/KFM5KAIFA-METER" , -1 not found
   int endChar   = FindCharInArrayRev(telegram, '!', len);  // 0-offset "!769A" , -1 not found
   bool endOfMessage = false;    // led on during long message transfer
 
