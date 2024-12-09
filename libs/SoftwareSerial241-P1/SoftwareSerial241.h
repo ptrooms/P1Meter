@@ -35,7 +35,7 @@ class SoftwareSerial : public Stream
 {
 public:
    SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
-   ~SoftwareSerial();
+   ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
 
    void begin(long speed);
    long baudRate();
