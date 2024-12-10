@@ -1,7 +1,8 @@
 // V44 enhanced comments alignment
 //  display at command 'F' the toggle rx2_function (renamed from v38_function) statusfunction
 //  reconnect(0 renamed to mqtt_reconnect()
-//  add FindCharInArrayFwd to do forward search
+//  add FindCharInArrayFwd to do forward search (corrected)
+//  loop check yield1500 changed tigger from 1.030 second to 1.080 seconds
 // v43 removed 2 stability bytes, line 2215, readded+1 as this looks to be needed to improve 1/30 (more C then Z)
 //     Compression reduced firmware size by 72% (was 305008 bytes, now 218719 bytes)
 //     removal superfluous increased error rate from 1/12 to 1/7
@@ -1365,11 +1366,11 @@ void loop()
   }
 
   // Following will trackdown loops
-  if (currentMillis > (previousLoop_Millis + 1030) ) { // exceeding one second  ?, warn user
+  if (currentMillis > (previousLoop_Millis + 1080) ) { // exceeding 1.08 second  ?, warn user
     // yield();
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
     if (outputOnSerial) {
-      Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yield1500\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+      Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yield1080\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
     } else {
       Serial.print("^");  // signal a yieldloop
     }
@@ -1732,7 +1733,7 @@ void readTelegram() {
     // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
     // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
     
-    if (outputOnSerial) {         // do we want/need to print the Telegram
+    if (outputOnSerial) {         // do we want/need to print the Telegram for Debug
       Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
       for (int cnt = 0; cnt < len; cnt++) {
           
@@ -2987,7 +2988,8 @@ int FindCharInArrayRev(char array[], char c, int len)               // Find char
   // 0-0:1.0.0(180611014816S)                  = sublen12 len=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
   // ...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record
-  for (int i = len - 1; i < 0; i--)   // backward
+  for (int i = len - 1; i >= 0; i--)   // backward
+  // for (int i = len - 1; i < 1; i--)   // backward
   {
     if (array[i] == c)
     {
