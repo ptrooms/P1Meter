@@ -1,3 +1,8 @@
+// v45 start to compare difference recovery crc
+//  commented superfluous stability code
+//  telegram_crcIn & telegram_crcOut in , source line 2800
+//  add crcIn16() routine in order to have created a full datarecord for crcRecovery
+//  done some straighlining
 // V44 enhanced comments alignment
 //  display at command 'F' the toggle rx2_function (renamed from v38_function) statusfunction
 //  reconnect(0 renamed to mqtt_reconnect()
@@ -42,13 +47,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1144.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1145.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2144.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2145.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -708,7 +713,7 @@ int filteredValueAdc = 0; // average between previous and and published
 //Infrastructure stuff
 #define MQTTCOMMANDLENGTH 80          // define our receiving buffer
 #define MQTTBUFFERLENGTH 480          // define our sending mqtt buffer
-#define MAXLINELENGTH 768           // full P1 serial message: the 589 byte message takes about 0.440 Seconds
+#define MAXLINELENGTH 1024           // full P1 serial message: the 589 byte message takes about 0.440 Seconds
 /*  #define MAXLINELENGTH 768            // shorten to see if this helps
     Executable segment sizes:
     BSS    : 28080 )         - zeroed variables      (global, static) in RAM/HEAP
@@ -733,23 +738,79 @@ int filteredValueAdc = 0; // average between previous and and published
 
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 char dummy2[17];       // add some spare bytes
-const char dummy2a[] = {0x0000};      // prevent overwrite
+const char dummy2a[] = {0x0000};    // prevent overwrite
 char telegram[MAXLINELENGTH];       // telegram maxsize bytes for P1 meter
 char telegramLast[3];               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
 //DebugCRC int  testTelegramPos  = 0;          // where are we
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
 
+unsigned int dataInCRC  = 0;          // CRC routine to calculate CRC of data telegram_crcIn
+int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
+char telegram_crcIn[MAXLINELENGTH];   // active telegram that is checked for crc
+int  telegram_crcIn_len = 0;          // length of this record
+int  telegram_crcOut_cnt = 0;         // number of times masking was positioned
+char telegram_crcOut[MAXLINELENGTH];  // processed telegram with changed positions to X
+const char dummy2b[] = {0x0000};      // prevent save overwrite
+// int  telegram_crcIn_cnt1 = 0;      // number of times CrcIn was called
+int  telegram_crcOut_len = 0;         // length of this record
+// int  telegram_crcIn_cnt2 = 0;      // number of times CrcIn was called
+
+/*
+  At header: initialise telegram_crcin
+  during CRC we accumulate record positions into telegram_crcin
+  At trailer:
+    if telegram_crcIn_len = telegram_crcOut_len and crcValidCounter > 0
+      if CRC=OK
+        // Mark telegram_crcOut with X changes comparing same telegram_crcin
+        for i=0 to len
+          if telegram_crcOut(i) != X and telegram_crcOut(i) != telegram_crcIn(i)
+          then telegram_crcOut(i) = X
+               crcMaskCounter++      // count masked positions
+        loop
+        crcValidCounter++            // count valid CRC
+      
+      else:   // CRC failure on input, try to recover
+        // try recover characters position: 
+        for i=0 to len
+          if telegram_crcOut(i) != X and telegram_crcOut(i) != telegram_crcIn(i)
+          then  telegram_crcIn(i) = telegram_crcOut(i)
+                crcRecoverCounter++
+        loop
+        if CRCOK telegram_crcIn
+          we have recovered the record, 
+          report recovery crcRecoverCounter++
+          redo value extraction
+        else:
+        // recovery failed, nothng much we can do here.
+        crcValidCounter--     // reduce valid CRC
+    
+    else: // different patatoe recordlength, reinitialise things
+      if CRC=OK
+        Copy telegram_crcin to telegram_crcout
+        telegram_crcOut_len = telegram_crcIn_len
+        for i=0 to len
+          telegram_crcOut(i) = telegram_crcIn(i)
+        loop
+        crcValidCounter = 1   // start validity all over
+        crcMaskCounter  = 0   // assume no masked positions
+      
+      else    // CRC failure on input and we have changed records
+        // recovery failed, nothing to initialise & reduce validness
+        crcValidCounter--     // reduce valid CRC
+
+*/
+
+
 // RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
 #define MAXLINELENGTH2 256
-char telegram2[MAXLINELENGTH2];     // telegram maxsize 64bytes for P1 meterMAXLINELENGTH
+char telegram2[MAXLINELENGTH2+128]; // RX2 serial databuffer during outside P1 loop
 char telegramLast2[3];              // overflow used to catch line termination bracket
-char telegramLast2o[19];            // overflow used to catch line termination bracket
-
-bool bGot_Telegram2Record = false;     // proces serial 2 until we have a outside P1 loop
-const char dummy3a[] = {0x0000};      // prevent overwrite
-char telegram2Record[MAXLINELENGTH2]; // telegram maxsize for P1 RX2 
-const char dummy4a[] = {0x0000};      // prevent overwrite
+char telegramLast2o[19];            // overflow-area to prevent memory leak
+bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
+const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak
+char telegram2Record[MAXLINELENGTH2]; // telegram extracted data maxsize for P1 RX2 
+const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak
 
 
 // Callback mqtt value which is used to received data
@@ -1696,7 +1757,8 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n Cycle: %02.9f DataCnt: %u started at %06.6f \b\b\t", ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
+  if (!outputOnSerial) Serial.printf("\r\n Cycle: %012.9f DataCnt: %u started at %06.6f \b\b\t", ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
+  // Cycle: 04.781228065
 
   if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
 
@@ -1834,7 +1896,7 @@ void readTelegram() {
          } // else
       */
 
-    } // if len > 1
+    } // if len > 0
   } // while serial available
   // Serial.println("startend..");
 } // void readTelegram
@@ -1919,7 +1981,7 @@ void readTelegram2() {
                   telegram2_Start = i;  // position input slash-/
                   telegram2_Pos = 0;    // reset output buffer
                   telegram2Record[telegram2_Pos] = 0;   // initialise first position
-                  telegram2_End = -1;    // reset to find excmamation-!
+                  telegram2_End = -1;    // reset to find exclamation-!
 
                 }
                 if (telegram2[i] == '!')  {
@@ -1940,7 +2002,7 @@ void readTelegram2() {
                   mySerial2.flush();        // v38 Clear GJ buffer
                   if (outputOnSerial) {
                       // debug print positions
-                      Serial.print("\ns1=")           ; // debug v38 print processing
+                      Serial.print("\nns1=")          ; // debug v38 print processing
                       Serial.print(telegram2_Start)   ; // debug v38 print processing serial /start
                       Serial.print(", ne1=")          ; // debug v38 print processing
                       Serial.print((telegram2_End))   ; // debug v38 print processing serial !End
@@ -2146,7 +2208,44 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
   Processing queued mqttCommand, received by callbackMqtt 
 */
 void ProcessMqttCommand(char* payload, unsigned int length) {
-  // int new_ThermostatState = 3;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Follow
+  /* Commands: (single byte)
+
+    0 heating On  valve relay D8=Gpio15
+    1 heating Off
+    2 Follow input (thermostat on D7=GPIO13)
+    3 No thermostat reading
+    R restart esp8266
+    D toggle Debug messages on serial output 
+    L Log messages to mqtt topi: /log/P1
+    l No mqtt logging
+    e enforce error div/0 causing a restart
+    E same, enforce error div/0 causing a restart
+    b decease P1 Baudrate port  Gpio14/D5  by 50
+    B increase Baudrate P1 port by 50
+    F toggle (test) Function
+    f BlueLed2 Gpio2/d4 led cycle Crc / off / HotWater / Water
+    W toggle Watertrigger on Gpio5/D1 or overriding it with Watertrigger1
+    w toggle PullUp input resistor Gpio5 (to stabilize optocoupler)
+    Z zero counters, like soft restart the MCU
+    I set inverval OK counter to 2880
+    i decrease interval OK counter 250/100/25/10/2
+    T loopback RX2 Gpio4 to TX2 Gpio2 serial port
+    P toggle output Power usage to /energy/p1power CurrentPowerConsumption: 463
+
+    Info - 
+          BlueLed is  Gpio16  /d0   - give some visual indication of state
+          Water is    Gpio5   /d1   - Optocoupler (with Soft Debounce)
+          RX2 GJ  is  Gpio4   /d2   - 115K8N1
+          ds18b20 is  Gpio0   /d3   - Onewire
+          BLUE_LED2   Gpio2   /d4   - monitor & (also TX2)
+          P1          Gpio14  /d5   - inverted 115K8N1
+          Hotwater    Gpio12  /d6   - LDR 1/0
+          Thermostat  Gpio13  /d7   - Switch
+          HeatValve   Gpio15  /d8   - isolated relay
+          LightAnalog Gpio17  /A0   - Ldr light 0- Dark1023
+
+
+  */
   if ((char)payload[0] != '\x00' && (char)payload[1] == '\x00' )  {   // only single command supported for now
     if         ((char)payload[0] == '0') {
       new_ThermostatState = 0;                   // Heating on
@@ -2225,8 +2324,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                     digitalWrite(BLUE_LED2, HIGH);
 
                     Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
-                    Serial.print(""); // stability test v43 // extra
-                    Serial.print(""); // stability test v43
+                    // Serial.print(""); // stability test v43 // extra
+                    // Serial.print(""); // stability test v43
                     Serial.print("."); // stability test v43
 
                     // Serial.print("BlueLed2 = HotWater.");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
@@ -2235,7 +2334,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                 } else if (blue_led2_HotWater) {
                     blue_led2_HotWater = !blue_led2_HotWater;
                     blue_led2_Crc = !blue_led2_Crc;
-                    Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Ctc to BleuLed2
+                    Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Crc check to BleuLed2 , initial On
                 } else if (blue_led2_Crc) {
                     blue_led2_Crc = !blue_led2_Crc;
                     Serial.print("BlueLed2 = Off");            // BlueLed2 Off
@@ -2251,8 +2350,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       // mySerial2.println("..echo.."); // echo back
       if (outputOnSerial) {
         Serial.print("RX2TX2 looptest=");
-        if (loopbackRx2Tx2)  Serial.print("ON.");
-        if (!loopbackRx2Tx2) Serial.print("OFF.");
+        Serial.print(loopbackRx2Tx2 == true ? "ON" : "OFF");
       }
 
 /* Does not operate, as serial isetup during setup
@@ -2630,8 +2728,11 @@ bool processLightRead(bool myOperation)
 
 /* 
   process P1 data start / to ! Let us decode to see what the /KFM5KAIFA-METER meter is reading
+  called each time we have a telegram record
 */
-bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
+bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends in Linefeed \n
+// there are 24 telegram lines (electricity() totalling  676bytes + 24 returns = 700 bytes
+
 {
   //need to check for start
   validCRCFound = false;  // bool Global defined
@@ -2640,6 +2741,7 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
   int endChar   = FindCharInArrayRev(telegram, '!', len);  // 0-offset "!769A" , -1 not found
   bool endOfMessage = false;    // led on during long message transfer
 
+  // if-else-if check if we are on header, trailer of in between those lines
   if (startChar >= 0) {        // We are at start/first line of Meter reading
     // digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off
     // digitalWrite(BLUE_LED, LOW);       // Turn the ESPLED on to inform user
@@ -2663,11 +2765,10 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
     // currentCRC=CRC16(currentCRC,(unsigned char *) "\x0d\x0a\x00\x0d\x0a", 5);    // our intersection messages are terminated with \n which is in fact cr-lf
     //DebugCRC   currentCRC=CRC16(0x0000,(unsigned char *) "/KFM5KAIFA-METER\x0d\x0a\x0d\x0a", 21);    // our intersection messages are terminated with \n which is in fact cr-lf
 
-    // initialise CRC
-
     if (strncmp(telegram, "/KFM5KAIFA-METER", strlen("/KFM5KAIFA-METER")) == 0) telegramP1header = true;   // indicate we are in header mode
-    currentCRC = CRC16(0x0000, (unsigned char *) telegram + startChar, len - startChar - 1); 
-    if (telegram[startChar+len-2] == '\x0d') currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
+
+    currentCRC = Crc16In(0x0000, (unsigned char *) telegram + startChar, len - startChar - 1);  // initialise using header
+    if (telegram[startChar+len-2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
 
     /*
     if ( len = 1 && telegram[len-1] == '\x0d') {
@@ -2694,16 +2795,64 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
          }
     */
 
-  } else {
+  } else {  // startChar >= 0
 
-    if (endChar >= 0 && telegramP1header) {   // Are we reading the last line of the Meter and header passed
+    if (endChar >= 0 && telegramP1header) {   // Are we reading the trailer of the Meter with header passed
 
-      currentCRC = CRC16(currentCRC, (unsigned char*)telegram + endChar, 1); // include trailer '!' into CRC
+      currentCRC = Crc16In(currentCRC, (unsigned char*)telegram + endChar, 1); // include trailer '!' into CRC
       char messageCRC[5];
-      strncpy(messageCRC, telegram + endChar + 1, 4);
-      messageCRC[4] = 0;  // make it an end of string
-      validCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);
-      if (outputOnSerial)  Serial.printf("crc\t!%s (arc=%x)\n", messageCRC, currentCRC); // /t produces an error
+      strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
+      messageCRC[4] = 0;                                // make it an end of string
+      validCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
+      
+      if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
+      // incoperate CRC reciovery function
+      if (validCRCFound) {   // temporari test√erify on Debug switch
+          if (currentCRC == dataInCRC) { // on match build masking array
+          // ----------------------------------------------------------------------------------------------
+            if  (telegram_crcIn_len == telegram_crcOut_len) {    // do we have a masking array ?
+                
+                for (int i=0; i < telegram_crcOut_len; i++) {    // check more masks
+                    if (telegram_crcOut[i] != 'X' && telegram_crcOut[i] != telegram_crcIn[i] ) {
+                          telegram_crcOut_cnt++;                // increase mask count
+                          if (outputOnSerial) Serial.printf(", ms#%d=%c%c", i, telegram_crcIn[i], telegram_crcOut[i]);
+                          telegram_crcOut[i] = 'X' ;            // mask this position
+                        }
+                    }
+                if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
+            } else {                                            // no or length changed masking array
+                if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
+                for (int i=0; i < telegram_crcIn_len; i++) {
+                    telegram_crcOut[i] = telegram_crcIn[i];     // (re)create masking array
+                }
+                telegram_crcOut_len = telegram_crcIn_len;
+                telegram_crcOut[telegram_crcOut_len] = 0x00;    // ensure we have a termination string
+                if (outputOnSerial) Serial.printf(", msLo#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
+            }
+          } else {  // this may be a logic error when running CRC is not same as collected
+             Serial.printf(", crE:%x!=%x",currentCRC,messageCRC);
+             telegram_crcOut[0] = 0x00;     // reset mask length and counters
+             telegram_crcOut_len = 0;
+             telegram_crcOut_cnt = 0;
+             if (outputOnSerial) Serial.printf(", msk0=%d ",telegram_crcOut_cnt);
+          }
+          // ----------------------------------------------------------------------------------------------
+      } else {    // we have a CRC error on ruuning CRC, try to recover
+        
+        if  (telegram_crcIn_len == telegram_crcOut_len) {    // if length of error is equal , try to unmask differences  ?
+            for (int i=0; i < telegram_crcIn_len; i++) {
+                if (telegram_crcOut[i] != 'X' && telegram_crcIn[i] != telegram_crcOut[i] ) {   // Unmasked the error
+                    if (outputOnSerial) Serial.printf(", msk1=%d:%c ", i, telegram_crcOut[i]);
+                    telegram_crcIn[i] = telegram_crcOut[i];
+                }                 
+            }
+            dataInCRC = Crc16In(0x0000, (unsigned char*) telegram_crcIn, telegram_crcIn_len ); // Get recovered Crc
+            if (outputOnSerial) Serial.printf(", crI%x==%x",currentCRC,dataInCRC);
+        }
+      }
+      if (outputOnSerial) Serial.printf("crl%d\t!%s (arc=%x)\n", telegram_crcIn_len, messageCRC, currentCRC); // /t produces an error
+      if (outputOnSerial) Serial.printf(", msLx#%d ", telegram_crcOut_len);
+      
       /* // DebugCRC not activated as most of the time we miss characters which make CRC Invalid
          if (outputOnSerial)  {
              if( validCRCFound) Serial.print((String)  "\nVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
@@ -2711,6 +2860,7 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
              Serial.printf(", crc=%x msg=%s \n",currentCRC,messageCRC);
          }
       */
+
       // digitalWrite(LED_BUILTIN, LOW);  // Turn the LED on
       // digitalWrite(BLUE_LED, HIGH);       //Turn the ESPLED off
       digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // revert BLUE led
@@ -2748,8 +2898,8 @@ bool decodeTelegram(int len)    // done at every P1 line that ends in crlf
       */
 
     } else {                        // We are reading between header and trailer
-      currentCRC = CRC16(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
-      if (telegram[len - 2] == '\x0d') currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
+      currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
+      if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
       if (outputOnSerial)
       {
         // Serial.print("<");
@@ -3011,6 +3161,79 @@ int FindCharInArrayFwd(char array[], char c, int len)               // Find char
   return -1;
 }
 
+/*
+  process CRC16 while accumulating the input to an array
+    input:
+     crc unsigned integer (2 bytes 0x0000-0xFFFF)
+     buf pointer=address of unsigned char to reference characters as int 0-255 values
+     len length of buf 0-768
+     
+     currentCRC = CRC16(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
+*/
+unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
+  /*
+
+        char telegram_crcIn[MAXLINELENGTH];   // active telegram that is checked for crc
+        int  telegram_crcIn_len = 0;          // length of this record
+        char telegram_crcOut[MAXLINELENGTH];  // processed telegram with changed positions to X
+        int  telegram_crcOut_len = 0;  
+
+        for (int i = len - 1; i >= 0; i--)   // backward
+        // for (int i = len - 1; i < 1; i--)   // backward
+        {
+          if (array[i] == c)
+          {
+            return i;
+          }
+        }
+        return -1;
+
+
+  */
+  // check if we need to (re)initialise) inputarray at crc 0x0000
+  if ( crc == 0 ) {
+    dataInCRC = 0;          // reset
+    telegram_crcIn_cnt = 0; // Initialise 
+    telegram_crcIn_len = 0; // Initialise
+    telegram_crcIn[telegram_crcIn_len] = 0x00;
+    if (outputOnSerial) Serial.println((String)" ch(" + dataInLen + ")" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
+  }
+   
+  // loop and collect the passed string into inputarray
+  for (int i=0; i < dataInLen ; i++) {
+    telegram_crcIn[telegram_crcIn_len] = dataIn[i];
+    telegram_crcIn_len++;
+    telegram_crcIn[telegram_crcIn_len] = 0x00;
+    if (telegram_crcIn_len >= MAXLINELENGTH ) break;
+  }
+
+  // if (outputOnSerial) Serial.println((String)" c=" + telegram_crcIn_len + ".");
+  // Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen)
+  /*   if (outputOnSerial)  Serial.println((String)" ct(" + dataInLen + ")" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
+    if ( outputOnSerial &&
+         telegram_crcIn_len == 761 && 
+         telegram_crcIn_cnt == 44) {
+           Serial.print(">");
+           Serial.print(telegram_crcIn[telegram_crcIn_len - 2]);
+           Serial.print(telegram_crcIn[telegram_crcIn_len - 1]);
+           Serial.print(telegram_crcIn[telegram_crcIn_len]);                      
+           Serial.print("<");
+      }
+
+  */ 
+  if (  telegram_crcIn_len > 1 && 
+        telegram_crcIn_cnt > 1 &&
+        telegram_crcIn[telegram_crcIn_len - 1] == '!' ) {  // (single quoted) are we on end of record ??
+      dataInCRC = CRC16(0x0000, (unsigned char*)telegram_crcIn, telegram_crcIn_len);  // get CRC of whole copied record
+      if (outputOnSerial) {   // print serial record count, total receivwed length, calculated CRC
+        // Serial.println((String)" ct=" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
+        Serial.printf("\tcr0=%x,crc=%d,crl=%d\t", dataInCRC,  telegram_crcIn_cnt, telegram_crcIn_len) ; 
+      }
+  }
+  telegram_crcIn_cnt++;
+  
+  return CRC16(crc, (unsigned char*)dataIn, dataInLen);  // initialise using header
+}
 
 /* 
   Check if we are complete on data retrieval
@@ -3026,8 +3249,8 @@ bool CheckData()        //
   }
 
   if (outputMqttLog) {  // if we LOG status old values not yet set
-    char msgpub[768];
-    char output[768];
+    char msgpub[MAXLINELENGTH];
+    char output[MAXLINELENGTH];
     String msg = "{";
     msg.concat("\"currentTime\": %lu,");              // %lu is unsigned long
     msg.concat("\"CurrentPowerConsumption\": %lu,");
@@ -3043,7 +3266,7 @@ bool CheckData()        //
     msg.concat("\"OldPowerProductionHighTariff\": %lu,");
     msg.concat("\"OldGasConsumption\": %lu");
     msg.concat("}");
-    msg.toCharArray(msgpub, 768);
+    msg.toCharArray(msgpub, MAXLINELENGTH);
     // sprintf(output, msgpub, currentTime,
 
     // sprintf(output, msgpub, millis(),                // prefer to use snprinf which offers protection
@@ -3110,11 +3333,11 @@ bool CheckData()        //
 
   if (outputMqttPower)    // output currrent power only , flatnumber
   {
-    char msgpub[768];     // allocate a message buffer
-    char output[768];     // use snprintf to format data
+    char msgpub[MAXLINELENGTH];     // allocate a message buffer
+    char output[MAXLINELENGTH];     // use snprintf to format data
     String msg = "";      // initialise data
     msg.concat("CurrentPowerConsumption: %lu");       // format data
-    msg.toCharArray(msgpub, 768);                     // move it to format buffwer
+    msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
     sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
     if (client.connected()) client.publish(mqttPower, output);                // publish output
   }
@@ -3145,7 +3368,6 @@ void SetOldValues()     // executed at end succesful  telegrams
   OldPowerProductionHighTariff  = powerProductionHighTariff;
   OldGasConsumption             = GasConsumption;
 }
-
 
 // check if data/field is numeric 0-9 & decimal-point
 bool isNumber(char *res, int len)       // False/true if numeriv

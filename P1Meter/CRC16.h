@@ -7,6 +7,10 @@
   #include "WProgram.h"
 #endif
 
+/*
+ Calculate/progress CRC using Character array *buf of length=len
+   shift calculate each byte to right
+*/
 unsigned int CRC16(unsigned int crc, unsigned char *buf, int len)
 {
   //DebugCRC Serial.println((String) "\nCRC16 call length="+len+"\t processed=" );  // limit prints
