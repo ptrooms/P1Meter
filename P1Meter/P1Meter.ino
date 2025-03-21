@@ -1,5 +1,11 @@
 // v45 start to compare difference recovery crc
-/* jan2025:
+/* 
+  V46 23feb25:
+    27feb25 : ignore zero fields that (prefix field !) that should always > 0 (Like total Power/Heat/Flow)
+    Either Flow or Heat is reported (occupiy the samen telegram record)
+    modification to include Read GJ from warmtelink 0-1:24.2.1(250222224600W)(65.478*GJ)<| to HeatConsumption
+    Note: 0-1:24.2.1(230227190235W)(84.108*m3) was moved to HeatFlowConsumption (v39)
+  v45 Jan2025: 
     improved protection by not using BLUE-LED2 (gpio2) for debug when softwarematic rs232/Tx2Function is used
     debugging rs232 use keytags (mskio /recovered characters  , R_ /recovered record)
     implemented masked recovery using collected state of fixed positions.
@@ -71,13 +77,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1145.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1146.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2145.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2146.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -694,7 +700,8 @@ bool rx2_function     = true;    // "F" ptro true  -> false , use v38 RX2 proces
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to cgheck if we have published
 long mqttCnt = 0;                    // updated with each publish as of 19nov19
-bool validTelegramCRCFound = false;          // Set by DdecodeTelegram if Message CRC = valid and send with Mqtt
+bool validTelegramCRCFound  = false;     // Set by DdecodeTelegram if Message CRC = valid and send with Mqtt
+bool validTelegram2CRCFound = false;    // v46 Set by readTelegram2 to check validity of RX2 record
 // P1smartmeter timestate messages
 long currentTime   =  210402;        // Meter reading Electrics - datetime  0-0:1.0.0(180611210402S)
 char currentTimeS[] = "210401";      // same in String format time, will be overriden by Telegrams
@@ -719,7 +726,8 @@ long CurrentPowerConsumption = 0;    // Meter reading Electrics - Actual consump
 long CurrentPowerProduction  = 0;    // Meter reading Electrics - Actual return in watts
 long GasConsumption = 0;             // Meter reading Gas in m3
 long HeatFlowConsumption = 0;        // v39 Meter reading P2 in m3 - value from RX2 Warmtelinkl
-long HeatConsumption = 0;            // v39 Meter reading P2 in GJ - tbd value from RX2 Warmtelinkl
+long HeatConsumption    = 0;            // v46 Meter reading P2 in MJ - tbd value from RX2 Warmtelinkl
+long HeatConsumptionOld = 0;            // v46 Meter reading P2 in MJ - tbd value from RX2 Warmtelinkl
 long OldPowerConsumptionLowTariff  = 0; // previous reading
 long OldPowerConsumptionHighTariff = 0; // previous reading
 long OldPowerProductionLowTariff  = 0;  // previous reading
@@ -991,7 +999,7 @@ void setup()
       digitalWrite(BLUE_LED, blueLedState);
       delay(250);
     }
-    Serial.print((String) "Connection to "+ ssid +", Faild, restarting in 2 seconds..");  // wait 5 seconds before retry
+    Serial.print((String) "Connection to "+ ssid +", Failed, restarting in 2 seconds..");  // wait 5 seconds before retry
     delay(2000);
     // WiFi.disconnect(true);   // ToTest 2021-04-26 22:30:51 still not erasing the ssid/pw. Will happily reconnect on next start
     // WiFi.begin("0","0");     // ToTest 2021-04-26 22:30:51 adding this effectively seems to erase the previous stored SSID/PW
@@ -1651,6 +1659,7 @@ void loop()
     } else {    // reliabilitty intervalP1cnt=360>0
 
       // report to error mqtt, // V20 candidate for a callable error routine
+      // tbd: consider to NOT send values
       char mqttOutput[128];
       String mqttMsg = "{";  // start of Json
       mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 rj11 serial not connected\""); 
@@ -1931,7 +1940,7 @@ void readTelegram() {
         yield();                    // do background processing required for wifi etc.
         ESP.wdtFeed();              // feed the hungry timer
         
-        // print validity statis of processed for debug reasons.
+        // print validity status of processed for debug reasons.
         if (validTelegramCRCFound) {
           Serial.print((String) "_C");      // print checked OK
         } else {
@@ -2114,15 +2123,38 @@ void readTelegram2() {
               0-1:96.1.0(303030304B414D363435343632)
               0-1:24.2.1(230227190235W)(84.108*m3)
               !5EAE
+              Note sinde 23feb25 --> 0-1:24.2.1(250222224600W)(65.478*GJ)  -new
 
               WL>[237-74=163:163,s=0,e=157,v=151]ISk5\2]T382-1000{<{<1-3:0.2.8(50){<0-0:1.1.0(230227211500W){<0-1:24.1.0(012){<0-1:96.1.0(303030304B494C373236323534){<0-1:24.2.1(230227211500W)(84.188*m3){<!C17F{
-              84.188*m3){<!C17F{
-              
+              WL>245-0=245:244,s=0,e=239,v=233]/WARMTELINK-VI\<|<|1-3:0.2.8(50)<|0-0:1.1.0(250222231918W)<|0-0:96.1.1(3037386633663736366566333065393434643561326461643162646237373865)<|0-1:24.1.0(012)<|0-1:96.1.0(37323632353436343243324433343043)<|0-1:24.2.1(250222231900W)(65.478*GJ)<|!E48B
           */
           
           int startChar = FindCharInArrayRev(telegram2Record, '/',  sizeof(telegram2Record));  // 0-offset "/ISk5\2MT382-1000" , -1 not found
           int endChar   = FindCharInArrayRev(telegram2Record, '!',  sizeof(telegram2Record));  // 0-offset "!769A" , -1 not found
           int valChar   = FindCharInArrayRev(telegram2Record, '*',  sizeof(telegram2Record));  // 0-offset "(84.108*m3)" , -1 not found
+
+          // add CRC chaeck on WL record, required as we can clearly wrong read values.
+          if  ( startChar >= 0  && endChar > startChar && valChar < endChar) {    // we have a start to end, ten do CRC check
+                char messageCRC2[5];
+                strncpy(messageCRC2, telegram2Record+(endChar-startChar)+1, 4);   // copy 4 bytes crc of record and
+                messageCRC2[4] = 0;
+                unsigned int currentCRC2 = CRC16(0x0000, (unsigned char*)telegram2Record + startChar, (endChar-startChar)+1); // include \header+!trailer '!' into CRC
+                validTelegram2CRCFound = (strtol(messageCRC2, NULL, 16) == currentCRC2);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
+                if (outputOnSerial) {   // print serial record count, total receivwed length, calculated CRC
+                  Serial.printf(" s=%c, e=%c, crt=%s, cr1=%x, ;", telegram2Record[startChar],telegram2Record[endChar], messageCRC2, currentCRC2) ;    // debug print calculated CRC
+                }
+                if (outputOnSerial) {   // before and after crc
+                  currentCRC2 = CRC16(0x0000, (unsigned char*)telegram2Record+startChar+1,(endChar-startChar));   // ignore header
+                  Serial.printf(" cr0=%x,", currentCRC2) ;    // debug print calculated CRC
+                  currentCRC2 = CRC16(0x0000, (unsigned char*)telegram2Record+startChar+1,(endChar-startChar)-1); // ignore header & trailer
+                  Serial.printf(" cr2=%x,", currentCRC2) ;    // debug print calculated CRC
+
+                }
+
+          }
+
+
+          // int valChar   = FindCharInArrayRev(telegram2Record, '*',  sizeof(telegram2Record));  // 0-offset "(84.108*GJ)" , -1 not found
 
           // .s2>[238]303030304B414D363435343632){<0-1:24.2.1(230228155651W)(84.707*m3){<!8945
           //          {</ISk5\2MT382-1000{<{<1-3:0.2.8(50){<0-0:1.1.0(230228155652W)
@@ -2133,17 +2165,11 @@ void readTelegram2() {
           //  /ISk5\2MT382-1000{<{<1-3:0.2.8(50){<0-0:1.1.0(230228155652W){<0-1:24.1.0(012){<0-1:96.1.0(303030304B414D363435343632)
           //  ...2....+....3....+....4....+....5....+....6..
           //  {<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C
+          //  {<0-1:24.2.1(250222224600W)(65.478*GJ){<!CB0x
+          //    9876543210987654321098765432109876543210
           //    ....+....1....+....2....+....3....+..
           // const char * strstr ( const char * str1, const char * str2 );      char * strstr (       char * str1, const char * str2 ); 
           // Locate substring Returns a pointer to the first occurrence of str2 in str1, or a null pointer if str2 is not part of str1.
-
-          HeatFlowConsumption = 0; // initialise v39
-          // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) { // total HeatFlow
-          if ( strstr(telegram2Record,"0-1:24.2.1(") && endChar > 0 && valChar > 0) { // if string found, total HeatFlow
-              if (outputOnSerial) Serial.print(telegram2Record+(valChar - 7) ); //  print value unconditionally string
-              HeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), (endChar - 37) );
-          }
-          
           if (outputOnSerial) {
             Serial.print("\nWL>");       // v38 debug print processing serial data
             Serial.print(telegram2_End); 
@@ -2163,14 +2189,46 @@ void readTelegram2() {
             Serial.println(telegram2Record); // debug print processing
             Serial.print("");             // debug print processing serial data
           }
-          if (HeatFlowConsumption >= 0) {
-            // Serial.print("\n\r\t WL-m3=");     //  v39 print value unconditionally on new line
-            Serial.print("\t WL-m3=");     //  v39 print value unconditionally on new line
-            Serial.print(HeatFlowConsumption); //  print value unconditionally string
-            Serial.print("\t");           //  print value unconditionally on new line
+
+          // search and get value from Heatlink
+          // HeatFlowConsumption = 0; // initialise v39
+          // HeatConsumption = 0;     // initialise v46
+          // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) { // total HeatFlow
+          
+          // info: strstr() = Locate substring ==> Returns a pointer to the first occurrence of str2 in str1
+          if ( strstr(telegram2Record,"0-1:24.2.1(") && endChar > 0 && valChar > 0) { // if string found, total HeatFlow
+              if (outputOnSerial) Serial.print(telegram2Record+(valChar - 9) ); //  print value unconditionally string
+              // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) {
+              // total HeatFlow
+              // HeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), (endChar - 40) );   // -37:xxx.xxx*m3, -38:xx.xxx GJ
+              long tHeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), 38) ;   // pointer & record length = 30-38 to get intger long
+              
+              Serial.print("\t WL-");               //  v46 print value/type unconditionally on new 
+              Serial.print(telegram2[valChar+1]);
+              Serial.print(telegram2[valChar+2]);
+              if (validTelegram2CRCFound) {         // print yes/no value
+                  Serial.print("=");
+              }
+              Serial.print("=");                
+              Serial.print(tHeatFlowConsumption);   // print value
+
+              if (tHeatFlowConsumption < 1) {       // check for valid value, must be at WL
+                Serial.print("-X");                
+              } else if ( telegram2[valChar+1] == 'G' ) { // record is expressed in GJ
+                HeatFlowConsumption = 0;                  // reset as we have Heat
+                HeatConsumptionOld = HeatConsumption;     // save previous read
+                HeatConsumption = tHeatFlowConsumption;   // get new read  
+                if (HeatConsumptionOld == 0  && HeatConsumption > 0) {  // do not apply compare when 0
+                    HeatConsumptionOld = HeatConsumption ;
+                }
+              } else if ( telegram2[valChar+1] == 'm') {  // record is expressed in m3
+                HeatConsumption = 0;                      // v46 reset as we have Flow
+                HeatFlowConsumption = tHeatFlowConsumption;  
+              }
+              Serial.print("\t");                  //  make room
           }
-        }
-        // }  // check rx2_function
+
+        } // bGot_Telegram2Record
         
 #ifndef NoTx2Function
         if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back , disabled as of v37
@@ -2188,8 +2246,8 @@ void readTelegram2() {
       Serial.print("].");
       Serial.println("");
     }
-  }  // if available
-} // void
+  }  // if mySerial2.available 
+} // void readTelegram2
 
 
 /* 
@@ -2545,13 +2603,21 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(",\"CurrentPowerConsumption\":%lu");    // P1
     msg.concat(",\"ThermoState\":%u");                 // Johnson
     msg.concat(",\"AnalogRead\":%u");                  // adc
-    msg.concat(",\"LedLight1\":%u");                   // Hot water
-    msg.concat(",\"powerConsumptionLowTariff\":%lu");  // P1
-    msg.concat(",\"powerConsumptionHighTariff\":%lu"); // P1
+    msg.concat(",\"LedLight1\":%u");                   // Hot water witch on
+
+    if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0 ) {
+        msg.concat(",\"powerConsumptionLowTariff\":%lu");  // P1   always > 0
+        msg.concat(",\"powerConsumptionHighTariff\":%lu"); // P1   always > 0
+    } else {
+        msg.concat(",\"!powerConsumptionLowTariff\":%lu");  // v46 P1 false or missing read, ignore field
+        msg.concat(",\"!powerConsumptionHighTariff\":%lu"); // v46 P1 false or missing read, ignore field
+    }
+    
     msg.concat(",\"P1crc\":%u");                       // Validity CRC 0 or 1
 
     char temperatureString[7];
     // sequence does matter
+    // TBD: consider logic to ignore if we have a missing sensorcount
     msg.concat(",\"T0\":"); dtostrf(tempDev[5], 2, 1, temperatureString); msg.concat(temperatureString);  // T0
     msg.concat(",\"T1\":"); dtostrf(tempDev[0], 2, 1, temperatureString); msg.concat(temperatureString);  // T1
     msg.concat(",\"T2\":"); dtostrf(tempDev[1], 2, 1, temperatureString); msg.concat(temperatureString);  // T2
@@ -2559,7 +2625,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(",\"T4\":"); dtostrf(tempDev[3], 2, 1, temperatureString); msg.concat(temperatureString);  // T4
     msg.concat(",\"T5\":"); dtostrf(tempDev[4], 2, 1, temperatureString); msg.concat(temperatureString);  // T5
     // concatenate remaining number of temperature sensors ,Ti:22
-    for (int i = 5; i < numberOfDsb18b20Devices; i++) {
+    for (int i = 6; i <= numberOfDsb18b20Devices; i++) {    // v46 start count as of T6
       msg.concat(",\"T"); 
       msg.concat(String(i)); 
       msg.concat("\":"); 
@@ -2600,7 +2666,19 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       msg.concat(", \"WaterCnt\":%u");       // as of 25mar21 Use this Json to indicate Normal Mode
       msg.concat(", \"WaterHotCnt\":%u");    // as of 26mar21 Use this Json to indicate Normal Mode for HotWater
     }
-    msg.concat(", \"HeatM3\":%u");           // v39 as of 28feb23 show HeatFlowConsumption
+
+    // v46: arrange & check that invlaid values are not published to normal Json field
+    if ( HeatFlowConsumption > 0 ) {
+        msg.concat(", \"HeatM3\":%u");    // valid count flow, should always > 0
+    } else {
+        msg.concat(", \"!HeatM3\":%u");    // invalid count
+    }
+    if ( HeatConsumption > 0 && (HeatConsumption - HeatConsumptionOld) <= 4 ) { // v46 Meter reading P2 in MJ - tbd value from RX2 Warmtelinkl  = 0;            // v46 Meter reading P2 in MJ - tbd value from RX2 Warmtelinkl) ) {
+        msg.concat(", \"HeatMJ\":%u");    // v46 as of 23feb25 show HeatConsumption in MJ
+    } else {
+        msg.concat(", \"!HeatMJ\":%u");   // invalid count
+    }
+    // HeatConsumptionOld = HeatConsumption;  // check for next cycle 
 
     if (useWaterTrigger1) msg.concat(", \"Trigger1\":1");  // show triggernumber
     if (useWaterPullUp)   msg.concat(", \"PullUp\":1");    // show pullupmode
@@ -2672,7 +2750,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
             waterReadCounter,           // Watersensor state 21mar21 number falldowns
             waterReadHotCounter,        // Watersensor state 26mar21 number during Hotwater
-            HeatFlowConsumption,        // v39 28feb23 show HeatFlowConsumption
+            HeatFlowConsumption,        // v39 28feb23 show HeatFlowConsumption RX2
+            HeatConsumption,            // v46 23feb25 show HeatConsumption MJ counter RX2
             
             prog_Version );             // (fixed) Version from program , see top
 
@@ -3168,6 +3247,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     CurrentPowerProduction = getValue(telegram, len);
 
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
+  // 0-1:24.2.1(250222224600W)(65.478*GJ)  -new
   // 0-1:24.2.1 = Gas (DSMR v4.0) on Kaifa MA105 meter
   if (strncmp(telegram, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0)      // Gaz
     GasConsumption = getValue(telegram, len);
@@ -3322,6 +3402,7 @@ long getValue(char *buffer, int maxlen)
   //           123456789012                                           // countlist after first bracket
   // 0-0:1.0.0(180611014816S)                   = data record len=25, string length datalen 12
   // 0-1:24.2.1(150531200000S)(00811.923*m3)    = gaz date record which we do not have at our P1
+  // 0-1:24.2.1(250222224600W)(65.478*GJ)       = new GJ
   // 1-0:1.8.2(010707.720*kWh)                  = power consumption record len=26 datalen 10
   // /ISk5\2MT382-1000...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record 0-162bytes
   //  .........1.........2.........3.........4.........5
@@ -3391,6 +3472,7 @@ int FindCharInArrayRev(char array[], char c, int len)               // Find char
   // 1234567890123456789012345678901234567890  = 40
   // 0-0:1.0.0(180611014816S)                  = sublen12 len=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
+  // 0-1:24.2.1(250222224600W)(65.478*GJ)  - GJ 
   // ...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record
   for (int i = len - 1; i >= 0; i--)   // backward
   // for (int i = len - 1; i < 1; i--)   // backward
