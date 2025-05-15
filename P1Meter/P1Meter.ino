@@ -1,11 +1,17 @@
-// v45 start to compare difference recovery crc
+// flaw1: will not process watercount during serial read.
+// issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
 /* 
+  V47 14may25: bugfix
+    Waterswitch sometimes stops when looptimer to check debounce transitioned to 0 after 70 minutes
+    WaterTrigger_ISR renamed to WaterTrigger0_ISR
+    Trigger routine made single threading
   V46 23feb25:
     27feb25 : ignore zero fields that (prefix field !) that should always > 0 (Like total Power/Heat/Flow)
     Either Flow or Heat is reported (occupiy the samen telegram record)
     modification to include Read GJ from warmtelink 0-1:24.2.1(250222224600W)(65.478*GJ)<| to HeatConsumption
     Note: 0-1:24.2.1(230227190235W)(84.108*m3) was moved to HeatFlowConsumption (v39)
   v45 Jan2025: 
+    start to compare difference for recovery crc
     improved protection by not using BLUE-LED2 (gpio2) for debug when softwarematic rs232/Tx2Function is used
     debugging rs232 use keytags (mskio /recovered characters  , R_ /recovered record)
     implemented masked recovery using collected state of fixed positions.
@@ -77,13 +83,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1146.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1147.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2146.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2147.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -567,9 +573,10 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
 #endif  // P1_Override_Settings
 
 // administrative timers for loop, check to limit  risks for WDT resets
-unsigned long currentMillis = 0; // millis() mainloop
-unsigned long currentMicros = 0; // micros() mainloop
-unsigned long startMicros   = 0; // micros()
+unsigned long currentMillis  = 0; // millis() mainloop set at start
+unsigned long currentMicros  = 0; // micros() mainloop set at start
+unsigned long previousMicros = 0; // micros() mainloop set at finish V47
+unsigned long startMicros    = 0; // micros() time readTelegram()
 
 // used to research and find position of wdt resets
 unsigned long test_WdtTime = 0;   // time the mainloop
@@ -738,16 +745,18 @@ bool thermostatReadState  = LOW;      // assume Input is active THERMOSTAT_READ
 bool thermostatWriteState = LOW;      // Set initial command output THERMOSTAT_WRITE
 bool lightReadState       = LOW;      // assume Input is active HEATING Light read
 
-void WaterTrigger_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
+void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
 long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
+long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
 bool waterReadState    = LOW; // switchsetting
-long waterReadDebounce = 200; // 200mS debounce
+long waterReadDebounce = 50; // 200mS debounce, v47 set to 50
 long waterReadCounter  = 0;   // nothing to read yet for regular water counter
 long waterReadHotCounter = 0; // nothing to read yet for HotWaterCounter
 long waterTriggerTime  = 0;   // initialise for ISR WaterTrigger()
 bool waterTriggerState = LOW; // switchsetting during trigger
+bool waterISRActive    = false; // V47: If ISR currently active this is High
 
 // used for analog read ADC port
 int nowValueAdc = 0;      // actual read
@@ -1470,9 +1479,21 @@ void setup()
 void loop()
 {
   // declare global timers loop(s)
+  // millis() and micros() return the number of milliseconds and microseconds elapsed after reset, respectively.
+  //  warning: this number will overflow (go back to zero), after approximately 70 minutes.
   currentMillis = millis(); // Get snapshot of runtime
+  previousMicros = currentMicros; // get V47 previous loop time
   currentMicros = micros(); // get current cycle time
-  unsigned long debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by last ISR waterTrigger
+  if (previousMicros >= currentMicros) {  // V47 cycle started where micros transitioned to 0
+    waterTriggerTime = currentMicros;     // let/reset to Fuzzy waterTriggerTime
+  }
+
+  // below is to fix/make water pulse working which currently is intermittently spiking
+  debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by last ISR waterTrigger
+  if (debounce_time < 0 || waterTriggerTime <= 0) {    // v47 over the 70 minutes or Debounce request, reset timer
+      waterTriggerTime = currentMicros;
+      debounce_time = 0;
+  }
 
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
@@ -1508,7 +1529,7 @@ void loop()
   //  ------------------------------------------------------------------------------------------------------------------------- START allowOtherActivities
   if (!allowOtherActivities) {     // are we outside P1 Telegram processing (which require serial-timed resources)
     if (waterTriggerCnt != 0) detachWaterInterrupt();
-  } else {
+  } else {                         // else we are allowed to do other acivities
     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
 
@@ -1533,7 +1554,7 @@ void loop()
 
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
-        if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." );
+        // if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." ); // v47 superfluous after preceding debug line
         // --> end of p1 read electricity
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
         if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
@@ -1575,33 +1596,37 @@ void loop()
     ESP.wdtFeed();  // as advised by forums
 
     // Check for WaterPulse triggerstate interrupt when debounce has passed
-    if ( debounce_time > (waterReadDebounce * 1000)) {  // check in mS
-      if (waterTriggerCnt == 0) {       // Is interrupt routine not active 
-          waterDebounceCnt++;                // administrate usage  for report
+    if ( debounce_time > (waterReadDebounce * 1000)) {  // check  (currentMicros - waterTriggerTime) in mS
+      if (waterTriggerCnt == 0) {       // Activate interrupt if not yet active
+          waterDebounceCnt++;           // administrate usage for report Dbc#
           attachWaterInterrupt();            
           waterTriggerTime = currentMicros;  // reset our trigger counter
           // waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
       } else {
-        if (waterTriggerTime != 0) {     // debounce_time (mSec
-           waterTriggerTime = 0;                        // reset ISR counter for next trigger
-           if (waterReadState != waterTriggerState) {   // switchsetting) {  // read switch state
-               waterReadState = waterTriggerState ;       // stabilize switch
-               if (!waterReadState) {
-                  waterReadCounter++;                     // count this as pulse if switch went LOW
-                  // lightReadState   = digitalRead(LIGHT_READ); // read D6
-                  // if (!lightReadState) waterReadHotCounter++; // count this as hotwater
-                  if (!digitalRead(LIGHT_READ)) waterReadHotCounter++; // count this as hotwater
-#ifdef NoTx2Function
+        if (waterTriggerTime != 0) {     // set by ISR watercnt routine by time
+            // waterTriggerTime = 0;                        // reset ISR counter for next debouncec trigger
+            if (waterReadState != waterTriggerState) {   // switchsetting) {  // read chanted switch state
+                waterReadState = waterTriggerState ;       // stabilize switch
+               if (waterReadState) {                      // accomodate/enforce stability (note: was inverted)
+                  pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Watersensor is Low, increase sensivity by pull-up
+                  waterReadCounter++;                     // v47 count this as pulse if switch went LOW
+                  if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + "=L INPUT_PULLUP");
+                  if (!digitalRead(LIGHT_READ)) waterReadHotCounter++; // v47 count this as hotwater
+                #ifdef NoTx2Function
                   if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, (digitalRead(LIGHT_READ)));  // debug readstate0
-                  if (!loopbackRx2Tx2 && blue_led2_Water)    digitalWrite(BLUE_LED2, HIGH); //Turn the LED OFF  (inactive-high)
-#endif
-               }
-               if (waterReadState) {                      // accomodate/enforce stability
-                 pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage external pull-up
+                  // if (!loopbackRx2Tx2 && blue_led2_Water)    digitalWrite(BLUE_LED2, HIGH); //Turn the LED OFF  (inactive-high)
+                #endif
                } else {
-                 pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external if not reading pull-up
+                  pinMode(WATERSENSOR_READ, INPUT);        // Watersensor is High, weaken sensivity without pull-up
+                  if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + "=H INPUT");
+                #ifdef NoTx2Function
+                  if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, !(digitalRead(LIGHT_READ)));  // debug readstate0
+                  // if (!loopbackRx2Tx2 && blue_led2_Water)    digitalWrite(BLUE_LED2, LOW); //Turn the LED OFF  (inactive-high)
+                #endif
+
                }
-           }
+
+            }
         }
       }
     }      
@@ -1633,7 +1658,7 @@ void loop()
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
     if (readTelegram2cnt < 6) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
-  }   // if allow other activities
+  }   // if-else allow other activities
   //  ------------------------------------------------------------------------------------------------------------------------- END of allowOtherActivities
 
   // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
@@ -1645,9 +1670,12 @@ void loop()
   ESP.wdtFeed();  // as advised by forums
 
   p1TriggerTime = millis();   // indicate our mainloop yield
-
   // check and prevail deadlock timeout
   // executed at no p1-message intervalP1<12 seconds, decrease reliability intervalP1cnt=360 until <1 which restarts; 
+  if (previousMillis > p1TriggerTime) {  // V47 ensure time transition to 0 will not colide as failure.
+    previousMillis = p1TriggerTime;
+  } 
+
   if   ((unsigned long)(currentMillis - previousMillis) >= intervalP1) {  // is our deadlock check interval passed  12secs ?
     //  if (millis() > 600000) {  // autonomous restart every 5 minutes
     intervalP1cnt--;            // decrease reliability
@@ -1829,7 +1857,11 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n Cycle: %012.9f DataCnt: %u started at %06.6f \b\b\t", ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
+  if (!outputOnSerial) Serial.printf("\r\n Cycle: %012.9f DataC%s%s: %u started at %06.6f \b\b\t", 
+        ((float)ESP.getCycleCount()/80000000),
+        (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
+        (mqttCnt + 1), ((float) startMicros / 1000000));
+
   // Cycle: 04.781228065
 
   if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
@@ -2292,7 +2324,7 @@ void processGpio() {    // Do regular functions of the system
     // if ( waterReadState) Serial.print( "1" );
     // if (!waterReadState) Serial.print( "0" );
     
-    Serial.print( (String) ", Trg#:" + waterTriggerCnt);    // print ISR call counter
+    Serial.print( (String) ", Trg#:" + waterTriggerCnt);    // print ISR call counter   
     Serial.print( (String) ", DbC#:" + waterDebounceCnt);   // print Debounce counter
     Serial.print( (String) ", Int#:" + intervalP1cnt);      // print Interval checking counter
     Serial.println( " ." );
@@ -2527,12 +2559,15 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           pinMode(WATERSENSOR_READ, INPUT);               // Do not use internal pullup
         }
       }
-
+    } else  if ((char)payload[0] == 'y') {
+        Serial.println((String) " debounce_time=" + debounce_time + ", waterTriggerCnt=" + waterTriggerCnt );
     } else  if ((char)payload[0] == 'Z') {
+      debounce_time    = 0 ;     // v47 Zero out debounce time
+      waterTriggerCnt  = 0 ;     // v47 reset waterTriggerCnt
       waterReadCounter = 0 ;     // Zero the Water counters
       waterReadHotCounter = 0 ;  // Zero the WaterHot counter
       mqttCnt = 0;               // Zero mqttCnt
-      waterTriggerTime  = 0;     // initialise debounce
+      waterTriggerTime  = currentMicros;     // initialise debounce ro current looptime
       waterTriggerState = LOW;   // reset debounce
       waterReadState    = LOW;   // read watersensor pin
       if (outputOnSerial) {
@@ -3844,8 +3879,8 @@ void attachWaterInterrupt() {   // activate waterinerrupt sensor
     attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
     if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
   } else {
-    attachInterrupt(WATERSENSOR_READ, WaterTrigger_ISR, CHANGE); // establish trigger
-    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger_ISR routine");
+    attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
+    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
   }
   waterTriggerCnt = 1;          // indicate ISR has been activated
 }
@@ -3857,56 +3892,125 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interfe
   detachInterrupt(WATERSENSOR_READ); // trigger at every change
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // Prevent calls as per expressif intruction
   waterTriggerCnt = 0;          // indicate ISR has been withdrawn
+  waterISRActive = false;   
 }
 
-
 /*
-  ISR water pulse primary (select via W,w command --> 0) 
+  V47 Stable live ISR water pulse, alternate (Debug select via W,w command --> 1) 
   will gLow Blueled if sensor triggered
-  will detach during some excessive vibration
+  will detach during more excessive vibration
 */
-void WaterTrigger_ISR()
+void WaterTrigger0_ISR()
 {
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
-  digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
-  waterTriggerCnt++ ;             // increase our call counter
-  long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-  waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+  if (outputOnSerial) Serial.print( (String) ".W" );
+  if (!waterISRActive) {    // set routine already active
+    waterISRActive = true;
 
-  if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
-    detachWaterInterrupt();
-    // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+    if (outputOnSerial) Serial.print( (String) "i" );    
+    interval_delay(20); // V47 wait 20ms --> implemented by flat plain while loop, all other types forbidden in ISR
+    if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
+        waterTriggerState = digitalRead(WATERSENSOR_READ); // read possible unstable watersensor pin
+
+        waterTriggerCnt++ ;             // increase our call counter
+        long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+        waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+
+        if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+          detachWaterInterrupt();
+          Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+          // waterTriggerState = LOW;      // v41 v47 force to low to ease things
+        }
+      #ifdef NoTx2Function
+        if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
+      #endif
+        if (outputOnSerial) Serial.print( (String) (waterTriggerState ? "tH " : "tL ") );    // V47 print ISR call counterwaterTriggerTime
+      }
+
+    waterISRActive = false;    // alow next interrupt
   }
-  waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
-#ifdef NoTx2Function
-  if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // expected to go have/went low 
-#endif
 }
 
+
 /*
-  ISR water pulse, alternate (Debug select via W,w command --> 1) 
+  V47 Stable live debug ISR1 water pulse, alternate (Debug select via W,w command --> 1) 
   will gLow Blueled if sensor triggered
   will detach during more excessive vibration
 */
 void WaterTrigger1_ISR()
 {
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
-  waterTriggerCnt++ ;             // increase call counter
-  long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-  waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
-  waterTriggerState = digitalRead(WATERSENSOR_READ); // read unstable watersensor pin
-  if ( (waterTriggerCnt) > 200 ) {
-    // Input went or is in vibration, disconnect ourselves a couuple a milliseconds
-    // detachInterrupt(WATERSENSOR_READ); // trigger at every change
-    detachWaterInterrupt();
-    // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
-    // waterTriggerTime  = waterTriggerTime + 10000; // forward our interrupt 10mS (disabled: now done in mainloop)
-    waterTriggerState = LOW;         // v41 force to low to ease things
+  Serial.print( (String) ".W" );
+  if (!waterISRActive) {    // set routine already active
+    waterISRActive = true;
+
+    Serial.print( (String) "p" );    
+    if (outputOnSerial) {
+        interval_delay(20); // wait 20ms --> implemented by flat plain while loop, all other types forbidden in ISR
+    }
+    if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
+        waterTriggerState = digitalRead(WATERSENSOR_READ); // read possible unstable watersensor pin
+
+        waterTriggerCnt++ ;             // increase our call counter
+        long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+        waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+
+      #ifdef NoTx2Function
+        if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // monitor by invert BLUE ked
+      #endif
+        if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+          detachWaterInterrupt();
+          Serial.print( (String) ", Detach>200WaterISR1="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+          // waterTriggerState = LOW;      // v41 v47 force to low to ease things
+        }
+      #ifdef NoTx2Function
+        // if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
+      #endif
+        Serial.print( (String) (waterTriggerState ? "tH " : "tL ") );    // V47 print ISR call counterwaterTriggerTime
+      }
+
+    waterISRActive = false;    // alow next interrupt
   }
-#ifdef NoTx2Function
-  if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // expected to go have/went low 
-#endif
 }
+
+/*
+  V47 Unstable ISR2 water pulse primary (select via W,w command --> 0) 
+  will gLow Blueled if sensor triggered
+  will detach during if excessive due bounces on reflective surface 
+*/
+void WaterTrigger2_ISR()
+{
+  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
+  // if (outputOnSerial) Serial.print( (String) ".i" );
+  if (!waterISRActive) {    // set routine active
+    waterISRActive = true;
+    // if (outputOnSerial) Serial.print( (String) "P" );
+   
+    if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
+        waterTriggerState = digitalRead(WATERSENSOR_READ); // read possible unstable watersensor pin
+
+        waterTriggerCnt++ ;             // increase our call counter
+        long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+        waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+
+        if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+          detachWaterInterrupt();
+          if (outputOnSerial) Serial.print( (String) ", Detach>100WaterISR2"+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+          // waterTriggerState = LOW;      // v41 v47 force to low to ease things
+        }
+      #ifdef NoTx2Function
+        if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
+      #endif
+        // if (outputOnSerial) Serial.print( (String) (waterTriggerState ? "tH " : "tL ") );    // V47 print ISR call counterwaterTriggerTime
+      }
+
+    waterISRActive = false;    // alow next interrupt
+  }
+}
+
 
 /* 20mar21 ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec */
 /*
@@ -3932,6 +4036,24 @@ String GetAddressToString(DeviceAddress deviceAddress) {
     str += String(deviceAddress[i], HEX);
   }
   return str;
+}
+
+/*
+  Routine to delay millieseconds by while-loop
+*/
+void interval_delay(int delayTime)   // Routine to use interval to pause program
+{
+  if (delayTime > 0 && delayTime < 1000) {        // check limits
+    unsigned long currentMillis  = millis();      // get time
+    unsigned long previousMillis = currentMillis;
+    while ( (currentMillis - previousMillis) < delayTime ) {
+      // yield();         // call by ISR causes WDT
+      // delay(1);
+      // ESP.wdtFeed();   // feed the hungry timer  system_soft_wdt_feed() call by ISR causes WDT
+                          // https://github.com/esp8266/Arduino/blob/4897e0006b5b0123a2fa31f67b14a3fff65ce561/cores/esp8266/Esp.cpp#L102
+      currentMillis = millis();   // get new time
+    }
+  }
 }
 
 /*
