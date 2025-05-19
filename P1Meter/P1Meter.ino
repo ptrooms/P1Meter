@@ -755,13 +755,13 @@ long waterReadDebounce = 50; // 200mS debounce, v47 set to 50
 long waterReadCounter  = 0;   // nothing to read yet for regular water counter
 long waterReadCounterPrevious  = 0;   // V47 to dsicriminate tapping in display
 long waterReadHotCounter = 0; // nothing to read yet for HotWaterCounter
-unsigned long waterTriggerTime  = 0;   // initialise for ISR WaterTrigger()
-bool waterTriggerState = LOW; // switchsetting during trigger
-bool waterISRActive    = false; // V47: If ISR currently active this is High
+volatile unsigned long waterTriggerTime  = 0;   // initialise for ISR WaterTrigger()
+volatile bool waterTriggerState = LOW; // switchsetting during trigger
+volatile bool waterISRActive    = false; // V47: If ISR currently active this is High
 
-unsigned long      ISR_time = 0;  // V47 keep track of the timing of recent interrupts
-unsigned long last_ISR_time = 0;  // V47 keep track of the timing of recent interrupts
-unsigned long ISR_time_cnt  = 0;  // administrate usage for report
+volatile unsigned long      ISR_time = 0;  // V47 keep track of the timing of recent interrupts
+volatile unsigned long last_ISR_time = 0;  // V47 keep track of the timing of recent interrupts
+volatile unsigned long ISR_time_cnt  = 0;  // administrate usage for report
 
 // used for analog read ADC port
 int nowValueAdc = 0;      // actual read
