@@ -1,6 +1,10 @@
 // flaw1: will not process watercount during serial read.
 // issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
-/* 
+/*
+  V48 05jun25: improve code style after inpecting
+    casting fix reinterpret_cast<unsigned char*>(telegram)
+    define unsigned literal using  unsigned char tempLiteral[] = {0x0A};
+    Fix some outbound array risks
   V47 14may25: bugfix
     Waterswitch sometimes stops when looptimer to check debounce transitioned to 0 after 70 minutes
     WaterTrigger_ISR renamed to WaterTrigger0_ISR
@@ -89,7 +93,7 @@
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2147.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2148.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -866,9 +870,9 @@ int  telegram_crcOut_len = 0;         // length of this record
 
 // RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
 #define MAXLINELENGTH2 256
-char telegram2[MAXLINELENGTH2+128]; // RX2 serial databuffer during outside P1 loop
-char telegramLast2[3];              // overflow used to catch line termination bracket
-char telegramLast2o[19];            // overflow-area to prevent memory leak
+char telegram2[MAXLINELENGTH2+128+3+19]; // RX2 serial databuffer during outside P1 loop Plus overflow
+// char telegramLast2[3];             // overflow used to catch line termination bracket
+// char telegramLast2o[19];           // overflow-area to prevent memory leak
 bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
 const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak
 char telegram2Record[MAXLINELENGTH2]; // telegram extracted data maxsize for P1 RX2 
@@ -1495,7 +1499,7 @@ void loop()
 
   // below is to fix/make water pulse working which currently is intermittently spiking
   debounce_time = currentMicros - waterTriggerTime;    // µSec - waterTriggerTime in micro seconds set by last ISR waterTrigger
-  if (debounce_time < 0 || waterTriggerTime <= 0) {    // v47 over the 70 minutes or Debounce request, reset timer
+  if (debounce_time < 0 || waterTriggerTime < 1) {    // v47 over the 70 minutes or Debounce request, reset timer
       waterTriggerTime = currentMicros;
       debounce_time = 0;
   }
@@ -1591,7 +1595,7 @@ void loop()
 
         // Serial are closed and not yet (re)started
         // check timer to set p1SerialActive to false in order to commence P1 data
-        if ( (unsigned long)(currentMillis - previousP1_Millis) >= (intervalP1 / 2) && !p1SerialFinish) {    // terminate serial2 and restart serial1 halfway
+        if ( (unsigned long)(currentMillis - previousP1_Millis) >= (intervalP1 / 2) ) {  // terminate serial2 and restart serial1 halfway
           p1SerialActive = false;   // activate serial in next round
           p1SerialFinish = false;  // and let it finish
           previousP1_Millis = currentMillis; // Use the snapshot to set track time to prepare next P1 serial event
@@ -2047,8 +2051,8 @@ void readTelegram2() {
     }
 
     memset(telegram2, 0,       sizeof(telegram2));        // initialise telegram array to 0
-    memset(telegramLast2, 0,   sizeof(telegramLast2));    // initialise array to 0
-    memset(telegram2Record, 0, sizeof(telegram2Record));  // initialise telegram array to 0
+    // memset(telegramLast2, 0,   sizeof(telegramLast2));    // initialise array to 0
+    // memset(telegram2Record, 0, sizeof(telegram2Record));  // initialise telegram array to 0
 
     // initialise positions
     int telegram2_Start = -1;
@@ -2067,9 +2071,12 @@ void readTelegram2() {
 
       if (len > 0)  {   // do we have bytes in buffer
         // remember  last character
-        telegramLast2[0] = telegram2[len - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
-        telegramLast2[1] = '\n';                // 3byte telegram lastbyte termination string
-        telegramLast2[2] = 0;                   // 3byte-telegram lastbyte terminaion variable
+        // telegramLast2[0] = telegram2[len - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
+        // telegramLast2[1] = '\n';                // 3byte telegram lastbyte termination string
+        // telegramLast2[2] = 0;                   // 3byte-telegram lastbyte terminaion variable
+        if ( len > (MAXLINELENGTH2 - 2) ) {            // we have clearly an overflow
+           len =  (MAXLINELENGTH2 - 2) ;
+        }
         telegram2[len + 1] = '\n';    // string set lastcharacter to \n
         telegram2[len + 2] = 0;       // variable next character before null
         /*
@@ -2173,16 +2180,16 @@ void readTelegram2() {
                 char messageCRC2[5];
                 strncpy(messageCRC2, telegram2Record+(endChar-startChar)+1, 4);   // copy 4 bytes crc of record and
                 messageCRC2[4] = 0;
-                unsigned int currentCRC2 = CRC16(0x0000, (unsigned char*)telegram2Record + startChar, (endChar-startChar)+1); // include \header+!trailer '!' into CRC
+                unsigned int currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar, (endChar-startChar)+1); // include \header+!trailer '!' into CRC, v48-casting
                 validTelegram2CRCFound = (strtol(messageCRC2, NULL, 16) == currentCRC2);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
                 if (outputOnSerial) {   // print serial record count, total receivwed length, calculated CRC
                   Serial.printf(" s=%c, e=%c, crt=%s, cr1=%x, ;", telegram2Record[startChar],telegram2Record[endChar], messageCRC2, currentCRC2) ;    // debug print calculated CRC
                 }
                 if (outputOnSerial) {   // before and after crc
-                  currentCRC2 = CRC16(0x0000, (unsigned char*)telegram2Record+startChar+1,(endChar-startChar));   // ignore header
+                  currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar));   // ignore header, v48-casting
                   Serial.printf(" cr0=%x,", currentCRC2) ;    // debug print calculated CRC
-                  currentCRC2 = CRC16(0x0000, (unsigned char*)telegram2Record+startChar+1,(endChar-startChar)-1); // ignore header & trailer
-                  Serial.printf(" cr2=%x,", currentCRC2) ;    // debug print calculated CRC
+                  currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar)-1); // ignore header & trailer, v48-casting
+                  Serial.printf(" cr-1=%x,", currentCRC2) ;    // debug print calculated CRC
 
                 }
 
@@ -2975,8 +2982,12 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
     if (strncmp(telegram, "/KFM5KAIFA-METER", strlen("/KFM5KAIFA-METER")) == 0) telegramP1header = true;   // indicate we are in header mode
 
-    currentCRC = Crc16In(0x0000, (unsigned char *) telegram + startChar, len - startChar - 1);  // initialise using header
-    if (telegram[startChar+len-2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
+    currentCRC = Crc16In(0x0000, reinterpret_cast<unsigned char*>(telegram) + startChar, len - startChar - 1);  // initialise using header, v48-casting
+    if (telegram[startChar+len-2] == '\x0d') { // v48-casting
+      // currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
+        unsigned char tempLiteral[] = {0x0A};  // use temporarily literal to "unsigned char* cast of Crc16In, v48-casting
+        currentCRC = Crc16In(currentCRC, tempLiteral, 1);
+    }
 
     /*
     if ( len = 1 && telegram[len-1] == '\x0d') {
@@ -3007,7 +3018,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
     if (endChar >= 0 && telegramP1header) {   // Are we reading the trailer of the Meter with header passed
 
-      currentCRC = Crc16In(currentCRC, (unsigned char*)telegram + endChar, 1); // include trailer '!' into CRC
+      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram) + endChar, 1); // include trailer '!' into CRC, v48-casting
       char messageCRC[5];
       strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
       messageCRC[4] = 0;                                // make it an end of string
@@ -3065,7 +3076,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
                   telegram_crcIn[i] = telegram_crcOut[i];
                 }                 
             }
-            dataInCRC = CRC16(0x0000, (unsigned char*) telegram_crcIn, telegram_crcIn_len ); // Get new native Crcin
+            dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len ); // Get new native Crcin, v48-casting
             validCrcInFound = (strtol(messageCRC, NULL, 16) == dataInCRC);    // check if we have a 16base-match
             if (validCrcInFound) {
               telegram_crcIn_rcv++ ;                       // count we can/could recover this corrupted telegram read
@@ -3124,8 +3135,21 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
       */
 
     } else {                        // We are reading between header and trailer
-      currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
-      if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
+      
+      // currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
+      //    reinterpret_cast<unsigned char*> to prevent "C-style pointer casting" message
+      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram), len - 1); // calculatate CRC upto/including 0x0D, v48-casting
+      
+      // prevent "C-style pointer casting" message
+      //  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
+      // dnw:  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>("\x0a"), 1); // add excluded \n
+      // dnw:  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, "\x0a", 1); // add excluded \n
+      if (telegram[len - 2] == '\x0d') {    // correctly use a literal to addin to Crc16in, v48-casting
+        // use temporarily literal to add
+        unsigned char tempLiteral[] = {0x0A};
+        currentCRC = Crc16In(currentCRC, tempLiteral, 1);
+      }
+
       if (outputOnSerial) {
         // Serial.print("<");
         if (len > 2) {  // (was > 2)
@@ -3306,7 +3330,6 @@ void RecoverTelegram_crcIn() {
     Serial.print("Recovery active.");
     if (currentTime2 != currentTime)  Serial.printf("\n\r\t..RcurrentTime2=%d/%d" , currentTime2 , currentTime );
     if (powerConsumptionLowTariff2  != powerConsumptionLowTariff)  Serial.printf("\n\r\t..RpowerConsumptionLowTariff2=%d/%d" , powerConsumptionLowTariff2 , powerConsumptionLowTariff  );
-    if (powerConsumptionLowTariff2  != powerConsumptionLowTariff)  Serial.printf("\n\r\t..RpowerConsumptionLowTariff2=%d/%d" , powerConsumptionLowTariff2 , powerConsumptionLowTariff  );
     if (powerConsumptionHighTariff2 != powerConsumptionHighTariff) Serial.printf("\n\r\t..RpowerConsumptionHighTariff2=%d/%d", powerConsumptionHighTariff2, powerConsumptionHighTariff );
     if (powerProductionLowTariff2   != powerProductionLowTariff)   Serial.printf("\n\r\t..RpowerProductionLowTariff2=%d/%d"  , powerProductionLowTariff2  , powerProductionLowTariff   );
     if (powerProductionHighTariff2  != powerProductionHighTariff)  Serial.printf("\n\r\t..RpowerProductionHighTariff2=%d/%d" , powerProductionHighTariff2 , powerProductionHighTariff  );
@@ -3316,7 +3339,6 @@ void RecoverTelegram_crcIn() {
   // moving unconditional  fields from recoverty record (todo: candidate to do this always)
   currentTime  = currentTime2;
   strncpy(currentTimeS2, currentTimeS, 6);
-  powerConsumptionLowTariff2  = powerConsumptionLowTariff;
   powerConsumptionLowTariff2  = powerConsumptionLowTariff;
   powerConsumptionHighTariff2 = powerConsumptionHighTariff;
   powerProductionLowTariff2   = powerProductionLowTariff;
@@ -3509,7 +3531,7 @@ char TranslateForPrint(char c)
 /* 
   generic subroutine to find a character in reverse , return position as offset to 0
 */
-int FindCharInArrayRev(char array[], char c, int len)               // Find character >=0 found, -1 failed
+int FindCharInArrayRev(const char array[], char c, int len)               // Find character >=0 found, -1 failed
 {
   //           123456789012
   // 1234567890123456789012345678901234567890  = 40
@@ -3531,7 +3553,7 @@ int FindCharInArrayRev(char array[], char c, int len)               // Find char
 /*
   find character forwarding for len bytes
 */
-int FindCharInArrayFwd(char array[], char c, int len)               // Find character >=0 found, -1 failed
+int FindCharInArrayFwd(const char array[], char c, int len)               // Find character >=0 found, -1 failed
 {
     for (int i = 0; i < len+1 ; i++)   // forward
   {
@@ -3546,7 +3568,7 @@ int FindCharInArrayFwd(char array[], char c, int len)               // Find char
 /*
   find word/wlen forwarding in array/len
 */
-int FindWordInArrayFwd(char array[], const char word[], int alen, int wlen) {               // Find character >=0 found, -1 failed
+int FindWordInArrayFwd(const char array[], const char word[], int alen, int wlen) {               // Find character >=0 found, -1 failed
   // Serial.printf(" alen=%d wlen=%d ", alen, wlen ); // alen=716 wlen=10
   // return 0;
   for (int i = 0; i < (alen-wlen)+1 ; i++) {  // search for start of searchstring
@@ -3599,11 +3621,11 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
   }
    
   // loop and collect the passed string into inputarray
-  for (int i=0; i < dataInLen ; i++) {
+  for (int i=0; i < dataInLen && telegram_crcIn_len < MAXLINELENGTH ; i++) {  // v48 prevent loop overflowing telegram_crcIn 
     telegram_crcIn[telegram_crcIn_len] = dataIn[i];
     telegram_crcIn_len++;
     telegram_crcIn[telegram_crcIn_len] = 0x00;
-    if (telegram_crcIn_len >= MAXLINELENGTH ) break;
+    // if (telegram_crcIn_len >= MAXLINELENGTH ) break;
   }
 
   // if (outputOnSerial) Serial.println((String)" c=" + telegram_crcIn_len + ".");
@@ -3623,7 +3645,7 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
   if (  telegram_crcIn_len > 1 && 
         telegram_crcIn_cnt > 1 &&
         telegram_crcIn[telegram_crcIn_len - 1] == '!' ) {  // (single quoted) are we on end of record ??
-      dataInCRC = CRC16(0x0000, (unsigned char*)telegram_crcIn, telegram_crcIn_len);  // get CRC of whole copied record
+      dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len);  // get CRC of whole copied record, v48-casting
       if (outputOnSerial) {   // print serial record count, total receivwed length, calculated CRC
         // Serial.println((String)" ct=" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
         Serial.printf("\tcr0=%x,crc=%d,crl=%d\t", dataInCRC,  telegram_crcIn_cnt, telegram_crcIn_len) ; 
@@ -3631,7 +3653,7 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
   }
   telegram_crcIn_cnt++;
   
-  return CRC16(crc, (unsigned char*)dataIn, dataInLen);  // initialise using header
+  return CRC16(crc, reinterpret_cast<unsigned char*>(dataIn), dataInLen);  // initialise using header, v48-casting
 }
 
 /* 
@@ -3777,7 +3799,7 @@ void SetOldValues()     // executed at end succesful  telegrams
 }
 
 // check if data/field is numeric 0-9 & decimal-point
-bool isNumber(char *res, int len)       // False/true if numeriv
+bool isNumber(const char *res, int len)       // False/true if numeriv
 {
   for (int i = 0; i < len; i++)
   {
@@ -3850,8 +3872,7 @@ void GetTemperatures() {
   // String message = "Number of devices: ";
   // message += numberOfDsb18b20Devices;
   // message += "\r\n";
-  char temperatureString[6];
-
+  
   for (int i = 0; i < numberOfDsb18b20Devices; i++) {
     float tempC = DS18B20.getTempC( devAddr[i] ); //Measuring temperature in Celsius
     tempDev[i] = tempC; //Save the measured value to the array
@@ -3862,6 +3883,7 @@ void GetTemperatures() {
   lastTempReadTime = millis();         // Remember the last time measurement
 
   if (outputOnSerial) {
+    char temperatureString[6];
     Serial.print( "Sending temperatures: " );
     for (int i = 0; i < numberOfDsb18b20Devices; i++) {
       // The dtostrf() function converts the double value passed in val into an ASCII representationthat will be stored under s.
@@ -4060,14 +4082,14 @@ String GetAddressToString(DeviceAddress deviceAddress) {
 void interval_delay(int delayTime)   // Routine to use interval to pause program
 {
   if (delayTime > 0 && delayTime < 1000) {        // check limits
-    unsigned long currentMillis  = millis();      // get time
-    unsigned long previousMillis = currentMillis;
-    while ( (currentMillis - previousMillis) < delayTime ) {
+    unsigned long _currentMillis  = millis();      // get time
+    unsigned long _previousMillis = _currentMillis;
+    while ( (_currentMillis - _previousMillis) < delayTime ) {
       // yield();         // call by ISR causes WDT
       // delay(1);
       // ESP.wdtFeed();   // feed the hungry timer  system_soft_wdt_feed() call by ISR causes WDT
                           // https://github.com/esp8266/Arduino/blob/4897e0006b5b0123a2fa31f67b14a3fff65ce561/cores/esp8266/Esp.cpp#L102
-      currentMillis = millis();   // get new time
+      _currentMillis = millis();   // get new time
     }
   }
 }
