@@ -4082,14 +4082,14 @@ String GetAddressToString(DeviceAddress deviceAddress) {
 void interval_delay(int delayTime)   // Routine to use interval to pause program
 {
   if (delayTime > 0 && delayTime < 1000) {        // check limits
-    unsigned long _currentMillis  = millis();      // get time
-    unsigned long _previousMillis = _currentMillis;
-    while ( (_currentMillis - _previousMillis) < delayTime ) {
+    unsigned long temp_currentMillis  = millis();      // get time
+    unsigned long temp_previousMillis = temp_currentMillis;
+    while ( (temp_currentMillis - temp_previousMillis) < delayTime ) {
       // yield();         // call by ISR causes WDT
       // delay(1);
       // ESP.wdtFeed();   // feed the hungry timer  system_soft_wdt_feed() call by ISR causes WDT
                           // https://github.com/esp8266/Arduino/blob/4897e0006b5b0123a2fa31f67b14a3fff65ce561/cores/esp8266/Esp.cpp#L102
-      _currentMillis = millis();   // get new time
+      temp_currentMillis = millis();   // get new time
     }
   }
 }
