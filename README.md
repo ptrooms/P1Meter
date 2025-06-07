@@ -2,7 +2,7 @@ W.i.P Home Automation via ESP8266 WiFi chip
 ===========================================
 
 This project brings control using the ESP8266 NodeMCU 12E board to the Home.
-The project aims control throught MQTT as a central control module for
+The project aims control through MQTT as a central control module for
 - Thermostat state and Heating control
 - measure/reading serial 115K2 serial connected P1 electricity status
 - Measuring Pulsed Watermeter
