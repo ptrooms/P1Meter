@@ -2382,6 +2382,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
 void ProcessMqttCommand(char* payload, unsigned int length) {
   /* Commands: (single byte)
 
+    ? Print brief helptexst on serial output
     0 heating On  valve relay D8=Gpio15
     1 heating Off
     2 Follow input (thermostat on D7=GPIO13)
@@ -2403,6 +2404,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     i decrease interval OK counter 250/100/25/10/2
     T loopback RX2 Gpio4 to TX2 Gpio2 serial port
     P toggle output Power usage to /energy/p1power CurrentPowerConsumption: 463
+    M Print recovery masking array where X does nog care positions v48
+    m Print Input array to be masked v48
 
     Info - 
           BlueLed is  Gpio16  /d0   - give some visual indication of state
@@ -2604,6 +2607,67 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         if (outputMqttPower ) Serial.print("Active.");
         if (!outputMqttPower ) Serial.print("Inactive.");
       }
+    } else  if ((char)payload[0] == 'm') {       // v48 10jun25 print m-asked Input array
+      Serial.println((String)"\r\n dataIn telegram_crcIn len=" + telegram_crcIn_len + " som>>");
+      for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
+        if (isprint(telegram_crcIn[cnt])) {             // if printable
+            Serial.print(telegram_crcIn[cnt]);
+        } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
+            Serial.print("\r");
+        } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
+            Serial.print("\n");
+        } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
+            Serial.print("|");
+            break;
+        } else  {
+            Serial.print("?");                    // unprintable
+        }
+      }
+      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+    } else  if ((char)payload[0] == 'M') {       // v48 10jun25 print M-asking array
+      Serial.println((String)"\r\n Recovery telegram_crcOut len=" + telegram_crcOut_len + " som>>");
+      for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
+        if (isprint(telegram_crcOut[cnt])) {             // if printable
+            Serial.print(telegram_crcOut[cnt]);
+        } else if (telegram_crcOut[cnt] == '\x0d') {     // carriage return
+            Serial.print("\r");
+        } else if (telegram_crcOut[cnt] == '\x0a') {     // linefeed
+            Serial.print("\n");
+        } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
+            Serial.print("|");
+            break;
+        } else  {
+            Serial.print("?");                    // unprintable
+        }
+      }
+      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+    } else  if ((char)payload[0] == '?') {       // v48 Print help 
+          Serial.println((String)"\n\r? Help commands");
+          Serial.println((String)"0 heating On");
+          Serial.println((String)"1 Heating off");
+          Serial.println((String)"2 Heat follow Thermostate");
+          Serial.println((String)"3 Thermostate disable");
+          Serial.println((String)"R Restart");
+          Serial.println((String)"D Debug");
+          Serial.println((String)"L Log to Mqtt");
+          Serial.println((String)"e force Error1");
+          Serial.println((String)"E force Error2");
+          Serial.println((String)"b Baud decrease gpio14");
+          Serial.println((String)"B Bbaud increase gpio14");
+          Serial.println((String)"e Exception activated");
+          Serial.println((String)"l Stoplog Mqtt");
+          Serial.println((String)"F on/off test Rx2 function");
+          Serial.println((String)"f Blueled cycle Error/Water/Hot");
+          Serial.println((String)"T RX2 loopback to BlueLed");
+          Serial.println((String)"W on/OFF Watertrigger1");
+          Serial.println((String)"w on/OFF Water Pullup");
+          Serial.println((String)"y print water debounce");
+          Serial.println((String)"Z zero counters");
+          Serial.println((String)"I intervalcount 2880");
+          Serial.println((String)"i decrease interval count");
+          Serial.println((String)"P ON/off publish Power");
+          Serial.println((String)"M print Masking array");
+          Serial.println((String)"m print Input array");
     } else  {
       if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" );
     }
@@ -3062,7 +3126,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
         }
         // ----------------------------------------------------------------------------------------------
-      } else {    // we have a CRC error on ruuning CRC, try to recover using using created mask
+      } else {    // we have a CRC error on running CRC, try to recover using using created mask
         
         if  (telegram_crcIn_len == telegram_crcOut_len) {    // if length of error is equal , try to unmask differences  ?
             for (int i=0; i < telegram_crcIn_len; i++) {
