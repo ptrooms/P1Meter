@@ -5,9 +5,10 @@ This project brings control using the ESP8266 NodeMCU 12E board to the Home.
 The project aims control throught MQTT as a central control module for
 - Thermostat state and Heating control
 - measure/reading serial 115K2 serial connected P1 electricity status
-- Measuring Pulsed Watermeter
-- getting Lux/Light state
-- measuring Hotwater usage
+- Measuring Pulsed Watermeter using an Infraded Optocoupler
+- getting Lux/Light state using a LDR in Living room
+- measuring Hotwater usage using a LDR on th Boiler Led
+- reading Heat  delivery using 2nd erial on P1 heat-exchange device.
 
 ### Installing / using Arduino IDE
 - TBD
@@ -19,7 +20,8 @@ The project aims control throught MQTT as a central control module for
 
 
 ### Installing / using Platform IO
-- TBD
+- see file: platformio.ini
+- see file: platformio_p1meter_env.ini 
 
 #### Latest release 
 Boards manager link: `http://arduino.esp8266.com/stable/package_esp8266com_index.json`
@@ -59,7 +61,9 @@ Using make instead of the Arduino IDE makes it easier to do automated and produc
 ### Documentation
 TBD 
 
-Documentation for latest development version: t.b.d.
+Documentation for latest development version: see comments in source.
+Note: we use a special adapted software serial to improve bit-banging reliability to approx 90% 
+In addition we've added a masked recovery routine to reduce read faults towards 98%
 
 ### Issues and support ###
 

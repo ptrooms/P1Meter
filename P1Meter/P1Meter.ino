@@ -5,6 +5,8 @@
     casting fix reinterpret_cast<unsigned char*>(telegram)
     define unsigned literal using  unsigned char tempLiteral[] = {0x0A};
     Fix some outbound array risks
+    add '?'on mqtt command for help
+    add 'M/m' mqtt command to print masking and masked P1 record
   V47 14may25: bugfix
     Waterswitch sometimes stops when looptimer to check debounce transitioned to 0 after 70 minutes
     WaterTrigger_ISR renamed to WaterTrigger0_ISR
