@@ -1,6 +1,11 @@
+// #define TEST_MODE    // set in PlatformIO; 
+#define DEBUG_ESP_OTA   // v49 wifi restart issues 
 // flaw1: will not process watercount during serial read.
 // issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
 /*
+  V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
+    wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
+    replaced faulty device
   V48 05jun25: improve code style after inpecting
     casting fix reinterpret_cast<unsigned char*>(telegram)
     define unsigned literal using  unsigned char tempLiteral[] = {0x0A};
@@ -72,7 +77,6 @@
 // Update $ git checkout -b v36 on https://github.com/ptrooms/P1Meter.git to correct watercnt errors 
 
 #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
-// #define TEST_MODE    // set in PlatformIO; use our file defined confidential wifi/server/mqtt settings
 #define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.1 and use P1serial verion to listen /header & !finish
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP       // if define we use Fixed-IP, else (undefined) we use dhcp
@@ -89,13 +93,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1147.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1149.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2148.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2149.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -997,7 +1001,8 @@ void setup()
   /*
     Added 2021-04-26 22:06:55 to test/check wifi issues
   */
-  WiFi.persistent(false); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083)
+  // WiFi.persistent(false); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083) since 29jun25 causes bootloop
+  WiFi.persistent(true); // Do not overwrites the FLASH if the settings are the same https://github.com/esp8266/Arduino/issues/1054#issuecomment-2662968960
   // WiFi.disconnect(true); // Delete SDK wifi config (after is has connected)
   delay(200);
   // WiFi.mode(WIFI_STA); // Disable AP mode
@@ -1009,6 +1014,7 @@ void setup()
 
   Serial.println((String) "Connecting to " + ssid);  // wait 5 seconds before retry
   WiFi.begin(ssid, password);     // login to AP
+  Serial.println((String) "Wifi Password sent");  // v49 added for debug
     
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.print((String)"Connection to "+ ssid +", Failing ..");  // wait before retry
@@ -1045,7 +1051,8 @@ void setup()
   */
 
   ArduinoOTA.setHostname(hostName);   // nodemcut1/p1
-
+  Serial.println("ArduinoOTA.setHostname set" );
+  
   ArduinoOTA.onStart([]() {
     Serial.println("Start");
   });
@@ -1071,7 +1078,7 @@ void setup()
     else if (error == OTA_END_ERROR)
       Serial.println("End Failed");
   });
-  
+  Serial.println("ArduinoOTA.begin() activated." );
   
 //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   // #define DEF_PROG_VERSION 1123.240
