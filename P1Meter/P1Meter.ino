@@ -5,7 +5,8 @@
 /*
   V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
     wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
-    replaced faulty device
+    replaced faulty device that had a blown schottky power diode 
+    Add code in to check valid GetTemperatures() reading to prevent -127C reports
   V48 05jun25: improve code style after inpecting
     casting fix reinterpret_cast<unsigned char*>(telegram)
     define unsigned literal using  unsigned char tempLiteral[] = {0x0A};
@@ -3942,13 +3943,30 @@ void SetupDS18B20() {
   Read and get DS18B20 temperatures to tempDev[]
 */
 void GetTemperatures() {
+// 29jun25: v49 issue sometimes a sensor is not reading and filled als -127.0°C
+//    Sending temperatures:   23.50   23.81   23.69   -127.00 23.56   25.25 
+//      voltage or poor grounding can cause unreliable readings DS18B20_SENSOR @ D3 = GPIO0
+//      strangely the new esp8266 has about 4 volt on its gpio0
+//      bypass for the issue is when < -126 , we ignore the setting
+
   // String message = "Number of devices: ";
   // message += numberOfDsb18b20Devices;
   // message += "\r\n";
-  
+  bool bTemp_Reading_State = true;
   for (int i = 0; i < numberOfDsb18b20Devices; i++) {
     float tempC = DS18B20.getTempC( devAddr[i] ); //Measuring temperature in Celsius
-    tempDev[i] = tempC; //Save the measured value to the array
+
+    if (tempC > -127.0) { // v49 when valid temperature
+      tempDev[i] = tempC; //Save the measured value to the array
+    } else {              // else bypass and report if logging is active
+        if (outputOnSerial) {   // report failures
+          if (bTemp_Reading_State) {
+            Serial.print((String)" Temperature failure on ");
+          }
+          Serial.print((String)"t"+ i +"=" + tempC + " " );    
+        }
+        bTemp_Reading_State = false;
+    }
   }
 
   DS18B20.setWaitForConversion(false); // No waiting for measurement
