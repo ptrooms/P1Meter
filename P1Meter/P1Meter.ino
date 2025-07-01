@@ -6,7 +6,8 @@
   V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
     wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
     replaced faulty device that had a blown schottky power diode 
-    Add code in to check valid GetTemperatures() reading to prevent -127C reports
+    Add code in to check valid processTemperatures() reading to prevent -127C reports
+    log to mqtt /error/... topic for failing sensors (p1-rj11, adc/light, temperature)
   V48 05jun25: improve code style after inpecting
     casting fix reinterpret_cast<unsigned char*>(telegram)
     define unsigned literal using  unsigned char tempLiteral[] = {0x0A};
@@ -71,6 +72,12 @@
 //      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
 //      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
 
+/* Log errors v49 to topic /error/x1
+  001 = RJ11 to P1 is not connected
+  002 = Temperature sensort fault (< REQUIRED_DSB18B20_SENSORS of < 127C)
+  003 = ADC lightlevel fault (< REQUIRED_ANALOG_ADC)
+*/
+
 // Todo1: safegurard routing if P1 expire often then 10-12 seconds... at 1sec rate routine is not honoured
 
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
@@ -82,6 +89,8 @@
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP       // if define we use Fixed-IP, else (undefined) we use dhcp
 #define NoTx2Function         // Do no serial out on D4/Gpio2/Blueled2
+#define REQUIRED_DSB18B20_SENSORS 6 // v49 miniomal required DS18B20 sensors
+#define REQUIRED_ANALOG_ADC 10 // v49 minimal required lightlevel for LDR sensor
 
 #ifdef TEST_MODE
   #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
@@ -2315,7 +2324,7 @@ void processGpio() {    // Do regular functions of the system
   processLightRead(LOW);        // process LedLightstatus read pin D6
   processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
 
-  GetTemperatures();      // from DS18B20 tempsensors
+  processTemperatures();      // from DS18B20 tempsensors
 
   // debug pin status 
   if (outputOnSerial) {
@@ -2994,6 +3003,17 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
     Serial.print(nowValueAdc);
     Serial.print(" filtered Value = ");
     Serial.print(filteredValueAdc);
+  }
+
+  if (nowValueAdc <= REQUIRED_ANALOG_ADC) {     // v49 check if we a Light sensor value reading
+    String mqttMsg = "{\"error\":003 ,\"msg\":\"ADC Lightsensor value ";  // start of Json error message
+    mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt\":"+ (mqttCnt+1) +"\"}");      // finish JSON error message
+    
+    char mqttOutput[128];
+    mqttMsg.toCharArray(mqttOutput, 128);
+    if (client.connected()) {
+      client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
+    }
   }
   return filteredValueAdc;
 }
@@ -3888,6 +3908,7 @@ bool isNumber(const char *res, int len)       // False/true if numeriv
 // =============================================== routines added for temperature processing
 /* 
   Setting the temperature sensor []
+  read for howto: https://randomnerdtutorials.com/guide-for-ds18b20-temperature-sensor-with-arduino/
 */
 void SetupDS18B20() {
 
@@ -3942,31 +3963,50 @@ void SetupDS18B20() {
 /* 
   Read and get DS18B20 temperatures to tempDev[]
 */
-void GetTemperatures() {
+void processTemperatures() {
 // 29jun25: v49 issue sometimes a sensor is not reading and filled als -127.0°C
 //    Sending temperatures:   23.50   23.81   23.69   -127.00 23.56   25.25 
 //      voltage or poor grounding can cause unreliable readings DS18B20_SENSOR @ D3 = GPIO0
 //      strangely the new esp8266 has about 4 volt on its gpio0
 //      bypass for the issue is when < -126 , we ignore the setting
 
-  // String message = "Number of devices: ";
-  // message += numberOfDsb18b20Devices;
-  // message += "\r\n";
-  bool bTemp_Reading_State = true;
-  for (int i = 0; i < numberOfDsb18b20Devices; i++) {
-    float tempC = DS18B20.getTempC( devAddr[i] ); //Measuring temperature in Celsius
+  bool bTemp_Reading_State = true;    // assume temperatures OK
 
-    if (tempC > -127.0) { // v49 when valid temperature
-      tempDev[i] = tempC; //Save the measured value to the array
-    } else {              // else bypass and report if logging is active
-        if (outputOnSerial) {   // report failures
-          if (bTemp_Reading_State) {
-            Serial.print((String)" Temperature failure on ");
-          }
-          Serial.print((String)"t"+ i +"=" + tempC + " " );    
-        }
+  String mqttMsg = "{\"error\":002 ,\"msg\":\"";  // start of Json erro message
+  if (numberOfDsb18b20Devices < REQUIRED_DSB18B20_SENSORS) {     // check if we have devices
         bTemp_Reading_State = false;
+        mqttMsg.concat((String) numberOfDsb18b20Devices + " of " + REQUIRED_DSB18B20_SENSORS + " tempsensors detected "); 
+  } 
+  // else { 
+
+    for (int i = 0; i < numberOfDsb18b20Devices; i++) {
+      float tempC = DS18B20.getTempC( devAddr[i] ); //Measuring temperature in Celsius
+      if (tempC > -127.0) { // v49 when valid temperature
+        tempDev[i] = tempC; //Save the measured value to the array
+      } else {              // else bypass and report if logging is active
+          if (bTemp_Reading_State) {
+            mqttMsg.concat("Tempsensor failure "); 
+            if (outputOnSerial) {   // report failures
+              Serial.print((String)" Temperature failure on ");
+            }
+          }
+          if (outputOnSerial) {   // report failures
+              Serial.print((String)   " T" + i + "=" + tempC + " " );
+          }
+          mqttMsg.concat((String) "T" + i + "=" + tempC + " "); 
+          bTemp_Reading_State = false;
+      }
     }
+  // }
+  mqttMsg.concat((String)"\", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+  mqttMsg.concat("\"}");      // finish JSON error message
+
+  if (!bTemp_Reading_State) { //  report failure on mqtt
+      char mqttOutput[128];
+      mqttMsg.toCharArray(mqttOutput, 128);
+      if (client.connected()) {
+        client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
+      }
   }
 
   DS18B20.setWaitForConversion(false); // No waiting for measurement
