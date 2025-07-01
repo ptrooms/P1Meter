@@ -3,6 +3,7 @@
 // flaw1: will not process watercount during serial read.
 // issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
 /*
+  V50 01jul25: centralise mqtt calls to into publishMqtt(), this eases selections in the future 
   V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
     wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
     replaced faulty device that had a blown schottky power diode 
@@ -103,13 +104,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1149.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1150.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2149.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2150.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -1706,7 +1707,7 @@ void loop()
     //  if (millis() > 600000) {  // autonomous restart every 5 minutes
     intervalP1cnt--;            // decrease reliability
     if ( intervalP1cnt < 1) {   // if we multiple or frequent misses, restart esp266 to survive
-      if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, "ESP P1 rj11 not connected" );  // report we have survived this interval
+      if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 not connected" );  // report we have survived this interval
       Serial.print("\n #!!# ESP P1 rj11 not connected, cnt="); // print message line
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
@@ -1725,10 +1726,8 @@ void loop()
       mqttMsg.concat("}");  // end of json
       mqttMsg.toCharArray(mqttOutput, 128);
 
-      if (client.connected()) {
-        client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
-        if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
-      }
+      publishMqtt(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
+      if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
 
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
@@ -1766,11 +1765,11 @@ void loop()
     // If no MQTT poublished in this timout interval, whatever the reason, execute a restart to reset
     if (!mqttP1Published) {  // in case no publish energy yet , try restart
       Serial.println("ESP timeout.mqttP1Published.restart"); // print message line
-      if (client.connected()) client.publish(mqttLogTopic, "ESP timeout.restart" );
+      publishMqtt(mqttLogTopic, "ESP timeout.restart" );
       ESP.restart();     // if no/yet data published force restart
     }
 
-    // if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 Active interval checking rj11" );  // report we have survived this interval
+    // if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 Active interval checking rj11" );  // report we have survived this interval
     previousMillis = currentMillis; // Use the snapshot to set track time until next loop event
     mqttP1Published = false;        // assume we have not yet published processed data
   }
@@ -1890,7 +1889,7 @@ void readTelegram() {
 
   // Cycle: 04.781228065
 
-  if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
+  if (outputMqttLog) publishMqtt(mqttLogTopic, mqttClientName );
 
   int lenTelegram = 0;
   memset(telegram, 0, sizeof(telegram));   // initialitelegram buffer-array to 0
@@ -2361,6 +2360,7 @@ void processGpio() {    // Do regular functions of the system
   // publishP1ToMqtt();      // PUBLISH this mqtt
 }
 
+
 /* 
     Mqtt input received, callled whenever a MQTT subscription message arrives
 */
@@ -2660,6 +2660,11 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+
+    } else  if ((char)payload[0] == 'h') {       // v48 check call function for centralied mqtt
+        String mqttMsg = "test1234";  // start of Json error message        
+        // const char* mqttMsg = nullptr; // to check for mullptr
+        publishMqtt(mqttErrorTopic, mqttMsg); // v49 calldo centralised mqqt sendroutine
     } else  if ((char)payload[0] == '?') {       // v48 Print help 
           Serial.println((String)"\n\r? Help commands");
           Serial.println((String)"0 heating On");
@@ -2889,7 +2894,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             prog_Version );             // (fixed) Version from program , see top
 
     if (client.connected()) {
-      if (outputMqttPower) client.publish(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
+      if (outputMqttPower) publishMqtt(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
       mqttP1Published = true;             // yes we have publised energy data
     }
 
@@ -3008,14 +3013,34 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
   if (nowValueAdc <= REQUIRED_ANALOG_ADC) {     // v49 check if we a Light sensor value reading
     String mqttMsg = "{\"error\":003 ,\"msg\":\"ADC Lightsensor value ";  // start of Json error message
     mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt\":"+ (mqttCnt+1) +"\"}");      // finish JSON error message
-    
+    publishMqtt(mqttErrorTopic, mqttMsg); // v50 calldo centralised mqqt sendroutine
+  /*
     char mqttOutput[128];
     mqttMsg.toCharArray(mqttOutput, 128);
     if (client.connected()) {
       client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
     }
+  */
   }
   return filteredValueAdc;
+}
+
+
+/* 
+    Send data to Mqtt topic
+*/
+void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
+  if (mqttTopic and payLoad) {    // check for not nullpointer
+    char mqttOutput[MAXLINELENGTH];
+    payLoad.toCharArray(mqttOutput, MAXLINELENGTH);
+    if (client.connected()) {
+      client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
+    }
+  } else {
+    if (outputOnSerial) {  // debug
+      Serial.println("Error in publishMqtt, nullreference fault");
+    }
+  }
 }
 
 // process Ledlightstatus indicating if Hotwater is tapped, return state
@@ -3279,37 +3304,37 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     } // else if endChar >= 0 && telegramP1header
   } // startChar >= 0
 
-  if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
-  // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
+  if (outputMqttLog) publishMqtt(mqttLogTopic, telegram );   // debug to mqtt log ?
+  // if (outputMqttLog) publishMqtt(mqttLogTopic, telegramLast );
 
   /*
     if (!(telegram[len - 2] == ')') ) { // ignore if not ending on )
       telegram[0] = telegram[len - 2];
       telegram[1] = telegram[len - 2];
       telegram[2] = telegram[len - 2];
-      client.publish(mqttLogTopic, telegram );   // log
+      publishMqtt(mqttLogTopic, telegram );   // log
       return endOfMessage;
     }
   */
 
   /*
-     if (telegram[len - 3] == ')' ) client.publish(mqttLogTopic, "tele-3" );   // log
-     if (telegram[len - 2] == ')' ) client.publish(mqttLogTopic, "tele-2" );   // log valid
-     if (telegram[len - 1] == ')' ) client.publish(mqttLogTopic, "tele-1" );   // log
-     if (telegram[len]     == ')' ) client.publish(mqttLogTopic, "tele=0" );   // log
-     if (telegram[len + 1] == ')' ) client.publish(mqttLogTopic, "tele+1" );   // log
-     if (telegram[len + 2] == ')' ) client.publish(mqttLogTopic, "tele+2" );   // log
-     if (telegram[len + 3] == ')' ) client.publish(mqttLogTopic, "tele+3" );   // log
+     if (telegram[len - 3] == ')' ) publishMqtt(mqttLogTopic, "tele-3" );   // log
+     if (telegram[len - 2] == ')' ) publishMqtt(mqttLogTopic, "tele-2" );   // log valid
+     if (telegram[len - 1] == ')' ) publishMqtt(mqttLogTopic, "tele-1" );   // log
+     if (telegram[len]     == ')' ) publishMqtt(mqttLogTopic, "tele=0" );   // log
+     if (telegram[len + 1] == ')' ) publishMqtt(mqttLogTopic, "tele+1" );   // log
+     if (telegram[len + 2] == ')' ) publishMqtt(mqttLogTopic, "tele+2" );   // log
+     if (telegram[len + 3] == ')' ) publishMqtt(mqttLogTopic, "tele+3" );   // log
 
-     if (telegram[22] == 'S'     ) client.publish(mqttLogTopic, "tele+S" );   // log
-     if (telegram[22] == 'S'     ) client.publish(mqttLogTopic, telegram );   // log DateTime
+     if (telegram[22] == 'S'     ) publishMqtt(mqttLogTopic, "tele+S" );   // log
+     if (telegram[22] == 'S'     ) publishMqtt(mqttLogTopic, telegram );   // log DateTime
   */
 
   // 11jun20 yield();  // do background Wifi processing else things will not work
 
   if ( startChar >= 0 or endChar >= 0 ) {   //  Do we have a start OR finish of meterread
-    // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );   // log
-    // client.publish(mqttLogTopic, telegram );   // log
+    // if (outputMqttLog) publishMqtt(mqttLogTopic, telegramLast );   // log
+    // publishMqtt(mqttLogTopic, telegram );   // log
     if (endChar >= 0 && telegramP1header ) {      // we have had a full Telegram
       endOfMessage = true;                      // assume end of message
       telegramP1header = false;                 // switch off header mode
@@ -3324,8 +3349,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
 
   // used to catch P1meter line termination bracket
-  // if (telegram[len - 3] != ')' ) client.publish(mqttErrorTopic, telegram ); // log invalid
-  // if (telegram[len - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
+  // if (telegram[len - 3] != ')' ) publishMqtt(mqttErrorTopic, telegram ); // log invalid
+  // if (telegram[len - 3] != ')' ) publishMqtt(mqttLogTopic, "tele-2" );   // log invalid
 
   if (   telegram[0] != '0' && telegram[0] != '1' && telegram[1] != '-' ) return endOfMessage; // if not start wih 0- or 1-
 
@@ -3340,7 +3365,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // long val = 0;
   // long val2 = 0;
 
-  // client.publish(mqttLogTopic, telegram );    // show what we have got
+  // publishMqtt(mqttLogTopic, telegram );    // show what we have got
 
   //  0123456789012345678901234567890
   //  0-0:1.0.0(180611014816S) added ptro
@@ -3400,7 +3425,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // 1-0:2.7.0(00.000*kW) Actuele teruglevering
   // 1-0:1.7.x = Electricity consumption actual usage (DSMR v4.0)
   if (strncmp(telegram, "1-0:1.7.0(", strlen("1-0:1.7.0(")) == 0)        // Watts usage
-    // client.publish(mqttLogTopic, telegram );
+    // publishMqtt(mqttLogTopic, telegram );
     CurrentPowerConsumption = getValue(telegram, len);
 
 
@@ -3795,7 +3820,7 @@ bool CheckData()        //
             OldPowerConsumptionLowTariff, OldPowerConsumptionHighTariff,
             OldPowerProductionLowTariff, OldPowerProductionHighTariff,
             OldGasConsumption);
-    if (client.connected()) client.publish(mqttLogTopic, output);
+    publishMqtt(mqttLogTopic, output);
   }
 
   
@@ -3854,7 +3879,7 @@ bool CheckData()        //
     msg.concat("CurrentPowerConsumption: %lu");       // format data
     msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
     sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-    if (client.connected()) client.publish(mqttPower, output);                // publish output
+    publishMqtt(mqttPower, output);                // publish output
   }
   // Serial.println("Debug5, Checkdata..true");
   return true;
@@ -4002,11 +4027,7 @@ void processTemperatures() {
   mqttMsg.concat("\"}");      // finish JSON error message
 
   if (!bTemp_Reading_State) { //  report failure on mqtt
-      char mqttOutput[128];
-      mqttMsg.toCharArray(mqttOutput, 128);
-      if (client.connected()) {
-        client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
-      }
+      publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
   }
 
   DS18B20.setWaitForConversion(false); // No waiting for measurement
