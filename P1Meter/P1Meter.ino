@@ -3823,6 +3823,19 @@ bool CheckData()        //
     publishMqtt(mqttLogTopic, output);
   }
 
+  if (outputMqttPower)    // output currrent power only , flatnumber
+  {
+    // char msgpub[MAXLINELENGTH];     // allocate a message buffer
+    char output[MAXLINELENGTH];     // use snprintf to format data
+    // String msg = "";      // initialise data
+    // msg.concat("CurrentPowerConsumption: %lu");       // format data
+    // msg.toCharArray(msgpub, MAXLINELENGTH);   // move msg to msgpub  https://docs.arduino.cc/language-reference/en/variables/data-types/stringObject/Functions/toCharArray/
+
+      // https://www.tutorialspoint.com/c_standard_library/c_function_sprintf.html  int sprintf(char *target, const char *sources_tr0, ...);
+    sprintf(output, "CurrentPowerConsumption: %lu", CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    publishMqtt(mqttPower, output);                // publish output
+  }
+
   
   // check overrating more then 25.200kWh per 10sec read (=70w/s => 80Amps) is likely die to misread, can require recycle to recover
   if ((powerConsumptionLowTariff  - OldPowerConsumptionLowTariff > 70) || powerConsumptionLowTariff < 1)   // ignore zero reads
@@ -3873,12 +3886,14 @@ bool CheckData()        //
 
   if (outputMqttPower)    // output currrent power only , flatnumber
   {
-    char msgpub[MAXLINELENGTH];     // allocate a message buffer
+    // char msgpub[MAXLINELENGTH];     // allocate a message buffer
     char output[MAXLINELENGTH];     // use snprintf to format data
-    String msg = "";      // initialise data
-    msg.concat("CurrentPowerConsumption: %lu");       // format data
-    msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
-    sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    // String msg = "";      // initialise data
+    // msg.concat("CurrentPowerConsumption: %lu");       // format data
+    // msg.toCharArray(msgpub, MAXLINELENGTH);   // move msg to msgpub  https://docs.arduino.cc/language-reference/en/variables/data-types/stringObject/Functions/toCharArray/
+
+      // https://www.tutorialspoint.com/c_standard_library/c_function_sprintf.html  int sprintf(char *target, const char *sources_tr0, ...);
+    sprintf(output, "CurrentPowerConsumption: %lu", CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
     publishMqtt(mqttPower, output);                // publish output
   }
   // Serial.println("Debug5, Checkdata..true");
