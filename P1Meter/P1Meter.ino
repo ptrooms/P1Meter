@@ -2733,7 +2733,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
   // Buffers
     char msgpub[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360  04apr21 to #define 480
-    char output[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480
+    char outputData[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480
 
     String msg = "{"; // build mqtt frame 
     // msg.concat("\"currentTime\": %lu");                // P1 19nov19 17u12 remove superflous comma
@@ -2854,7 +2854,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
 // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
 //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
-    snprintf(output, sizeof(output), msgpub ,
+    snprintf(outputData, sizeof(outputData), msgpub ,
             // currentTime,                // metertime difference 52 seconds can also use millis()
             currentTimeS,               // meter time in string format from timedate record
             // millis(),
@@ -2894,7 +2894,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             prog_Version );             // (fixed) Version from program , see top
 
     if (client.connected()) {
-      if (outputMqttPower) publishMqtt(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
+      if (outputMqttPower) publishMqtt(mqttTopic, outputData);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
       mqttP1Published = true;             // yes we have publised energy data
     }
 
@@ -3797,7 +3797,7 @@ bool CheckData()        //
 
   if (outputMqttLog) {  // if we LOG status old values not yet set
     char msgpub[MAXLINELENGTH];
-    char output[MAXLINELENGTH];
+    char outputData[MAXLINELENGTH];
     String msg = "{";
     msg.concat("\"currentTime\": %lu,");              // %lu is unsigned long
     msg.concat("\"CurrentPowerConsumption\": %lu,");
@@ -3817,7 +3817,7 @@ bool CheckData()        //
     // sprintf(output, msgpub, currentTime,
 
     // sprintf(output, msgpub, millis(),                // prefer to use snprinf which offers protection
-    snprintf(output, sizeof(output), msgpub,
+    snprintf(outputData, sizeof(outputData), msgpub,
             millis(),
             CurrentPowerConsumption,
             powerConsumptionLowTariff, powerConsumptionHighTariff,
@@ -3827,20 +3827,20 @@ bool CheckData()        //
             OldPowerConsumptionLowTariff, OldPowerConsumptionHighTariff,
             OldPowerProductionLowTariff, OldPowerProductionHighTariff,
             OldGasConsumption);
-    publishMqtt(mqttLogTopic, output);
+    publishMqtt(mqttLogTopic, outputData);
   }
 
-  if (outputMqttPower)    // output currrent power only , flatnumber
+  if (outputMqttPower)    // output currrent power only , flatnumber for test
   {
     // char msgpub[MAXLINELENGTH];     // allocate a message buffer
-    char output[MAXLINELENGTH];     // use snprintf to format data
     // String msg = "";      // initialise data
     // msg.concat("CurrentPowerConsumption: %lu");       // format data
     // msg.toCharArray(msgpub, MAXLINELENGTH);   // move msg to msgpub  https://docs.arduino.cc/language-reference/en/variables/data-types/stringObject/Functions/toCharArray/
 
       // https://www.tutorialspoint.com/c_standard_library/c_function_sprintf.html  int sprintf(char *target, const char *sources_tr0, ...);
-    sprintf(output, "CurrentPowerConsumption: %lu", CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-    publishMqtt(mqttPower, output);                // publish output
+    char outputData1[32];     // use snprintf to format data
+    sprintf(outputData1, "CurrentPowerConsumption: %lu", CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    publishMqtt(mqttPower, outputData1);                // publish output
   }
 
   
@@ -3894,14 +3894,14 @@ bool CheckData()        //
   if (outputMqttPower)    // output currrent power only , flatnumber
   {
     // char msgpub[MAXLINELENGTH];     // allocate a message buffer
-    char output[MAXLINELENGTH];     // use snprintf to format data
+    char outputData[32];     // use snprintf to format data
     // String msg = "";      // initialise data
     // msg.concat("CurrentPowerConsumption: %lu");       // format data
     // msg.toCharArray(msgpub, MAXLINELENGTH);   // move msg to msgpub  https://docs.arduino.cc/language-reference/en/variables/data-types/stringObject/Functions/toCharArray/
 
       // https://www.tutorialspoint.com/c_standard_library/c_function_sprintf.html  int sprintf(char *target, const char *sources_tr0, ...);
-    sprintf(output, "CurrentPowerConsumption: %lu", CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-    publishMqtt(mqttPower, output);                // publish output
+    sprintf(outputData, "CurrentPowerConsumption: %lu", CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    publishMqtt(mqttPower, outputData);                // publish output
   }
   // Serial.println("Debug5, Checkdata..true");
   return true;
