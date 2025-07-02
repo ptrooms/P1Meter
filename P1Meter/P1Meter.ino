@@ -1,4 +1,4 @@
-// #define TEST_MODE    // set in PlatformIO; 
+#define TEST_MODE    // set in PlatformIO; v50
 #define DEBUG_ESP_OTA   // v49 wifi restart issues 
 // flaw1: will not process watercount during serial read.
 // issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
