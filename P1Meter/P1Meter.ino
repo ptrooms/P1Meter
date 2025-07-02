@@ -3030,6 +3030,9 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
     Send data to Mqtt topic
 */
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
+  if (outputOnSerial) {  // debug
+      Serial.print((String) "[" + mqttTopic + ":" + payLoad + ".");
+  }
   if (mqttTopic and payLoad) {    // check for not nullpointer
     char mqttOutput[MAXLINELENGTH];
     payLoad.toCharArray(mqttOutput, MAXLINELENGTH);
@@ -3041,6 +3044,10 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
       Serial.println("Error in publishMqtt, nullreference fault");
     }
   }
+  if (outputOnSerial) {  // debug
+      Serial.print("]");
+  }
+
 }
 
 // process Ledlightstatus indicating if Hotwater is tapped, return state
