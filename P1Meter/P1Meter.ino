@@ -1707,7 +1707,7 @@ void loop()
     //  if (millis() > 600000) {  // autonomous restart every 5 minutes
     intervalP1cnt--;            // decrease reliability
     if ( intervalP1cnt < 1) {   // if we multiple or frequent misses, restart esp266 to survive
-      if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, "ESP P1 rj11 not connected" );  // report we have survived this interval
+      if (outputMqttLog) publishMqtt(mqttLogTopic, (String) "ESP P1 rj11 not connected" );  // report we have survived this interval, v51 String'ed
       Serial.print("\n #!!# ESP P1 rj11 not connected, cnt="); // print message line
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
@@ -1724,13 +1724,11 @@ void loop()
       // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
       mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
-      mqttMsg.toCharArray(mqttOutput, 128);
+      // mqttMsg.toCharArray(mqttOutput, 128);
 
-      if (client.connected()) {
-        client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
-        if (outputMqttLog) client.publish(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
-      }
-
+      publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
+        if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
+      
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
       Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %06f.6f checking %d timecP:%d timec2:%d .\n\r",   
@@ -1767,7 +1765,7 @@ void loop()
     // If no MQTT poublished in this timout interval, whatever the reason, execute a restart to reset
     if (!mqttP1Published) {  // in case no publish energy yet , try restart
       Serial.println("ESP timeout.mqttP1Published.restart"); // print message line
-      if (client.connected()) client.publish(mqttLogTopic, "ESP timeout.restart" );
+      publishMqtt(mqttLogTopic, (String) "ESP timeout.restart" );
       ESP.restart();     // if no/yet data published force restart
     }
 
@@ -2461,12 +2459,15 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       outputOnSerial  = !outputOnSerial ; // re/enable print logging
       Serial.print("Serial Debug ");
       if (!outputOnSerial)  Serial.print("Inactive\n\r");
-      if (outputOnSerial) Serial.println("\nActive.");
-    } else  if ((char)payload[0] == 'L') {
-      outputMqttLog   = true ;         // Do log to mqtt 
-      if (outputOnSerial) {
-        Serial.print("outputMqttLog now ON.");
-      }
+      if (outputOnSerial)   Serial.println("\nActive.");
+    } else  if ((char)payload[0] == 'L') {       // v51 make it toggle
+      outputMqttLog   = !outputMqttLog ;         // switch
+      Serial.print(" MqttLogging ");
+      if (!outputMqttLog)  Serial.print("OFF\n\r ");
+      if (outputMqttLog)   Serial.println("\nON ");
+    } else  if ((char)payload[0] == 'l') {       // v51 force off
+      outputMqttLog   = false ;         // switch
+      Serial.print(" MqttLogging forced OFF\n\r ");
     } else  if ((char)payload[0] == 'e') {
         Serial.print("forcing infinite loop");
         while (true) {
@@ -2501,12 +2502,6 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
               Serial.print((String) "Exception activated" + e.what() );
           }
 */
-    } else  if ((char)payload[0] == 'l') {  // stop logging to mqtt
-      outputMqttLog   = false ;       // Do not publish Log
-      if (outputOnSerial) {
-        Serial.print("outputMqttLog now OFF");
-      }
-
     } else  if ((char)payload[0] == 'F') {
       rx2_function = !rx2_function ; // toggle on/off testing newFunction
       if (outputOnSerial) {
@@ -2662,24 +2657,56 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
 
-    } else  if ((char)payload[0] == 'h') {       // v48 check call function for centralied mqtt
+    } else  if ((char)payload[0] == 'h') {       // v51 check call functions of pointers and data
         // String mqttMsg = "test1234:a" ;  // start of Json error message        
         // const char* mqttMsg = nullptr; // to check for mullptr
-        publishMqtt(mqttErrorTopic, "constantdata 2665"); // v49 works
+        publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__); // v51 with (String) ok marking
+
+        char msgpub2[32];     // allocate a message buffer
+        char output2[32];     // use snprintf to format data
+        String msg2 = "";      // initialise data
+        msg2.concat("CurrentPowerConsumption: %lu");       // format data
+        msg2.toCharArray(msgpub2, 32);                     // move it to format buffwer
+        sprintf(output2, msgpub2, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+        client.publish(mqttPower, output2);                // publish output
+        publishMqtt(mqttErrorTopic, msg2);  
+        publishMqtt(mqttErrorTopic, output2);  
+
+      /*
+        String mqttMsg999 = "{";  // start of Json
+        mqttMsg999.concat("\"error\":999 ,\"msg\":\"Check mqttMsg999\"}");  // v51 ok
+        publishMqtt(mqttErrorTopic, mqttMsg999);
+       
+        publishMqtt(mqttErrorTopic, "constantdata" ); // v51 ok "constantdata", looks as a string
+        publishMqtt(mqttErrorTopic, "constantdata" + __LINE__); // v51 wrongly: "SID set:"
+        publishMqtt(mqttErrorTopic, "constantdata" + (String)__LINE__); // v51 tbd
+
+        publishMqtt(mqttErrorTopic, (String) "String1_" + __LINE__); // v51 with (String) ok
+        publishMqtt(mqttErrorTopic, "string2_" + __LINE__); // v51 wrongly "(null)"
         
-        String mqttMsg2 = "string2666" ; 
-        publishMqtt(mqttPower, mqttMsg2); // v49 works
+        String mqttMsg2 = "String3_" + (String) __LINE__ ; // v51 ok 
+        publishMqtt(mqttPower, mqttMsg2); // v51 ok
+        String mqttMsg3 = "string4_" + __LINE__ ;
+        publishMqtt(mqttPower, mqttMsg3); // v51 wrong --> "ntication Failed"
+        publishMqtt(mqttPower, (String) mqttMsg3); // wring --> "ntication Failed"
 
         char outputData1[32];     // use snprintf to format data
-        sprintf(outputData1, "CurrentPowerConsumption1: %lu", 123); // Note: if using multiple values use snprint
-        client.publish(mqttPower, outputData1);        // v50a works
+        sprintf(outputData1, "__LINE__=%lu", __LINE__); // Note: if using multiple values use snprint
+        client.publish(mqttPower, outputData1);        // v51 ok as outputData1 = String'ed
         
-        char outputData3[MAXLINELENGTH]={};     // use snprintf to format data
+        char outputData3[16]={}; // define array to veriy behavior, initialised to 0x00
         outputData3[0]= 'A';     // this convert A to a number
-        outputData3[MAXLINELENGTH-1]= 'Z';
-        outputData3[MAXLINELENGTH]= 0x00;
-        client.publish(mqttPower, outputData3);        // v50a works
-
+        outputData3[1]= 'B';     // this convert B to a number
+        outputData3[2]= 'C';     // this convert C to a number
+        outputData3[3]= 'D';     // this convert D to a number
+        if (outputData3[4] == 0x00) outputData3[3] = 'E';   // v51 check behavior of array [4]=0x00 (yes) ABCE
+        outputData3[14]= 'Z';    // this convert to a number
+        outputData3[15]= 0x00;   // this convert to a number
+        client.publish(mqttPower, outputData3);        // v51 works as array is terminated 0x00
+        outputData3[2]= 0x00;     // this convert C to a number
+        client.publish(mqttPower, outputData3);        // v51 array early terminated (yes) "AB"
+      */
+        publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__); // v51 with (String) ok marking
     } else  if ((char)payload[0] == '?') {       // v48 Print help 
           Serial.println((String)"\n\r? Help commands");
           Serial.println((String)"0 heating On");
@@ -3893,8 +3920,8 @@ bool CheckData()        //
 
   if (outputMqttPower)    // output currrent power only , flatnumber
   {
-    char msgpub[MAXLINELENGTH];     // allocate a message buffer
-    char output[MAXLINELENGTH];     // use snprintf to format data
+    char msgpub[32];     // allocate a message buffer
+    char output[32];     // use snprintf to format data
     String msg = "";      // initialise data
     msg.concat("CurrentPowerConsumption: %lu");       // format data
     msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
