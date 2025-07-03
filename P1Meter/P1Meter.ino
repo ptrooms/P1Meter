@@ -2,8 +2,16 @@
 #define DEBUG_ESP_OTA   // v49 wifi restart issues 
 // flaw1: will not process watercount during serial read.
 // issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
+// tbd: cleaout no longer needed code
 /*
-  V51 03jul25: skipped 50 trying to centralis p1mqtt which irratically corrupts things
+  V51 03jul25: skipped 50 trying to centralise p1mqtt which irratically corrupts things
+    added RX2 check availabiluy, we must have 1 read overy 7 mqttcnt record, else error:004 with successcount (bGot)
+    added verboseLevel (int  verboseLeve) do minimize data, default as it was, we van incease by command 'v'
+    made 'L' switch a toggle, 'l' will alsway go to off
+    using snprint(... with converting format to const* using formatdata.c_str())
+    assisted by deepseek  Serial.println(String("Value: " + analogRead(A0)).c_str());
+    hereafter removed/ commented out lots of no longer needed casting/toarry (amongst search key // rm)
+    skipped v50/v50a version as w.i.p.
   V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
     wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
     replaced faulty device that had a blown schottky power diode 
@@ -901,6 +909,7 @@ char telegram2[MAXLINELENGTH2+128+3+19]; // RX2 serial databuffer during outside
 bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
 long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records before loop
 long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
+long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
 const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak
 char telegram2Record[MAXLINELENGTH2]; // telegram extracted data maxsize for P1 RX2 
 const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak
@@ -3032,9 +3041,11 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
 
     if (Got_Telegram2Record_cnt > Got_Telegram2Record_prev) {
-        Got_Telegram2Record_prev = Got_Telegram2Record_cnt;    // count for this record
+        Got_Telegram2Record_prev = Got_Telegram2Record_cnt;   // count for this record
+        Got_Telegram2Record_last = mqttCnt;                 // administrate receive
     } else {
-        if ((mqttCnt % 10) == 6 ) {    // if time elapsed > 6*mqttCnt (=secs, signal a missing error
+        if (((mqttCnt - (Got_Telegram2Record_last)+1) % 7) == 1) {  // signal error at every 7th fault, +1 to prevent initial fault
+                                            // normally , every 7th interval we have a RX2 record., 
           if (outputOnSerial) {
              Serial.println((String)"#!!# ESP RX2 timeout Warmtelink=" + intervalP1cnt );
           }
