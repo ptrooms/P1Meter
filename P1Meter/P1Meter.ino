@@ -3060,15 +3060,6 @@ void publishP1ToMqtt()    // this will go to Mosquitto
         }
     }
 
-    /* check for RX2 data
-      current mqttCnt publishes
-      current RX count ok: Got_Telegram2Record_cnt 
-   
-    bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
-    long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records before loop
-    long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
-    */
-
     // digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off
     digitalWrite(BLUE_LED, thermostatReadState);   //Turn the ESPLED according to input thermostate
   }
