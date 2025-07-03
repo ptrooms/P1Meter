@@ -1612,7 +1612,7 @@ void loop()
         // if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." ); // v47 superfluous after preceding debug line
         // --> end of p1 read electricity
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
-        if (!outputOnSerial) Serial.printf("\t stopped: %6.6f (%4.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
+        if (!outputOnSerial) Serial.printf("\t stopped: %11.6f (%6.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
@@ -1755,8 +1755,8 @@ void loop()
       
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
-      Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %06f.6f checking %d timecP:%d timec2:%d .\n\r",   
-                          ((float) startMicros / 1000000), 
+      Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\n\r",   
+                          ((float)  micros() / 1000000), 
                           intervalP1cnt,
                           previousMillis,
                           currentMillis);
@@ -1905,12 +1905,12 @@ void readTelegram() {
   if (!mySerial.available()) return ;  // quick return if no data
 
   if (outputOnSerial)    {
-    if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + "s=s123..\b\b\b\b\b") ; // print message line
+    if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + " s=s123..\b\b\b\b\b") ; // print message line
     // if (  telegramP1header) Serial.print("\n\rxP= "); // print message line if message is broken in buffer
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n Cycle: %012.9f DataC%s%s: %u started at %06.6f \b\b\t", 
+  if (!outputOnSerial) Serial.printf("\r\n Cycle: %12.9f DataC%s%s: %5u started at %11.6f \b\b ", 
         ((float)ESP.getCycleCount()/80000000),
         (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
         (mqttCnt + 1), ((float) startMicros / 1000000));
@@ -3822,8 +3822,8 @@ long getValue(char *buffer, int maxlen)
 char TranslateForPrint(char c)
 {
   if (c == 10) c = '|' ;                 // translate NL to |
-  if (c == 13) c = '<' ;                 // translate NL to <
-  if (c == 00) c = '_' ;                 // translate NL to _
+  if (c == 13) c = '<' ;                 // translate CR to <
+  if (c == 00) c = '_' ;                 // translate NULL to _
   if (c < 32 || c > 127 ) c = '~' ;    // translate unprintable
   return c;
 }  
