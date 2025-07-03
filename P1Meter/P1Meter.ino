@@ -59,27 +59,28 @@
         RAM:   [=====     ]  53.7% (used 43988 bytes from 81920 bytes)
         Flash: [=         ]   7.2% (used 303636 bytes from 4194304 bytes)
         Compression reduced firmware size by 72% (was 307776 bytes, now 220591 bytes)
+  -------------------------------------------- comments to block v51
+  V44 enhanced comments alignment
+    array size for  rs232 increased to 1024 bytes.
+    display at command 'F' the toggle rx2_function (renamed from v38_function) statusfunction
+    reconnect(0 renamed to mqtt_reconnect()
+    add FindCharInArrayFwd to do forward search (corrected)
+    loop check yield1500 changed tigger from 1.030 second to 1.080 seconds
+  v43 removed 2 stability bytes, line 2215, readded+1 as this looks to be needed to improve 1/30 (more C then Z)
+    Compression reduced firmware size by 72% (was 305008 bytes, now 218719 bytes)
+    removal superfluous increased error rate from 1/12 to 1/7
+  v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to hget wifi stable see https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html
+  v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count
+  v40 improve WarmteLink detection, sometimes skipped....
+  v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
+  v38 rx2_function false LGTM stabilized by inter/procedure bytes
+  ------------------------------------------------------------------------------------------------------------------
+  require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
+          -- Arduino BoardsManager --> esp8266 --> ensure it has 2.4.1
+    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
+      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
+      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
 */
-// V44 enhanced comments alignment
-//  array size for  rs232 increased to 1024 bytes.
-//  display at command 'F' the toggle rx2_function (renamed from v38_function) statusfunction
-//  reconnect(0 renamed to mqtt_reconnect()
-//  add FindCharInArrayFwd to do forward search (corrected)
-//  loop check yield1500 changed tigger from 1.030 second to 1.080 seconds
-// v43 removed 2 stability bytes, line 2215, readded+1 as this looks to be needed to improve 1/30 (more C then Z)
-//     Compression reduced firmware size by 72% (was 305008 bytes, now 218719 bytes)
-//     removal superfluous increased error rate from 1/12 to 1/7
-// v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to hget wifi stable see https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html
-// v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count
-// v40 improve WarmteLink detection, sometimes skipped....
-// v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
-// v38 rx2_function false LGTM stabilized by inter/procedure bytes
-// ------------------------------------------------------------------------------------------------------------------
-// require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
-//          -- Arduino BoardsManager --> esp8266 --> ensure it has 2.4.1
-//    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
-//      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
-//      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
 
 /* Log errors v49 to topic /error/x1
   001 = RJ11 to P1 is not connected
