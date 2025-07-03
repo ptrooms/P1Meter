@@ -1715,7 +1715,7 @@ void loop()
 
       // report to error mqtt, // V20 candidate for a callable error routine
       // tbd: consider to NOT send values
-      char mqttOutput[128];
+      // char mqttOutput[128]; // v51 not used as we do 
       String mqttMsg = "{";  // start of Json
       mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 rj11 serial not connected\""); 
       // String mqttMsg = "Error, "; // build mqtt frame 
@@ -1889,7 +1889,7 @@ void readTelegram() {
 
   // Cycle: 04.781228065
 
-  if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, mqttClientName );
+  if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );
 
   int lenTelegram = 0;
   memset(telegram, 0, sizeof(telegram));   // initialitelegram buffer-array to 0
@@ -2660,19 +2660,89 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'h') {       // v51 check call functions of pointers and data
         // String mqttMsg = "test1234:a" ;  // start of Json error message        
         // const char* mqttMsg = nullptr; // to check for mullptr
-        publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__); // v51 with (String) ok marking
+        publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__ 
+            + ", c++ version="  + __cplusplus); // v51 with (String) ok marking version=201103 (C++11)
 
+        String arduinoString = "Temperature: %.1f°C";
+        char buffer[50];
+        float temp = 23.5f;
+        // Simple conversion - preferred method
+        snprintf(buffer, sizeof(buffer), arduinoString.c_str(), temp);
+        publishMqtt(mqttErrorTopic, buffer);      // v51:   CurrentPowerConsumption: %lu
+
+        char output5[128];     // use snprintf to format data
+        String msg5 = "{\"currentTime\":\"%d\", \"CurrentPowerConsumption\":%lu }";   // warning %s iso %d will crash
+        snprintf(output5, sizeof(output5), msg5.c_str(), millis(), CurrentPowerConsumption);
+        publishMqtt(mqttErrorTopic, output5);      // v51:   CurrentPowerConsumption: %lu
+
+      // v51 test this snprint construction , crashes
+        char output4[] = "secs:123456 51:51:51";     // use snprintf to format data
+        unsigned long allSeconds = currentMillis / 1000;  // take time of mailoop
+          int runHours = (allSeconds / 3600) % 24;
+          int secsRemaining = allSeconds % 3600;
+          int runMinutes = secsRemaining / 60;
+          int runSeconds = secsRemaining % 60;
+        snprintf(output4, sizeof(output4), "secs:%06d %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
+        publishMqtt(mqttErrorTopic, output4);      // v51:   CurrentPowerConsumption: %lu
+
+        char msgpub3[128];     // allocate a message buffer
+        char output3[128];     // use snprintf to format data
+        // std::string msg3 -->  std::string' has no member named 'concat' and so on
+        // class String {  --- The string class in /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/WString.h
+        //      --> https://cplusplus.com/reference/string/wstring/
+
+        
+        String msg3 = "{"; // build mqtt frame 
+        msg3.concat("\"currentTime\":\"%d\"");                  // %s is string whc will crash
+        msg3.concat(",\"CurrentPowerConsumption\":%lu }");    // P1
+        msg3.toCharArray(msgpub3, 64);   
+        msg3.toCharArray(msgpub3, sizeof(msgpub3)); // v51 convert/move/vast to char[]
+        publishMqtt(mqttErrorTopic, msg3);       // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+        publishMqtt(mqttErrorTopic, msgpub3);    // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+
+      // const char* dst = src.c_str(); // returns const char* to an ASCIIZ (NUL-terminated) representation of the value   
+      // const char* dst = src.data();  // returns const char* to the string's internal buffer
+      //   const char* output3_data = msg3.data();  // C native returns const char* to the string's internal buffer
+      //   const char* output3_str  = msg3.str();  // C native returns const char* to the string's internal buffer
+      // snprintf(output3, sizeof(output3), msgpub3, millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
+        snprintf(output3, sizeof(output3), "Millis=%d Power=%d", millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
+        publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
+
+        // snprint: Write formatted output to sized buffer https://cplusplus.com/reference/cstdio/snprintf/
+        // snprintf(output3, sizeof(output3), msgpub3,millis(), CurrentPowerConsumption);  // v51 Aduino crashes
+
+        // snprintf(output3, sizeof(output3), msg3.c_str(), millis(), CurrentPowerConsumption);  // v51 Aduino crashes
+        // publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436        
+        
+        // Serial.println((String)"\n\rv51 snprint" + output3 + "n\r");
+        // publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
+
+      /*
+      // v51 test this snprint construction , crashes
+        char msgpub3[64];     // allocate a message buffer
+        char output3[64];     // use snprintf to format data
+        String msg3 = "{"; // build mqtt frame 
+        msg3.concat("\"currentTime\":\"%s\"");                  // %s is string
+        msg3.concat(",\"CurrentPowerConsumption\":%lu");    // P1
+        msg3.toCharArray(msgpub3, 64);   
+        snprintf(output3, sizeof(output3), msgpub3,         // snprint clearly causes crash !!!!
+                millis(),
+                CurrentPowerConsumption);     
+        publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
+      
+
+      // v51 test thiss construction
         char msgpub2[32];     // allocate a message buffer
         char output2[32];     // use snprintf to format data
         String msg2 = "";      // initialise data
         msg2.concat("CurrentPowerConsumption: %lu");       // format data
         msg2.toCharArray(msgpub2, 32);                     // move it to format buffwer
         sprintf(output2, msgpub2, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-        client.publish(mqttPower, output2);                // publish output
-        publishMqtt(mqttErrorTopic, msg2);  
-        publishMqtt(mqttErrorTopic, output2);  
-
-      /*
+        client.publish(mqttPower, output2);     // v51:   CurrentPowerConsumption: 436
+        publishMqtt(mqttErrorTopic, msg2);      // v51:   CurrentPowerConsumption: %lu
+        publishMqtt(mqttErrorTopic, output2);   // v51:   CurrentPowerConsumption: 436
+      
+      // test these approaches
         String mqttMsg999 = "{";  // start of Json
         mqttMsg999.concat("\"error\":999 ,\"msg\":\"Check mqttMsg999\"}");  // v51 ok
         publishMqtt(mqttErrorTopic, mqttMsg999);
@@ -2774,7 +2844,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
 
   // Buffers
-    char msgpub[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360  04apr21 to #define 480
+    // char msgpub[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360  04apr21 to #define 480
     char output[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480
 
     String msg = "{"; // build mqtt frame 
@@ -2889,14 +2959,13 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     }
 
     msg.concat(", \"Version\":%u");                    // version to determine message layout
-
     msg.concat(" }"); // terminate JSON
     
-    msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
-
 // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
+//  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
 //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
-    snprintf(output, sizeof(output), msgpub ,
+    // snprintf(output, sizeof(output), msgpub ,
+    snprintf(output, sizeof(output), msg.c_str(),
             // currentTime,                // metertime difference 52 seconds can also use millis()
             currentTimeS,               // meter time in string format from timedate record
             // millis(),
@@ -2936,7 +3005,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             prog_Version );             // (fixed) Version from program , see top
 
     if (client.connected()) {
-      if (outputMqttPower) client.publish(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
+      if (outputMqttPower) publishMqtt(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
       mqttP1Published = true;             // yes we have publised energy data
     }
 
@@ -3056,11 +3125,12 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
     String mqttMsg = "{\"error\":003 ,\"msg\":\"ADC Lightsensor value ";  // start of Json error message
     mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt\":"+ (mqttCnt+1) +"\"}");      // finish JSON error message
     
-    char mqttOutput[128];
-    mqttMsg.toCharArray(mqttOutput, 128);
-    if (client.connected()) {
-      client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
-    }
+    // char mqttOutput[128];
+    // mqttMsg.toCharArray(mqttOutput, 128);
+    // if (client.connected()) {
+      // publishMqtt(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
+      publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
+    // }
   }
   return filteredValueAdc;
 }
@@ -3071,7 +3141,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 */
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
   if (outputOnSerial) {  // debug
-      Serial.print((String) "[" + mqttTopic + ":" + payLoad + ".");
+      Serial.print((String) "\n\r[" + mqttTopic + ":" + payLoad + ".");
   }
   if (mqttTopic and payLoad) {    // check for not nullpointer
     char mqttOutput[MAXLINELENGTH];
@@ -3085,7 +3155,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     }
   }
   if (outputOnSerial) {  // debug
-      Serial.print("]");
+      Serial.print("]\n\r");
   }
 
 }
@@ -3351,7 +3421,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     } // else if endChar >= 0 && telegramP1header
   } // startChar >= 0
 
-  if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
+  // if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
+  if (outputMqttLog) publishMqtt(mqttLogTopic, telegram );   // debug to mqtt log ?
   // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
 
   /*
@@ -3836,7 +3907,7 @@ bool CheckData()        //
   }
 
   if (outputMqttLog) {  // if we LOG status old values not yet set
-    char msgpub[MAXLINELENGTH];
+    // char msgpub[MAXLINELENGTH];
     char output[MAXLINELENGTH];
     String msg = "{ checkdata, ";
     msg.concat("\"currentTime\": %lu,");              // %lu is unsigned long
@@ -3853,11 +3924,10 @@ bool CheckData()        //
     msg.concat("\"OldPowerProductionHighTariff\": %lu,");
     msg.concat("\"OldGasConsumption\": %lu");
     msg.concat("}");
-    msg.toCharArray(msgpub, MAXLINELENGTH);
-    // sprintf(output, msgpub, currentTime,
-
-    // sprintf(output, msgpub, millis(),                // prefer to use snprinf which offers protection
-    snprintf(output, sizeof(output), msgpub,
+    
+    // msg.toCharArray(msgpub, MAXLINELENGTH);
+    // snprintf(output, sizeof(output), msgpub,
+    snprintf(output, sizeof(output), msg.c_str(),
             millis(),
             CurrentPowerConsumption,
             powerConsumptionLowTariff, powerConsumptionHighTariff,
@@ -3867,7 +3937,9 @@ bool CheckData()        //
             OldPowerConsumptionLowTariff, OldPowerConsumptionHighTariff,
             OldPowerProductionLowTariff, OldPowerProductionHighTariff,
             OldGasConsumption);
-    if (client.connected()) client.publish(mqttLogTopic, output);
+    // if (client.connected()) client.publish(mqttLogTopic, output);
+    publishMqtt(mqttLogTopic, output);
+    
   }
 
   
@@ -3920,13 +3992,15 @@ bool CheckData()        //
 
   if (outputMqttPower)    // output currrent power only , flatnumber
   {
-    char msgpub[32];     // allocate a message buffer
     char output[32];     // use snprintf to format data
     String msg = "";      // initialise data
     msg.concat("CurrentPowerConsumption: %lu");       // format data
-    msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
-    sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-    if (client.connected()) client.publish(mqttPower, output);                // publish output
+    // rm char msgpub[32];     // allocate a message buffer    
+    // rm msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
+    // rm sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    sprintf(output, msg.c_str(), CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    // rm if (client.connected()) client.publish(mqttPower, output);  
+    publishMqtt(mqttPower, output);  // publish outputpower
   }
   // Serial.println("Debug5, Checkdata..true");
   return true;
@@ -4074,10 +4148,11 @@ void processTemperatures() {
   mqttMsg.concat("\"}");      // finish JSON error message
 
   if (!bTemp_Reading_State) { //  report failure on mqtt
-      char mqttOutput[128];
-      mqttMsg.toCharArray(mqttOutput, 128);
+      // char mqttOutput[128];
+      // mqttMsg.toCharArray(mqttOutput, 128);
       if (client.connected()) {
-        client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
+        // client.publish(mqttErrorTopic, mqttOutput); // report to /error/P1 topic
+        publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
       }
   }
 
