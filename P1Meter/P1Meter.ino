@@ -685,7 +685,7 @@ const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+
 // add const if this should never change
 int intervalP1    = 12000;    // mSecs : P1 30 --> 12 seconds response time interval of meter is 10 seconds
 int intervalP1cnt =  360;     // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
-int readTelegram2cnt = 6;     // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
+int loopTelegram2cnt = 6;     // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
 bool forceCheckData = false;  // force check on data in order to output some essential mqtt (Thermostat & Temprature) functions.
 bool firstRun = true;         // do not use forceCheckData (which might be activated during setup-() or first loop-() )
 
@@ -712,9 +712,17 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 // -------------------------------------------------------------------------------------------------- DEBUG output
 #ifdef TEST_MODE
 bool outputOnSerial  = true;    // "D" debug default output in Testmode
+int  verboseLevel    = 5;       // Verbose 5 + publishMtt
+                                // Verbose 4 + details P1
+                                // Verbose 3 + RX2
+                                // Verbose 2 + GPIO
+                                // Verbose 1 basic
 #else
 bool outputOnSerial  = false;   // "D" No debug default output in production
+int  verboseLevel    = 5;       // Verbose level, all messages
 #endif
+
+
 // bool outputOnSerial  = true;    // "D" debug default output in Testmode
 // ---------------------------------------------------------------------------------------------------
 
@@ -726,7 +734,7 @@ bool outputMqttPower  = true;    // "P" ptro true  -> false , output to /energy/
 bool rx2_function     = true;    // "F" ptro true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
 
 // Vars to store meter readings & statistics
-bool mqttP1Published = false;        //flag to cgheck if we have published
+bool mqttP1Published = false;        //flag to check if we have published
 long mqttCnt = 0;                    // updated with each publish as of 19nov19
 bool validTelegramCRCFound  = false;     // Set by DdecodeTelegram if Message CRC = valid and send with Mqtt
 bool validTelegram2CRCFound = false;    // v46 Set by readTelegram2 to check validity of RX2 record
@@ -891,6 +899,8 @@ char telegram2[MAXLINELENGTH2+128+3+19]; // RX2 serial databuffer during outside
 // char telegramLast2[3];             // overflow used to catch line termination bracket
 // char telegramLast2o[19];           // overflow-area to prevent memory leak
 bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
+long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records before loop
+long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
 const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak
 char telegram2Record[MAXLINELENGTH2]; // telegram extracted data maxsize for P1 RX2 
 const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak
@@ -1593,7 +1603,7 @@ void loop()
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
         mySerial.flush();  // Clear P1 buffer
-        readTelegram2cnt = 0;  // allow readtelegram2
+        loopTelegram2cnt = 0;  // allow readtelegram2  for a maximum of "6 loops" of actual receives
 
         // Only activate myserial2  atdesignated times
         // int checkIntervalRx2 = mqttCnt % 7;
@@ -1684,7 +1694,7 @@ void loop()
     // old dlocation of  cechking for incoming mqtt  commands
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
-    if (readTelegram2cnt < 6) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
+    if (loopTelegram2cnt < 6) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if-else allow other activities
   //  ------------------------------------------------------------------------------------------------------------------------- END of allowOtherActivities
 
@@ -1759,11 +1769,11 @@ void loop()
       publishP1ToMqtt();        // PUBLISH this mqtt
       forceCheckData = false; // enforce  mode inactive
 
-      mqttP1Published = true;
+      mqttP1Published = true;   // assume publish to prevent conditional restart if things are running here
     } // else millis exceeded intervalP1 hile enforce mqtt for tempsensors
 
     // If no MQTT poublished in this timout interval, whatever the reason, execute a restart to reset
-    if (!mqttP1Published) {  // in case no publish energy yet , try restart
+    if (!mqttP1Published) {  // in case no publish energy yet (client not connected) , try restart
       Serial.println("ESP timeout.mqttP1Published.restart"); // print message line
       publishMqtt(mqttLogTopic, (String) "ESP timeout.restart" );
       ESP.restart();     // if no/yet data published force restart
@@ -1811,7 +1821,11 @@ void mqtt_reconnect() {                 // mqtt read usage doc https://pubsubcli
         }
         doCritical();  // do critical process to maintain basic Thermostat & OTA functions
       }
-      if (mqttConnectDelay <= 27000) {      // v45 check if we are below backup time (2+5+8+11+14+17+20+23+26+29=155sec)
+#ifdef TEST_MODE            
+      if (mqttConnectDelay < 11000) {      // v45 check if we are below backup time (2+5+8=15sec)  testmode
+#else
+      if (mqttConnectDelay <=27000) {      // v45 check if we are below backup time (2+5+8+11+14+17+20+23+26+29=155sec) production
+#endif      
         mqttConnectDelay = mqttConnectDelay + 3000; // increase retry
         Serial.print((String) "... try again in " + (mqttConnectDelay / 1000) + " seconds...\r\n");
       } else {
@@ -1924,7 +1938,7 @@ void readTelegram() {
     // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
     // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
     
-    if (outputOnSerial) {         // do we want/need to print the Telegram for Debug
+    if (outputOnSerial && verboseLevel > 3) {     // do we want/need to print the Telegram for Debug
       Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
       for (int cnt = 0; cnt < len; cnt++) {
           
@@ -2064,10 +2078,9 @@ void readTelegram2() {
 
   // 30mar21: no data available .....
   if (mySerial2.available())   {
-    if (outputOnSerial)    {
+    if (outputOnSerial && verboseLevel > 2)    {
       Serial.print("\n\r Rx2N= "); // print message line
     }
-
     memset(telegram2, 0,       sizeof(telegram2));        // initialise telegram array to 0
     // memset(telegramLast2, 0,   sizeof(telegramLast2));    // initialise array to 0
     // memset(telegram2Record, 0, sizeof(telegram2Record));  // initialise telegram array to 0
@@ -2077,7 +2090,7 @@ void readTelegram2() {
     int telegram2_End   = -1;
     int telegram2_Pos   = 0;
 
-    while (mySerial2.available() && readTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
+    while (mySerial2.available() && loopTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
        
       // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
@@ -2139,9 +2152,10 @@ void readTelegram2() {
               if (telegram2_Pos > 4) {      // check for length start2finish before Checksum
                 if (telegram2Record[0] == '/' && telegram2Record[telegram2_Pos - 5] == '!')  {
                   bGot_Telegram2Record = true;
+                  Got_Telegram2Record_cnt++;      // v51 count for this receive
                   mySerial2.end();          // v38 Stop- if any - GJ communication
                   mySerial2.flush();        // v38 Clear GJ buffer
-                  if (outputOnSerial) {
+                  if (outputOnSerial && verboseLevel > 2) {
                       // debug print positions
                       Serial.print("\nns1=")          ; // debug v38 print processing
                       Serial.print(telegram2_Start)   ; // debug v38 print processing serial /start
@@ -2160,7 +2174,7 @@ void readTelegram2() {
         } // end for loop scanning serialbuffer
 
         // if (outputOnSerial && !bGot_Telegram2Record) {    // v38 debug print if we catched a record
-        if (outputOnSerial) {
+        if (outputOnSerial && verboseLevel > 2) {
           Serial.print("\n.s2>[");   // debug print processing serial data
           Serial.print(len);         // debug print processing serial data
           Serial.print("]");         // debug print processing serial data
@@ -2231,7 +2245,7 @@ void readTelegram2() {
           // const char * strstr ( const char * str1, const char * str2 );      char * strstr (       char * str1, const char * str2 ); 
           // Locate substring Returns a pointer to the first occurrence of str2 in str1, or a null pointer if str2 is not part of str1.
           if (outputOnSerial) {
-            Serial.print("\nWL>");       // v38 debug print processing serial data
+            Serial.print("\n\rWL>");       // v38 debug print processing serial data
             Serial.print(telegram2_End); 
             Serial.print("-");            // print minus
             Serial.print(telegram2_Start); 
@@ -2245,7 +2259,7 @@ void readTelegram2() {
             Serial.print(endChar);        // debug print processing position of !  end
             Serial.print(",v=");          // debug print processing 
             Serial.print(valChar);        // debug print processing position of * value
-            Serial.print("]");            // debug print processing
+            Serial.print("]\t");            // debug print processing
             Serial.println(telegram2Record); // debug print processing
             Serial.print("");             // debug print processing serial data
           }
@@ -2257,7 +2271,10 @@ void readTelegram2() {
           
           // info: strstr() = Locate substring ==> Returns a pointer to the first occurrence of str2 in str1
           if ( strstr(telegram2Record,"0-1:24.2.1(") && endChar > 0 && valChar > 0) { // if string found, total HeatFlow
-              if (outputOnSerial) Serial.print(telegram2Record+(valChar - 9) ); //  print value unconditionally string
+              if (outputOnSerial) {
+                Serial.print((String) "\twl-scan:");     //  ident
+                Serial.print(telegram2Record+(valChar - 9)); //  print 9 bytes before
+              }
               // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) {
               // total HeatFlow
               // HeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), (endChar - 40) );   // -37:xxx.xxx*m3, -38:xx.xxx GJ
@@ -2297,13 +2314,13 @@ void readTelegram2() {
         ESP.wdtFeed(); // feed the hungry timer
 
       } // if (len > 0)  {   // do we have bytes in buffer
-      readTelegram2cnt++;   /// account this readloop
+      loopTelegram2cnt++;   /// account this readloop to prevent overrunning on RX2
     } // while data
 
     if (outputOnSerial) {
-      Serial.print(" [l2_total=");         // debug print transaction length
-      Serial.print(lenTelegram2);
-      Serial.print("].");
+      Serial.print((String) " [lenTelegram2="    + lenTelegram2 );  // debug print transaction length
+      Serial.print((String) ", loopTelegram2cnt="+ loopTelegram2cnt + "].");
+      Serial.print((String) ", Got_Telegram2Record_cnt="+ Got_Telegram2Record_cnt + "].");
       Serial.println("");
     }
   }  // if mySerial2.available 
@@ -2468,6 +2485,10 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'l') {       // v51 force off
       outputMqttLog   = false ;         // switch
       Serial.print(" MqttLogging forced OFF\n\r ");
+    } else  if ((char)payload[0] == 'v') {                                            // Restart
+      verboseLevel++ ;
+      if (verboseLevel > 5) verboseLevel = 0;
+      if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
     } else  if ((char)payload[0] == 'e') {
         Serial.print("forcing infinite loop");
         while (true) {
@@ -3009,6 +3030,30 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       mqttP1Published = true;             // yes we have publised energy data
     }
 
+
+    if (Got_Telegram2Record_cnt > Got_Telegram2Record_prev) {
+        Got_Telegram2Record_prev = Got_Telegram2Record_cnt;    // count for this record
+    } else {
+        if ((mqttCnt % 10) == 6 ) {    // if time elapsed > 6*mqttCnt (=secs, signal a missing error
+          if (outputOnSerial) {
+             Serial.println((String)"#!!# ESP RX2 timeout Warmtelink=" + intervalP1cnt );
+          }
+          String mqttMsg = "{\"error\":004 ,\"msg\":\"RX2fail";  // start of Json error message
+          mqttMsg.concat((String) " " +  + "\", \"RX2Cnt\":"+ (Got_Telegram2Record_cnt) +"\"");      // finish JSON error message
+          mqttMsg.concat((String) " " +  + "\", \"mqttCnt\":"+ (mqttCnt) +"\"}");      // finish JSON error message
+          publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
+        }
+    }
+
+    /* check for RX2 data
+      current mqttCnt publishes
+      current RX count ok: Got_Telegram2Record_cnt 
+   
+    bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
+    long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records before loop
+    long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
+    */
+
     // digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off
     digitalWrite(BLUE_LED, thermostatReadState);   //Turn the ESPLED according to input thermostate
   }
@@ -3141,7 +3186,11 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 */
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
   if (outputOnSerial) {  // debug
+    if (verboseLevel > 4) {
       Serial.print((String) "\n\r[" + mqttTopic + ":" + payLoad + ".");
+    } else {
+      Serial.print("{");        // print mqtt start operation
+    }
   }
   if (mqttTopic and payLoad) {    // check for not nullpointer
     char mqttOutput[MAXLINELENGTH];
@@ -3151,11 +3200,17 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     }
   } else {
     if (outputOnSerial) {  // debug
-      Serial.println("Error in publishMqtt, nullreference fault");
+      Serial.println("_Error in publishMqtt, nullreference fault_");  // display error on debug
+    } else {
+      Serial.print("{E}");    // display error sign
     }
   }
   if (outputOnSerial) {  // debug
+    if (verboseLevel > 4) {
       Serial.print("]\n\r");
+    } else {
+      Serial.print("}");      // print mqtt finish oeration
+    }
   }
 
 }
