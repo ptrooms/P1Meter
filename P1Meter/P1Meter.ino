@@ -3,6 +3,7 @@
 // flaw1: will not process watercount during serial read.
 // issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
 /*
+  V51 03jul25: skipped 50 trying to centralis p1mqtt which irratically corrupts things
   V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
     wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
     replaced faulty device that had a blown schottky power diode 
@@ -103,13 +104,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1149.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1151.241 // current version (displayed in mqtt record)
       // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2149.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 251.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -2660,6 +2661,25 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+
+    } else  if ((char)payload[0] == 'h') {       // v48 check call function for centralied mqtt
+        // String mqttMsg = "test1234:a" ;  // start of Json error message        
+        // const char* mqttMsg = nullptr; // to check for mullptr
+        publishMqtt(mqttErrorTopic, "constantdata 2665"); // v49 works
+        
+        String mqttMsg2 = "string2666" ; 
+        publishMqtt(mqttPower, mqttMsg2); // v49 works
+
+        char outputData1[32];     // use snprintf to format data
+        sprintf(outputData1, "CurrentPowerConsumption1: %lu", 123); // Note: if using multiple values use snprint
+        client.publish(mqttPower, outputData1);        // v50a works
+        
+        char outputData3[MAXLINELENGTH]={};     // use snprintf to format data
+        outputData3[0]= 'A';     // this convert A to a number
+        outputData3[MAXLINELENGTH-1]= 'Z';
+        outputData3[MAXLINELENGTH]= 0x00;
+        client.publish(mqttPower, outputData3);        // v50a works
+
     } else  if ((char)payload[0] == '?') {       // v48 Print help 
           Serial.println((String)"\n\r? Help commands");
           Serial.println((String)"0 heating On");
@@ -3016,6 +3036,31 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
     }
   }
   return filteredValueAdc;
+}
+
+
+/* 
+    Send data to Mqtt topic v51
+*/
+void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
+  if (outputOnSerial) {  // debug
+      Serial.print((String) "[" + mqttTopic + ":" + payLoad + ".");
+  }
+  if (mqttTopic and payLoad) {    // check for not nullpointer
+    char mqttOutput[MAXLINELENGTH];
+    payLoad.toCharArray(mqttOutput, MAXLINELENGTH);
+    if (client.connected()) {
+      client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
+    }
+  } else {
+    if (outputOnSerial) {  // debug
+      Serial.println("Error in publishMqtt, nullreference fault");
+    }
+  }
+  if (outputOnSerial) {  // debug
+      Serial.print("]");
+  }
+
 }
 
 // process Ledlightstatus indicating if Hotwater is tapped, return state
@@ -3766,7 +3811,7 @@ bool CheckData()        //
   if (outputMqttLog) {  // if we LOG status old values not yet set
     char msgpub[MAXLINELENGTH];
     char output[MAXLINELENGTH];
-    String msg = "{";
+    String msg = "{ checkdata, ";
     msg.concat("\"currentTime\": %lu,");              // %lu is unsigned long
     msg.concat("\"CurrentPowerConsumption\": %lu,");
     msg.concat("\"powerConsumptionLowTariff\": %lu,");
