@@ -718,16 +718,20 @@ long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active w
 
 int  telegramError    = false;   // indicate the P1 Telegram contains non-printable data ((e=...)
 // -------------------------------------------------------------------------------------------------- DEBUG output
+
+#define VERBOSE_MAX  5    // maximum after we cylced to 0
+#define VERBOSE_MQTT 5    // print all below and MQTT
+#define VERBOSE_P1   4    // print all below and P1
+#define VERBOSE_RX2  3    // print all below and RX2 Warmtelink
+#define VERBOSE_GPIO 2    // print all below and GPIO with interrupts
+#define VERBOSE_ON   1    // tbd
+#define VERBOSE_OFF  0    // tbd
 #ifdef TEST_MODE
-bool outputOnSerial  = true;    // "D" debug default output in Testmode
-int  verboseLevel    = 5;       // Verbose 5 + publishMtt
-                                // Verbose 4 + details P1
-                                // Verbose 3 + RX2
-                                // Verbose 2 + GPIO
-                                // Verbose 1 basic
+  bool outputOnSerial  = true;    // "D" debug default output in Testmode
+  int  verboseLevel    = VERBOSE_MQTT;
 #else
-bool outputOnSerial  = false;   // "D" No debug default output in production
-int  verboseLevel    = 5;       // Verbose level, all messages
+  bool outputOnSerial  = false;   // "D" No debug default output in production
+  int  verboseLevel    = VERBOSE_P1;       // Verbose level, all messages
 #endif
 
 
@@ -1947,7 +1951,7 @@ void readTelegram() {
     // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
     // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
     
-    if (outputOnSerial && verboseLevel > 3) {     // do we want/need to print the Telegram for Debug
+    if (outputOnSerial && verboseLevel >= VERBOSE_P1) {     // do we want/need to print the Telegram for Debug
       Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
       for (int cnt = 0; cnt < len; cnt++) {
           
@@ -2087,7 +2091,7 @@ void readTelegram2() {
 
   // 30mar21: no data available .....
   if (mySerial2.available())   {
-    if (outputOnSerial && verboseLevel > 2)    {
+    if (outputOnSerial && verboseLevel >= VERBOSE_RX2)    {
       Serial.print("\n\r Rx2N= "); // print message line
     }
     memset(telegram2, 0,       sizeof(telegram2));        // initialise telegram array to 0
@@ -2164,7 +2168,7 @@ void readTelegram2() {
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
                   mySerial2.end();          // v38 Stop- if any - GJ communication
                   mySerial2.flush();        // v38 Clear GJ buffer
-                  if (outputOnSerial && verboseLevel > 2) {
+                  if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
                       // debug print positions
                       Serial.print("\nns1=")          ; // debug v38 print processing
                       Serial.print(telegram2_Start)   ; // debug v38 print processing serial /start
@@ -2183,7 +2187,7 @@ void readTelegram2() {
         } // end for loop scanning serialbuffer
 
         // if (outputOnSerial && !bGot_Telegram2Record) {    // v38 debug print if we catched a record
-        if (outputOnSerial && verboseLevel > 2) {
+        if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
           Serial.print("\n.s2>[");   // debug print processing serial data
           Serial.print(len);         // debug print processing serial data
           Serial.print("]");         // debug print processing serial data
@@ -2253,7 +2257,7 @@ void readTelegram2() {
           //    ....+....1....+....2....+....3....+..
           // const char * strstr ( const char * str1, const char * str2 );      char * strstr (       char * str1, const char * str2 ); 
           // Locate substring Returns a pointer to the first occurrence of str2 in str1, or a null pointer if str2 is not part of str1.
-          if (outputOnSerial) {
+          if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
             Serial.print("\n\rWL>");       // v38 debug print processing serial data
             Serial.print(telegram2_End); 
             Serial.print("-");            // print minus
@@ -2278,9 +2282,9 @@ void readTelegram2() {
           // HeatConsumption = 0;     // initialise v46
           // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) { // total HeatFlow
           
-          // info: strstr() = Locate substring ==> Returns a pointer to the first occurrence of str2 in str1
+          // info: strstr() = Locate substring => Returns a pointer to the first occurrence of str2 in str1
           if ( strstr(telegram2Record,"0-1:24.2.1(") && endChar > 0 && valChar > 0) { // if string found, total HeatFlow
-              if (outputOnSerial) {
+              if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
                 Serial.print((String) "\twl-scan:");     //  ident
                 Serial.print(telegram2Record+(valChar - 9)); //  print 9 bytes before
               }
@@ -2327,8 +2331,8 @@ void readTelegram2() {
     } // while data
 
     if (outputOnSerial) {
-      Serial.print((String) " [lenTelegram2="    + lenTelegram2 );  // debug print transaction length
-      Serial.print((String) ", loopTelegram2cnt="+ loopTelegram2cnt + "].");
+      Serial.print((String) " [lenTelegram2="     + lenTelegram2 );  // debug print transaction length
+      Serial.print((String) ", loopTelegram2cnt=" + loopTelegram2cnt );
       Serial.print((String) ", Got_Telegram2Record_cnt="+ Got_Telegram2Record_cnt + "].");
       Serial.println("");
     }
@@ -2496,7 +2500,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       Serial.print(" MqttLogging forced OFF\n\r ");
     } else  if ((char)payload[0] == 'v') {                                            // Restart
       verboseLevel++ ;
-      if (verboseLevel > 5) verboseLevel = 0;
+      if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
       if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
     } else  if ((char)payload[0] == 'e') {
         Serial.print("forcing infinite loop");
@@ -3050,8 +3054,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
              Serial.println((String)"#!!# ESP RX2 timeout Warmtelink=" + intervalP1cnt );
           }
           String mqttMsg = "{\"error\":004 ,\"msg\":\"RX2fail";  // start of Json error message
-          mqttMsg.concat((String) " " +  + "\", \"RX2Cnt\":"+ (Got_Telegram2Record_cnt) +"\"");      // finish JSON error message
-          mqttMsg.concat((String) " " +  + "\", \"mqttCnt\":"+ (mqttCnt) +"\"}");      // finish JSON error message
+          mqttMsg.concat((String) " " +  + "\", \"RX2Cnt\":"+ (Got_Telegram2Record_cnt) );      // finish JSON error message
+          mqttMsg.concat((String) " " +  + "\", \"mqttCnt\":"+ (mqttCnt) +"}");      // finish JSON error message
           publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
         }
     }
@@ -3179,7 +3183,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 
   if (nowValueAdc <= REQUIRED_ANALOG_ADC) {     // v49 check if we a Light sensor value reading
     String mqttMsg = "{\"error\":003 ,\"msg\":\"ADC Lightsensor value ";  // start of Json error message
-    mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt\":"+ (mqttCnt+1) +"\"}");      // finish JSON error message
+    mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt\":"+ (mqttCnt+1) +"}");      // finish JSON error message
     
     // char mqttOutput[128];
     // mqttMsg.toCharArray(mqttOutput, 128);
@@ -3197,7 +3201,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 */
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
   if (outputOnSerial) {  // debug
-    if (verboseLevel > 4) {
+    if (verboseLevel >= VERBOSE_MQTT) {
       Serial.print((String) "\n\r[" + mqttTopic + ":" + payLoad + ".");
     } else {
       Serial.print("{");        // print mqtt start operation
@@ -3217,7 +3221,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     }
   }
   if (outputOnSerial) {  // debug
-    if (verboseLevel > 4) {
+    if (verboseLevel > VERBOSE_MQTT) {
       Serial.print("]\n\r");
     } else {
       Serial.print("}");      // print mqtt finish oeration
@@ -3488,7 +3492,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   } // startChar >= 0
 
   // if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
-  if (outputMqttLog) publishMqtt(mqttLogTopic, telegram );   // debug to mqtt log ?
+  
+  // if (outputMqttLog) publishMqtt(mqttLogTopic, telegram );   // debug to mqtt log, v51 produces wraparounds
   // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
 
   /*
@@ -4289,7 +4294,7 @@ void WaterTrigger0_ISR()
             ISR_time_cnt++ ;          // increase our change counter      
         }
 
-        if (outputOnSerial) Serial.print( (String) "i" );    
+        if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) "i" );    
         interval_delay(1); // V47 wait 20ms --> implemented by flat plain while loop, all other types forbidden in ISR
         if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
             waterTriggerState = !waterTriggerState; // revert to make the same
@@ -4307,7 +4312,7 @@ void WaterTrigger0_ISR()
           #ifdef NoTx2Function
             if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
           #endif
-            if (outputOnSerial) Serial.print( (String) (waterTriggerState ? "tH " : "tL ") );    // V47 print ISR call counterwaterTriggerTime
+            if (outputOnSerial && verboseLevel >= VERBOSE_GPIO) Serial.print( (String) (waterTriggerState ? "tH " : "tL ") );    // V47 print ISR call counterwaterTriggerTime
           }
 
       waterISRActive = false;    // alow next interrupt
