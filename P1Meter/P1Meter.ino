@@ -452,7 +452,7 @@
 // #define libuse274  // unstable, the esp remains for at 10 to 35 minutes active and then goes into wdt, UseNewSoftSerialLIB
 // #define libuse240  // very goed library, fast compile to use UseNewSoftSerialLIB
 
-// - - - > following was for test experimenting with libbary use directived. Can be deleted.
+// - - - > following was for test experimenting with library use directived. Can be deleted.
 // test #include </home/pafoxp/code-P1meter/SoftwareSerial_2.4.0/SoftwareSerial.h>
 // #ifdef UseP1SoftSerialLIB   // do we use an old library
 // #undef UseP1SoftSerialLIB   // clear setting for now until included
@@ -574,6 +574,14 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
 // Standard includes for Wifi, OTA, ds18b20 temperature
 #include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform
 
+const char *hostName = "nodemcu"        P1_VERSION_TYPE;    // Note our hostname nodemcup1 nodemcut1
+const char *mqttClientName = "nodemcu-" P1_VERSION_TYPE;    // Note our ClientId nodemcu-p1 nodemcu-t1
+const char *mqttTopic      = "/energy/" P1_VERSION_TYPE;            // 'P' on/off outputMqttPower
+const char *mqttLogTopic   = "/log/"    P1_VERSION_TYPE;            // 'L' on/off outputMqttLog
+const char *mqttErrorTopic = "/error/"  P1_VERSION_TYPE;            // The error topic will also log into serverlog
+const char *mqttPower      = "/energy/" P1_VERSION_TYPE "power";    // 'p' on/off outputMqttPower2
+const int   mqttPort = 1883;
+const char *mqttLogTopic2  = "/log/wl"  P1_VERSION_TYPE;            // 'l' on/off outputMqttLog for RX2 data
 #ifdef P1_Override_Settings      // include our P1_Override_Settings
   #include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
   // #warning Using override settings
@@ -582,15 +590,8 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
   #ifdef TEST_MODE                  // Note: we use the override file at compile
     const char *ssid = "Production ssid";    // "Pafo SSID4"    //  T E  S T   setting
     const char *password = "wifipassword";
-    const char *hostName = "nodemcu" P1_VERSION_TYPE;          // our hostname for OTA nodemcut1
     const char *mqttServer = "192.168.1.8";                    // our mqtt server adress
     const char *mqttServer2 = "192.168.1.88";                  // our backup test mqtt server adress (desk top test)
-    const char *mqttClientName = "nodemcu-" P1_VERSION_TYPE;          // Note our ClientId for mqtt
-    const char *mqttTopic = "/T1meter/" P1_VERSION_TYPE;          // mqtt topic s is /T1Meter/p1
-    const char *mqttLogTopic = "/log/" P1_VERSION_TYPE;          // mqtt topic is /log/p1
-    const char *mqttErrorTopic = "/error/" P1_VERSION_TYPE;          // mqtt topic is /error/p1
-    const char *mqttPower = "/T1meter/" P1_VERSION_TYPE "power";  // mqtt topic is /T1meter/P1power
-    const int   mqttPort = 1883;
     #ifdef P1_STATIC_IP
       IPAddress local_IP(192, 168, 1, 35);
       IPAddress gateway(192, 168, 1, 1);
@@ -601,15 +602,8 @@ const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
   #else
     const char *ssid = "Test ssid";    // "Pafo SSID5"    //  P R O D U C T I O N  setting
     const char *password = "wifipassword";
-    const char *hostName = "nodemcu"        P1_VERSION_TYPE;          // our hostname for OTA nodemcut1
     const char *mqttServer  = "192.168.1.254";                        // our mqtt server address
     const char *mqttServer2 = "192.168.1.253";                        // our backup mqtt server address
-    const char *mqttClientName = "nodemcu-" P1_VERSION_TYPE;          // Note our ClientId
-    const char *mqttTopic = "/P1meter/"     P1_VERSION_TYPE;          // mqtt topic is /P1Meter/p1
-    const char *mqttLogTopic = "/log/"      P1_VERSION_TYPE;          // mqtt topic is /log/p1
-    const char *mqttErrorTopic = "/error/"  P1_VERSION_TYPE;          // mqtt topic is /error/p1
-    const char *mqttPower = "/P1meter/"     P1_VERSION_TYPE "power";  // mqtt topic is /P1meter/P1power
-    const int   mqttPort = 1883;
     #ifdef P1_STATIC_IP
       IPAddress local_IP(192, 168, 1, 35);
       IPAddress gateway(192, 168, 1, 1);
@@ -762,9 +756,12 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
-bool outputMqttLog    = false;   // "L" ptro false -> true , output to /log/t0
-bool outputMqttPower  = true;    // "P" ptro true  -> false , output to /energy/t0current
-bool rx2_function     = true;    // "F" ptro true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
+bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
+bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
+bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
+bool rx2_function     = true;    // "F" true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
+bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogRX2 /log/wl2
+
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
@@ -1594,7 +1591,7 @@ void loop()
     if (outputOnSerial) {
       Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yield1080\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
     } else {
-      Serial.print("^");  // signal a yieldloop
+      Serial.print("@");  // signal a yieldloop
     }
   }
   previousLoop_Millis = currentMillis;  // registrate our loop time
@@ -1642,7 +1639,7 @@ void loop()
         // if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." ); // v47 superfluous after preceding debug line
         // --> end of p1 read electricity
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
-        if (!outputOnSerial) Serial.printf("\t stopped: %11.6f (%6.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
+        if (!outputOnSerial) Serial.printf("\t endP1: %11.6f (%6.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
@@ -1940,7 +1937,7 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n Cycle: %12.9f DataC%s%s: %5u started at %11.6f \b\b ", 
+  if (!outputOnSerial) Serial.printf("\r\n Cycle: %12.9f DataC%s%s: %5u start: %11.6f \b\b ", 
         ((float)ESP.getCycleCount()/80000000),
         (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
         (mqttCnt + 1), ((float) startMicros / 1000000));
@@ -2123,7 +2120,7 @@ void readTelegram2() {
   // 30mar21: no data available .....
   if (mySerial2.available())   {
     if (outputOnSerial && verboseLevel >= VERBOSE_RX2)    {
-      Serial.print("\n\r Rx2N= "); // print message line
+      Serial.print("\n\r Rx2N="); // print message line
     }
     memset(telegram2, 0,       sizeof(telegram2));        // initialise telegram array to 0
     // memset(telegramLast2, 0,   sizeof(telegramLast2));    // initialise array to 0
@@ -2214,18 +2211,33 @@ void readTelegram2() {
             
             // modify our work buffer for v38 printing (contents may already have been translated)
             telegram2[i] = TranslateForPrint(telegram2[i]);    // move value to  translated output
-
         } // end for loop scanning serialbuffer
 
-        // if (outputOnSerial && !bGot_Telegram2Record) {    // v38 debug print if we catched a record
+        if (outputMqttLog2 && bGot_Telegram2Record) {       // we have a record, ensure we only process valid ones
+            telegram2[telegram2_Pos] = 0x00;    // enforce String-end of this for serial print
+            publishMqtt(mqttLogTopic2, (String)
+                     "{ rx2-" +  __LINE__   // print RX2 data line, already converted to print
+                        + ", \"mqttCnt\":" + mqttCnt
+                        + ", \"length\":"  + telegram2_Pos
+                        + ", \"rx2=\":\""  + (String) telegram2
+                     + "\"}" );
+            // Serial.println((String) "\n\r\t.s2>[len=" + len + " Pos=" + telegram2_Pos + "]" + telegram2) ;
+            /*                     
+            for (int i = 200; i <= len; i++) {  // forward
+                Serial.print(" ") ;         // debug print processing serial data
+                Serial.print((int8) telegram2[i] ) ;         // debug print processing serial data
+                Serial.print((String) + "=" + telegram2[i] ) ;         // debug print processing serial data
+            }
+            */
+        }
         if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
-          Serial.print("\n.s2>[");   // debug print processing serial data
-          Serial.print(len);         // debug print processing serial data
-          Serial.print("]");         // debug print processing serial data
-          Serial.println(telegram2); // debug print processing serial data
+          Serial.println((String) "\n.s2>[len=" + len + " Pos=" + telegram2_Pos + "]" + telegram2) ;
         }
 
         // if (rx2_function) { // do we want to execute v38 rx2_function (superfluous , as routine her eis v38)
+        /*
+          Process console
+        */
         if (bGot_Telegram2Record) {   // v38 print record serial2 if we have catched a record
           Serial.print("&&&&");     //  v39 print indicator // added 14mar22 to show activeness
           Serial.print("\b\b\b+3.");     //  v41 print indicator // added 21jun23 to get it stable: Serial.print("\b\b\b+3."); 
@@ -2247,11 +2259,14 @@ void readTelegram2() {
               WL>245-0=245:244,s=0,e=239,v=233]/WARMTELINK-VI\<|<|1-3:0.2.8(50)<|0-0:1.1.0(250222231918W)<|0-0:96.1.1(3037386633663736366566333065393434643561326461643162646237373865)<|0-1:24.1.0(012)<|0-1:96.1.0(37323632353436343243324433343043)<|0-1:24.2.1(250222231900W)(65.478*GJ)<|!E48B
           */
           
+
           int startChar = FindCharInArrayRev(telegram2Record, '/',  sizeof(telegram2Record));  // 0-offset "/ISk5\2MT382-1000" , -1 not found
           int endChar   = FindCharInArrayRev(telegram2Record, '!',  sizeof(telegram2Record));  // 0-offset "!769A" , -1 not found
           int valChar   = FindCharInArrayRev(telegram2Record, '*',  sizeof(telegram2Record));  // 0-offset "(84.108*m3)" , -1 not found
 
-          // add CRC chaeck on WL record, required as we can clearly wrong read values.
+          /*
+              add CRC check on WL record, required as we have clearly wrong read values.
+          */
           if  ( startChar >= 0  && endChar > startChar && valChar < endChar) {    // we have a start to end, ten do CRC check
                 char messageCRC2[5];
                 strncpy(messageCRC2, telegram2Record+(endChar-startChar)+1, 4);   // copy 4 bytes crc of record and
@@ -2482,7 +2497,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     I set inverval OK counter to 2880
     i decrease interval OK counter 250/100/25/10/2
     T loopback RX2 Gpio4 to TX2 Gpio2 serial port
-    P toggle output Power usage to /energy/p1power CurrentPowerConsumption: 463
+    P toggle output Power usage to /energy/p1 { json record }
+    p toggle output Power2 usage to /energy/p1power CurrentPowerConsumption: 463    
     M Print recovery masking array where X does nog care positions v48
     m Print Input array to be masked v48
 
@@ -2521,34 +2537,36 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       Serial.print("Serial Debug ");
       if (!outputOnSerial)  Serial.print("Inactive\n\r");
       if (outputOnSerial)   Serial.println("\nActive.");
-    } else  if ((char)payload[0] == 'L') {       // v51 make it toggle
-      outputMqttLog   = !outputMqttLog ;         // switch
+    } else  if ((char)payload[0] == 'L') {       // v51 log lines to topic mqttLogTopic
+      outputMqttLog   = !outputMqttLog ;         // swap
       Serial.print(" MqttLogging ");
       if (!outputMqttLog)  Serial.print("OFF\n\r ");
       if (outputMqttLog)   Serial.println("\nON ");
-    } else  if ((char)payload[0] == 'l') {       // v51 force off
-      outputMqttLog   = false ;         // switch
-      Serial.print(" MqttLogging forced OFF\n\r ");
+    } else  if ((char)payload[0] == 'l') {       // v51 make RX record toggle to topic mqttLogTopic2
+      outputMqttLog2   = !outputMqttLog2 ;       // swap
+      Serial.print(" MqttLogging2 ");
+      if (!outputMqttLog2)  Serial.print("OFF\n\r ");
+      if (outputMqttLog2)   Serial.println("\nON ");
     } else  if ((char)payload[0] == 'v') {                                            // Restart
       verboseLevel++ ;
       if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
       if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
     } else  if ((char)payload[0] == 'e') {
-        Serial.print("forcing infinite loop");
+        Serial.print("## forcing divide error");
         while (true) {
           int a = 0;
           int b = 10;
           volatile int c = b / a;
-          Serial.printf(" e%d ", c); // print used variable 'c'
+          // Serial.printf(" e%d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
     } else  if ((char)payload[0] == 'E') {    // here
-        Serial.print("forcing infinite loop");
+        Serial.print("## forcing infinite loop");
         while (true) {
-          int a = 0;
+          int a = 1;
           int b = 10;
           volatile int c = b / a;
-          Serial.printf(" E%d ", c); // print used variable 'c'
+          // Serial.printf(" E%d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
 
@@ -2687,6 +2705,13 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         if (outputMqttPower ) Serial.print("Active.");
         if (!outputMqttPower ) Serial.print("Inactive.");
       }
+    } else  if ((char)payload[0] == 'p') {
+      outputMqttPower2 = !outputMqttPower2 ;       // Do not publish P1 meter
+      if (outputOnSerial) {
+        Serial.print("outputMqttPower2 now ");
+        if (outputMqttPower2 ) Serial.print("Active.");
+        if (!outputMqttPower2 ) Serial.print("Inactive.");
+      }
     } else  if ((char)payload[0] == 'm') {       // v48 10jun25 print m-asked Input array
       Serial.println((String)"\r\n dataIn telegram_crcIn len=" + telegram_crcIn_len + " som>>");
       for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
@@ -2725,7 +2750,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'h') {       // v51 check call functions of pointers and data
         // String mqttMsg = "test1234:a" ;  // start of Json error message        
         // const char* mqttMsg = nullptr; // to check for mullptr
-        publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__ 
+        publishMqtt(mqttErrorTopic, (String) "H-test" + __LINE__ 
             + ", c++ version="  + __cplusplus); // v51 with (String) ok marking version=201103 (C++11)
 
         String arduinoString = "Temperature: %.1f°C";
@@ -2841,36 +2866,45 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         outputData3[2]= 0x00;     // this convert C to a number
         client.publish(mqttPower, outputData3);        // v51 array early terminated (yes) "AB"
       */
-        publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__); // v51 with (String) ok marking
-    } else  if ((char)payload[0] == '?') {       // v48 Print help 
-          Serial.println((String)"\n\r? Help commands");
-          Serial.println((String)"0 heating On");
-          Serial.println((String)"1 Heating off");
-          Serial.println((String)"2 Heat follow Thermostate");
-          Serial.println((String)"3 Thermostate disable");
-          Serial.println((String)"R Restart");
-          Serial.println((String)"D Debug");
-          Serial.println((String)"L Log to Mqtt");
-          Serial.println((String)"e force Error1");
-          Serial.println((String)"E force Error2");
-          Serial.println((String)"b Baud decrease gpio14");
-          Serial.println((String)"B Bbaud increase gpio14");
-          Serial.println((String)"e Exception activated");
-          Serial.println((String)"l Stoplog Mqtt");
-          Serial.println((String)"F on/off test Rx2 function");
-          Serial.println((String)"f Blueled cycle Error/Water/Hot");
-          Serial.println((String)"T RX2 loopback to BlueLed");
-          Serial.println((String)"W on/OFF Watertrigger1");
-          Serial.println((String)"w on/OFF Water Pullup");
+        publishMqtt(mqttErrorTopic, (String) "H-test" + __LINE__); // v51 with (String) ok marking
+    } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
+          Serial.println((String)"\n\r? Help commands "  + __FILE__ 
+                                                        + " version " + DEF_PROG_VERSION 
+                                                        + ", compiled " __DATE__ + " " + __TIME__ );
+          Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
+          Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
+          Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") follow Thermostate"  
+                                                    + (new_ThermostatState == 2 ? " <--" : "" ) );
+          Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
+                                                    + (new_ThermostatState == 3 ? " <--" : "" ) );
+          Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
+          Serial.println((String)"D debug (" + (IPAddress) local_IP + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
+          Serial.println((String)"L log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
+          Serial.println((String)"e force exception1");
+          Serial.println((String)"E force exception2");
+          Serial.println((String)"b Baud decrease gpio14:"        + "\t" +  p1Baudrate);
+          Serial.println((String)"B Baud increase gpio14"         + "\t" +  p1Baudrate);
+          Serial.println((String)"l Stoplog "+ mqttLogTopic);
+          Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
+          Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
+                                                                         + (blue_led2_Water ? "Y" : "N") 
+                                                                         + (blue_led2_HotWater ? "Y" : "N") );
+          Serial.println((String)"T rx2 loopback to BlueLed:"     + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")   );
+          Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
+          Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
           Serial.println((String)"Z zero counters");
-          Serial.println((String)"I intervalcount 2880");
-          Serial.println((String)"i decrease interval count");
-          Serial.println((String)"P ON/off publish Power");
+          Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
+          Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
+          Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
+          Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
           Serial.println((String)"M print Masking array");
           Serial.println((String)"m print Input array");
+          Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
+          Serial.println((String)"v Verboselevel:"                + "\t" +  verboseLevel );
+          
           Serial.println((String)"--------------------");
-          Serial.println("Portmap: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15");          // v51 print portstatus 
+          Serial.println("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)");          // v51 print portstatus 
           Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
                                 + "\t" + WATERSENSOR_READ  + "=WATERSENSOR_READ:" + !digitalRead(WATERSENSOR_READ) 
                                 + "\t" + SERIAL_RX2        + "=SERIAL_RX2:"       + !digitalRead(SERIAL_RX2)       
@@ -3082,6 +3116,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     if (client.connected()) {
       if (outputMqttPower) publishMqtt(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
       mqttP1Published = true;             // yes we have publised energy data
+    } else {
+      Serial.println((String)"v");        // indicate no connection at datarecord
     }
 
 
@@ -3232,6 +3268,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
     Send data to Mqtt topic v51
 */
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
+  Serial.print("^");     // signal write mqtt entered
   if (outputOnSerial) {  // debug
     if (verboseLevel >= VERBOSE_MQTT) {
       Serial.print((String) "\n\r[" + mqttTopic + ":" + payLoad + ".");
@@ -4093,7 +4130,7 @@ bool CheckData()        //
     SetOldValues();
   */
 
-  if (outputMqttPower)    // output currrent power only , flatnumber
+  if (outputMqttPower2)    // output currrent power, flatnumber
   {
     char output[32];     // use snprintf to format data
     String msg = "";      // initialise data
