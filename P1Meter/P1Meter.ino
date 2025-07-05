@@ -1534,7 +1534,7 @@ void setup()
   waterTriggerTime = 0;  // ensure and assum no trigger yet
   test_WdtTime = 0;  // set first loop timer
   loopcnt = 0;              // set loopcount to 0
-
+  Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
 //  WiFi.printDiag(Serial);   // print data
 } // setup
 
@@ -1554,8 +1554,8 @@ void setup()
   // WiFi.printDiag(Serial);
 */
 void loop()
-{
-  if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have entered the the buulding
+{ 
+  if (verboseLevel == 1) Serial.print("\b"); // exit loop to check if we have entered the the buulding
   // note this loop() routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
@@ -1622,15 +1622,15 @@ void loop()
       mySerial2.flush();        // Clear GJ buffer
       telegramError = 0;        // start with no errors
       // Start secondary serial connection if not yet active
-#ifdef UseNewSoftSerialLIB
+  #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
       mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-#else
+  #else
       // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
       mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud
       // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
-#endif
+  #endif
 
     } else {    // if (!p1SerialActive)
 
@@ -1650,14 +1650,14 @@ void loop()
         // int checkIntervalRx2 = mqttCnt % 7;
         if ( rx2_function && (mqttCnt == 2  || (mqttCnt > 0 && ((mqttCnt % 7) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
-#ifdef UseNewSoftSerialLIB
+  #ifdef UseNewSoftSerialLIB
           // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
           // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
           mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
-#else
+  #else
           // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
           mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
-#endif
+  #endif
         }
         
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
@@ -1799,9 +1799,9 @@ void loop()
     */  
 
       // output on secondary  TX if not already used for loopback
-#ifndef NoTx2Function
+  #ifndef NoTx2Function
       if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput , disabled as of v37
-#endif
+  #endif
       // }
 
       forceCheckData = true;  // enforce  mode active
@@ -1831,7 +1831,7 @@ void loop()
   }
 
   ArduinoOTA.handle();             // check if we must service on the Air update
-  if (verboseLevel == 1) Serial.print("<"); // exit loop to check if we have left the building
+  if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have left the building
 }
 
 /* 
@@ -1937,9 +1937,10 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n Cycle: %12.9f DataC%s%s: %5u start: %11.6f \b\b ", 
+  if (!outputOnSerial) Serial.printf("\r\n Cycle: %12.9f D%d%s%sC%s%s: %5u start: %11.6f \b\b ", 
         ((float)ESP.getCycleCount()/80000000),
-        (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
+          (int) new_ThermostatState, (thermostatReadState ? "d" : "T"),  (thermostatWriteState ? "A" : "i"),
+          (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
         (mqttCnt + 1), ((float) startMicros / 1000000));
 
   // Cycle: 04.781228065
