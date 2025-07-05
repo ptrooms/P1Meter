@@ -82,6 +82,24 @@
       https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
 */
 
+/* Water sensor logic: (doc v51)
+  ------------------------------------------------------------------------------------------------------------------------------
+    WaterTrigger0/1_ISR() attach/detachWaterInterrupt is activated in loop() during peiodes not reading serial1/2 data.
+      With command 'W' we can test/switch between WaterTrigger0/1_ISR (used for development reasons)
+      (tbd: With command 'w' we could change/force next pullup behavior, now active/low/high automatically)
+
+    Using a wheel that senses mirrored Infrared: 1 pulse (going in --> going out) = 1 Liter
+        We use active GPIO5 Interrupt Service Routine for the cycle below, where a segmented turn = liter
+        An UP or Down is only valid if this continues to be the case for at least 50mS (v51, waterReadDebounce=50)
+           (debounce measuremnt starts/resets in ISR and is monitored in in loop())
+    then: in loop() If -->
+      A) GPIO5=activeHigh to low, wheel sensor has as entered blink zone and shorts ActiveHigh to GND
+            GPIO5 now goes goes L and we disable the pull resistor waiting for active-low  (mode Input)
+      B) GPIO5=atciveLow to high, waited until wheelsensor left by pulling activeLow to VCC
+            GPIO5 now goes H and we enable the pull resistor for ActiveHigh (mode Input PullUp)
+  ------------------------------------------------------------------------------------------------------------------------------    
+*/
+
 /* Log errors v49 to topic /error/x1
   001 = RJ11 to P1 is not connected
   002 = Temperature sensort fault (< REQUIRED_DSB18B20_SENSORS of < 127C)
@@ -114,8 +132,8 @@
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   #define DEF_PROG_VERSION 1151.241 // current version (displayed in mqtt record)
-      // #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
-      // #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
+      #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
+      #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
@@ -649,7 +667,9 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 */
 
 // Standard includes for Wifi, OTA, ds18b20 temperature
-// #include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform
+// #include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform 
+//                                    // Arduino    /home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/libraries/ESP8266WiFi
+//                                    // Platformio /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ESP8266WiFi
 
 // #include <ESP8266mDNS.h>        // standard, ESP8266 Multicast DNS req. ESP8266WiFi AND needed for dynamic OTA
 // #include <ESP8266HTTPClient.h>   // not needed
@@ -946,7 +966,11 @@ SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, 
 SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
-// Wifi
+// Wifi https://docs.arduino.cc/language-reference/en/functions/wifi/client/
+/*
+  https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/client-class.html
+  WiFi library is very similar to the Ethernet library,
+*/ 
 WiFiClient espClient;             // declare and name our Internet conenction
 PubSubClient client(espClient);   // Use this connection client
 
@@ -1163,13 +1187,14 @@ void setup()
   // Test float functions
   Serial.printf ("Test FloatingPoint support\n", mqttCnt);
   // asm(".global _printf_float"); // setin in Setup()
-  Serial.printf ("\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);
-  Serial.printf ("\tmqttCnt ValueUu = %u\n", mqttCnt);
-  Serial.printf ("\t9.0453 Value4.1f = %4.1f\n", 9.0453);   
-  Serial.printf ("\t9.12 Value4.1f = %4.1f\n", 9.0); 
-  Serial.printf ("\t9.12340 Value5.1f = %5.2f\n", 9.0); 
-  Serial.printf ("\t 9.0 Value4.1f = %6.1f\n", 9.0);
-  Serial.printf ("\t1234.567 Value6.1f = %6.6f\n", 1234.567);
+  // read: https://en.cppreference.com/w/c/io/fprintf
+  Serial.printf ("\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);   // strange lont number 2681....8192.0
+  Serial.printf ("\t12.345 ValeUu2 = %3u_\n", 12.345);        // strange 3607772529_
+  Serial.printf ("\t9.0453 Value4.2f = %4.2f\n", 9.0453);     // 9.05
+  Serial.printf ("\t9.1 Value4.1f = %4.1f\n", 9.1);           //  9.1
+  Serial.printf ("\t9.12340 Value5.1f = %5.2f\n", 9.12340);   //  9.12
+  Serial.printf ("\t 9.5 Value4.1f = %6.1f\n", 9.5);          //    9.5
+  Serial.printf ("\t1234.567 Value6.1f = %6.6f\n", 1234.567); // 1234.567000
 #endif
 
 #ifdef TEST_CALCULATE_TIMINGS
@@ -1226,7 +1251,7 @@ void setup()
   start3f = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
   // 10.000xnop1 vs nop2 Start3=2109430182, start3e=2109480889(nop1=50707), start3f=2109541239(nop2=60350) .
   // 10nops vs 20nops Start3=2782556574, start3e=2782556936(nop1=362), start3f=2782557306(nop2=370) . Only 8 cycles difference (compiler optimized?)
-  Serial.println((String) "\n Start3=" + start3 + ", start3e=" + start3e + "(nop1=" + (start3e - start3) + ")" + ", start3f=" + start3f + "(nop2=" + (start3f - start3e) + ") .");
+  Serial.println((String) "\n Start3=" + start3 + ", start3e=" + start3e + "(nop10=" + (start3e - start3) + ")" + ", start3f=" + start3f + "(nop20=" + (start3f - start3e) + ") .");
 
   // serial test timings
   // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
@@ -1244,7 +1269,7 @@ void setup()
   // Setup our test skeleton
     #define WAITtest4  { while (ESP.getCycleCount()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
     Serial.println((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
-    int m_rxPin4 = SERIAL_RX; 
+    int m_rxPin4 = SERIAL_RX;     // gpio14
     unsigned long speed4 = 115200;
     unsigned long m_bitTime4 = ESP.getCpuFreqMHz()*1000000/speed4;
     int m_buffSize4 = 66; // test
@@ -1254,7 +1279,7 @@ void setup()
     // simulate the serial routine for 1byte   
     unsigned long wait4 = m_bitTime4 + m_bitTime4/3 - 498;		// offset 501=425 offset 498=427cycles 115k2@80MHz
     
-    // below a 1:1 copy of the serial routine of plerup
+    // below a 1:1 copy of the serial routine of plerup, this to check/simulate the time for. 
     unsigned long start4 = ESP.getCycleCount();
     uint8_t rec = 0;
     // WAITtest4;    // wait/skip startbit 427 cycles
@@ -1267,7 +1292,7 @@ void setup()
     if (m_rxPin4) rec = ~rec;   // simulate the invert
     unsigned int m_inPos4 = 10;
     unsigned int m_outPos4 = 5;
-    int next4 = (m_inPos4 +1) % m_buffSize4;
+    int next4 = (m_inPos4 +1) % m_buffSize4;  // (10+1) % 66 = 11
     if (next4 != m_outPos4) {
         if (rec == '/') m_P1active4 = true ;   // 26mar21 Ptro P1 messageing has started by header
         if (rec == '!') m_P1active4 = false; // 26mar21 Ptro P1 messageing has ended due valid trailer
@@ -1277,9 +1302,11 @@ void setup()
         m_P1active4 = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
         m_overflow4 = true;
     }
-    unsigned long start4e = ESP.getCycleCount();
     
-    Serial.println((String)" TestRead4Rx start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+    unsigned long start4e = ESP.getCycleCount();
+    Serial.println((String)" TestRead4Rx start4=" + start4 + ", end4="+ start4e 
+            + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 
+            + ", bittime4=" + m_bitTime4 );   // v51: start4=1171498770, end4=1171504757, diff4=5987, wait4=6673, bittime4=694
 
 
     // calculate getCycleCnt
@@ -1366,7 +1393,7 @@ void setup()
   }
 
   // check-test native ISR routine
-  cli();   // hold interrupts
+  cli();   // hold interrupts ( or noInterrupts() )
   unsigned long startMicro2 = micros();
   unsigned long startCycle2 = ESP.getCycleCount();
   unsigned long wait2 = m_bitTime + m_bitTime / 3 - 500; // 425 115k2@80MHz
@@ -1377,7 +1404,7 @@ void setup()
   unsigned long   endMicro2 = micros();
   unsigned long  diffCycle2 =  endCycle2 - startCycle2 ;
   unsigned long  diffMicro2 =  endMicro2 - startMicro2 ;
-  cli();   // resume interrupts
+  sei();   // resume interrupts   (or interrupts() )     // v51 correction
   for (int i = 0; i < 1000; i++) {
     int test = 0;
   }
@@ -1531,6 +1558,9 @@ void setup()
 */
 void loop()
 {
+  if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have entered the the buulding
+  // note this loop() routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
+  
   // declare global timers loop(s)
   // millis() and micros() return the number of milliseconds and microseconds elapsed after reset, respectively.
   //  warning: this number will overflow (go back to zero), after approximately 70 minutes.
@@ -1804,7 +1834,7 @@ void loop()
   }
 
   ArduinoOTA.handle();             // check if we must service on the Air update
-
+  if (verboseLevel == 1) Serial.print("<"); // exit loop to check if we have left the building
 }
 
 /* 
@@ -2839,9 +2869,19 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"P ON/off publish Power");
           Serial.println((String)"M print Masking array");
           Serial.println((String)"m print Input array");
-    } else  {
-      if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" );
-    }
+          Serial.println((String)"--------------------");
+          Serial.println("Portmap: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15");          // v51 print portstatus 
+          Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
+                                + "\t" + WATERSENSOR_READ  + "=WATERSENSOR_READ:" + !digitalRead(WATERSENSOR_READ) 
+                                + "\t" + SERIAL_RX2        + "=SERIAL_RX2:"       + !digitalRead(SERIAL_RX2)       
+                                + "\t" + DS18B20_SENSOR    + "=DS18B20_SENSOR:"   + !digitalRead(DS18B20_SENSOR)   
+                                + "\t" + BLUE_LED2         + "=BLUE_LED2:"        + !digitalRead(BLUE_LED2)       ); 
+          Serial.println((String) "\t" + SERIAL_RX         + "=SERIAL_RX:"        + !digitalRead(SERIAL_RX)        
+                                + "\t" + LIGHT_READ        + "=LIGHT_READ:"       + !digitalRead(LIGHT_READ)       
+                                + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
+                                + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
+                                + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
+    } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
 
      if (outputOnSerial) Serial.println();   // ensure crlf
   }
