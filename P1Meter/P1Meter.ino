@@ -1,20 +1,40 @@
 // #define TEST_MODE    // set in PlatformIO; 
 #define DEBUG_ESP_OTA   // v49 wifi restart issues 
-// flaw1: will not process watercount during serial read.
-// issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
-// tbd: cleaout no longer needed code
-/*
+/*  documentation 
+    https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
+    api reference: https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf
+    sdk: https://github.com/espressif/ESP8266_NONOS_SDK/tree/release/v2.2.x
+                  https://espressif.com/sites/default/files/documentation/2a-esp8266-sdk_getting_started_guide_en.pdf
+*/
+
+/* tbd 
+  cleaout no longer needed code
   error: 06jul25 13u00 
       ESP8266-ResetReason: Hardware Watchdog
       Found Temp ghost device at 5 but could not detect address.
       ESP8266-ResetReason: Software Watchdog
       Crash after line: --> ESP8266-chip-size: 4194304 , ESP8#'+/37;?BFJNRVZ^bfjnrvz
       (ESP8266-sdk-version: 2.2.1(cfd48f3) )
-
+*/
+/* change history
   V52 06jul25:
-    tbd: activate antifreeze for 1 hour when any of the temperature sensors goes below threshold 10-12°C
+    tbd: power protection
+          -- check excessive power usage
+    tbd: smart thermostat
+        controls heat based on own thermo couple
+            -- learn feedback time
+    tbd: feed check, 
+        veriy we have commands on a daily basis
+    tbd: activate antifreeze protection 
+        for 1 hour when any of the temperature below average threshold 10-12°C during > 15 minutes
+        check if heat is produced by monitoring warmtelink
     tbd: alarm flashing blueleds ??
-    tbd: read/write countersmqtt
+        design code to alternate flash
+    tbd: read/write countersmqtt: Sents (C__) Misses (Cxx) Fails (Z_) Recovers (R)
+        we have a miss if the P1 RX premature  ends < 340µSec, usually <= 86.016
+        we have a fail if CRC does not match
+        we have a Recver if we coull reconstruct CRC
+        we have an OK if none of the above and we output things 
   V51 03jul25: skipped 50 trying to centralise p1mqtt which irratically corrupts things
     added RX2 check availabiluy, we must have 1 read overy 7 mqttcnt record, else error:004 with successcount (bGot)
     added verboseLevel (int  verboseLeve) do minimize data, default as it was, we van incease by command 'v'
@@ -38,6 +58,8 @@
     Waterswitch sometimes stops when looptimer to check debounce transitioned to 0 after 70 minutes
     WaterTrigger_ISR renamed to WaterTrigger0_ISR
     Trigger routine made single threading
+    solved flaw1: will not process watercount during serial read.
+    solved issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
   V46 23feb25:
     27feb25 : ignore zero fields that (prefix field !) that should always > 0 (Like total Power/Heat/Flow)
     Either Flow or Heat is reported (occupiy the samen telegram record)
@@ -452,11 +474,14 @@
 
 //
 
-// Note changing libarieslooks to be useless as only 2.4.1 seem to resist WDT reset and is 99% (Serial) reliable
-//      but we levae the oportunity to centrally control which specifx libary will be included/
-//      any library must be made available with(in) Arduino/esp8266 Boardmanager
-// #define libuse242  // 301136 bytes, not very reliable, serial produces not many successes
+
+/* 
+   Note changing libarieslooks to be useless as only 2.4.1 seem to resist WDT reset and is 99% (Serial) reliable
+        but we levae the oportunity to centrally control which specifx libary will be included/
+        any library must be made available with(in) Arduino/esp8266 Boardmanager
+*/
 #define libuse241     // 297428/prod, 297412/test bytes, best version offering reliability and NO spontaneous wdt resets
+// #define libuse242  // 301136 bytes, not very reliable, serial produces not many successes
 // #define libuse250  // TBI 322320 bytes, not very trustfull, serial is interrupt and causes soft errors, not sure about wdt
 // #define libuse252  // unreliable (in the past, not sure how i operates with adapted P1 softserial), UseNewSoftSerialLIB
 // #define libuse241  // 297428 bytes, very stable, fast compile (note we use the softserial 2.4.1. adapted to p1), 
@@ -476,44 +501,41 @@
 
 // Note 2.4.0 is to be used , works most of time OK, sometimes errors at higher baudrate
 #ifdef libuse240
-#undef UseNewSoftSerialLIB      // use the the standard  localised library
-
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/Arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.0/variants/nodemcu/pins_arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/stdlib_noniso.h>
+  #undef UseNewSoftSerialLIB      // use the the standard  localised library
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/Arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.0/variants/nodemcu/pins_arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/stdlib_noniso.h>
 #endif
 
 // Note 2.4.1  very stable and reliable softserial and now wdt resets
 #ifdef libuse241
-#undef UseNewSoftSerialLIB      // use the the standard  localised library
-// #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/Arduino.h>
-// #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/variants/nodemcu/pins_arduino.h>
-// #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/stdlib_noniso.h>
+  #undef UseNewSoftSerialLIB      // use the the standard  localised library
+  // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/Arduino.h>
+  // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/variants/nodemcu/pins_arduino.h>
+  // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/stdlib_noniso.h>
 #endif
 
 // Note 2.4.2  TBI
 #ifdef libuse242
-#undef UseNewSoftSerialLIB      // use the the standard  localised library
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/cores/esp8266/Arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/variants/nodemcu/pins_arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/cores/esp8266/stdlib_noniso.h>
+  #undef UseNewSoftSerialLIB      // use the the standard  localised library
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/cores/esp8266/Arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/variants/nodemcu/pins_arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/cores/esp8266/stdlib_noniso.h>
 #endif
-
 
 // Note 2.5.0  to be checked
 #ifdef libuse250
-#undef UseNewSoftSerialLIB      // use the the standard  localised library
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/cores/esp8266/Arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/variants/nodemcu/pins_arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/cores/esp8266/stdlib_noniso.h>
+  #undef UseNewSoftSerialLIB      // use the the standard  localised library
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/cores/esp8266/Arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/variants/nodemcu/pins_arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/cores/esp8266/stdlib_noniso.h>
 #endif
-
 
 // Note 2.5.2 is  not to be used, was unstable on softserial
 #ifdef libuse252
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/cores/esp8266/Arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/variants/nodemcu/pins_arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/cores/esp8266/stdlib_noniso.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/cores/esp8266/Arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/variants/nodemcu/pins_arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/cores/esp8266/stdlib_noniso.h>
 #endif
 
 // 2.6.0. give strange Git and Software sofserial errors, do not use
@@ -521,18 +543,18 @@
   #ifndef UseP1SoftSerialLIB   // do we use an old library
   #define UseNewSoftSerialLIB   // softwareserial format made equal to hardware version
   #endif
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/cores/esp8266/Arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/variants/nodemcu/pins_arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/cores/esp8266/stdlib_noniso.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/cores/esp8266/Arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/variants/nodemcu/pins_arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/cores/esp8266/stdlib_noniso.h>
 #endif
 
 #ifdef libuse274              // not very stable, we must use the (old 2.4.1 now) P1 adapted softserial
   #ifndef UseP1SoftSerialLIB   // do we use an old library
   #define UseNewSoftSerialLIB   // softwareserial format made equal to hardware version
   #endif
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/Arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/variants/nodemcu/pins_arduino.h>
-#include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/stdlib_noniso.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/Arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/variants/nodemcu/pins_arduino.h>
+  #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/stdlib_noniso.h>
 #endif
 
 #ifndef P1_VERSION_TYPE         // if not defined, fallback to test version
@@ -575,10 +597,17 @@ bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted seria
 
 const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
 
-#ifndef ARDUINO_ESP8266_RELEASE
-  // note: file [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_version.h] contains 
+#ifndef ARDUINO_ESP8266_RELEASE 
+  /*
+   2.4.1: file /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_version.h
+     main file:   [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_esp8266_main.cpp]
+        static void loop_wrapper() --> setup() else loop(); run_scheduled_functions(); esp_schedule()
+        post_mortem at crash: [/home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_esp8266_postmortem.c]
+
+
+  note: file   [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_version.h] contains 
+  */ 
   #include <core_version.h>
-  // see also file: [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_esp8266_main.cpp]
 #endif  
 // const const char *core_version_P1Meter_Release = ARDUINO_ESP8266_RELEASE ; 
 
@@ -888,8 +917,7 @@ const char dummy2b[] = {0x0000};      // prevent save overwrite
 int  telegram_crcOut_len = 0;         // length of this record
 // int  telegram_crcIn_cnt2 = 0;      // number of times CrcIn was called
 
-/*
-  At header: initialise telegram_crcin
+/* At header: initialise telegram_crcin
   during CRC we accumulate record positions into telegram_crcin
   At trailer:
     if telegram_crcIn_len = telegram_crcOut_len and crcValidCounter > 0
@@ -2883,6 +2911,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"\n\r? Help commands "  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
                                                         + ", compiled " __DATE__ + " " + __TIME__ );
+          // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
           Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
           Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
           Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") follow Thermostate"  
@@ -3920,8 +3949,7 @@ char TranslateForPrint(char c)
 /* 
   generic subroutine to find a character in reverse , return position as offset to 0
 */
-int FindCharInArrayRev(const char array[], char c, int len)               // Find character >=0 found, -1 failed
-{
+int FindCharInArrayRev(const char array[], char c, int len) {              // Find character >=0 found, -1 failed
   //           123456789012
   // 1234567890123456789012345678901234567890  = 40
   // 0-0:1.0.0(180611014816S)                  = sublen12 len=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
@@ -3943,8 +3971,7 @@ int FindCharInArrayRev(const char array[], char c, int len)               // Fin
   find character forwarding for len bytes
 */
 int FindCharInArrayFwd(const char array[], char c, int len) {              // Find character >=0 found, -1 failed
-{
-    for (int i = 0; i < len+1 ; i++)   // forward
+  for (int i = 0; i < len+1 ; i++)   // forward
   {
     if (array[i] == c)
     {
