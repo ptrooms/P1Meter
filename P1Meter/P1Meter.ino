@@ -1862,11 +1862,11 @@ void mqtt_reconnect() {                 // mqtt read usage doc https://pubsubcli
         }
         doCritical();  // do critical process to maintain basic Thermostat & OTA functions
       }
-#ifdef TEST_MODE            
+ #ifdef TEST_MODE            
       if (mqttConnectDelay < 11000) {      // v45 check if we are below backup time (2+5+8=15sec)  testmode
-#else
+ #else
       if (mqttConnectDelay <=27000) {      // v45 check if we are below backup time (2+5+8+11+14+17+20+23+26+29=155sec) production
-#endif      
+ #endif      
         mqttConnectDelay = mqttConnectDelay + 3000; // increase retry
         Serial.print((String) "... try again in " + (mqttConnectDelay / 1000) + " seconds...\r\n");
       } else {
@@ -1926,9 +1926,9 @@ void readTelegram() {
     p1TriggerTime = millis();
   }
 
-#ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
+ #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
   if ( mySerial.P1active())  return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
-#endif  
+ #endif  
   if (!mySerial.available()) return ;  // quick return if no data
 
   if (outputOnSerial)    {
@@ -2060,9 +2060,9 @@ void readTelegram() {
           if (validCrcInFound) Serial.print((String) "_R"); else Serial.print((String) "Z_");  // v45 print failed or recovered
         }
 
-#ifdef NoTx2Function
+ #ifdef NoTx2Function
         if (!loopbackRx2Tx2 && blue_led2_Crc) validTelegramCRCFound ? digitalWrite(BLUE_LED2, HIGH) : digitalWrite(BLUE_LED2, LOW) ; // v38 monitoring
-#endif
+ #endif
 
         p1TriggerTime = millis();   // indicate we have a yield
 
@@ -2102,9 +2102,9 @@ void readTelegram() {
 */
 void readTelegram2() {
   // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
-#ifdef UseP1SoftSerialLIB
-  if (mySerial.P1active()) return ;   // return if P1 is active
-#endif  
+ #ifdef UseP1SoftSerialLIB
+    if (mySerial.P1active()) return ;   // return if P1 is active
+ #endif  
 
   bGot_Telegram2Record  = false;      // v38 check RX2 seen
 
@@ -2367,9 +2367,9 @@ void readTelegram2() {
 
         } // bGot_Telegram2Record
         
-#ifndef NoTx2Function
+ #ifndef NoTx2Function
         if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back , disabled as of v37
-#endif
+ #endif
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
@@ -2474,7 +2474,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
 /* 
   Processing queued mqttCommand, received by callbackMqtt 
 */
-void ProcessMqttCommand(char* payload, unsigned int length) {
+void ProcessMqttCommand(char* payload, unsigned int length) { 
   /* Commands: (single byte)
 
     ? Print brief helptexst on serial output
@@ -2488,7 +2488,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     l No mqtt logging
     e enforce error div/0 causing a restart
     E same, enforce error div/0 causing a restart
-    b decease P1 Baudrate port  Gpio14/D5  by 50
+    b decrease P1 Baudrate port  Gpio14/D5  by 50
     B increase Baudrate P1 port by 50
     F toggle (test) Function
     f BlueLed2 Gpio2/d4 led cycle Crc / off / HotWater / Water
@@ -2578,14 +2578,14 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         p1Baudrate = p1Baudrate + 50 ;
         Serial.print((String)"Increasing Baudrate to " + p1Baudrate);
         
-/* DNO , leave it to investigate how to force an exception
-    } else  if ((char)payload[0] == 'e') {    // here
-          try {
-              throwExceptionFunction();
-          } catch (const exception& e) {
-              Serial.print((String) "Exception activated" + e.what() );
-          }
-*/
+  /* DNO , leave it to investigate how to force an exception
+      } else  if ((char)payload[0] == 'e') {    // here
+            try {
+                throwExceptionFunction();
+            } catch (const exception& e) {
+                Serial.print((String) "Exception activated" + e.what() );
+            }
+  */
     } else  if ((char)payload[0] == 'F') {
       rx2_function = !rx2_function ; // toggle on/off testing newFunction
       if (outputOnSerial) {
@@ -2597,9 +2597,9 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                 if (blue_led2_Water) {
                     blue_led2_Water = !blue_led2_Water;
                     blue_led2_HotWater = !blue_led2_HotWater;          
-#ifdef NoTx2Function                    
+  #ifdef NoTx2Function                    
                     if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);   // OFF
-#endif                    
+  #endif                    
                     Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
                     // Serial.print(""); // stability test v43 // extra
                     // Serial.print(""); // stability test v43
@@ -2617,9 +2617,9 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                     Serial.print("BlueLed2 = Off");            // BlueLed2 Off
                 } else {
                    blue_led2_Water = !blue_led2_Water;
-#ifdef NoTx2Function                                       
+  #ifdef NoTx2Function                                       
                    if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
-#endif
+  #endif
                    Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
                 }
 
@@ -2632,7 +2632,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         Serial.print(loopbackRx2Tx2 == true ? "ON" : "OFF");
       }
 
-/* Does not operate, as serial isetup during setup
+  /* Does not operate, as serial isetup during setup
     } else  if ((char)payload[0] == 't') {
       bSERIAL_INVERT = !bSERIAL_INVERT ; // switch between invert/noninvert
       if (outputOnSerial) {
@@ -2640,7 +2640,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         if (bSERIAL_INVERT)  Serial.print("Positive P1 serial.");
         if (!bSERIAL_INVERT) Serial.print("Negative P1 serial.");
       }
-*/
+  */
 
     } else  if ((char)payload[0] == 'W') {
       useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
@@ -3071,9 +3071,9 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(", \"Version\":%u");                    // version to determine message layout
     msg.concat(" }"); // terminate JSON
     
-// important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
-//  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
-//  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
+  // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
+  //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
+  //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
     // snprintf(output, sizeof(output), msgpub ,
     snprintf(output, sizeof(output), msg.c_str(),
             // currentTime,                // metertime difference 52 seconds can also use millis()
@@ -3304,9 +3304,9 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
 bool processLightRead(bool myOperation)
 {
   lightReadState   = digitalRead(LIGHT_READ); // read D6
-#ifdef NoTx2Function                      
-  if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
-#endif  
+  #ifdef NoTx2Function                      
+    if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
+  #endif  
   
   if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
   // Process this one-to-one directly to output
@@ -3321,9 +3321,9 @@ bool processLightRead(bool myOperation)
   called each time we have a telegram record
 */
 bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends in Linefeed \n
-// there are 24 telegram lines (electricity() totalling  676bytes + 24 returns = 700 bytes
-
 {
+  // there are 24 telegram lines (electricity() totalling  676bytes + 24 returns = 700 bytes
+
   //need to check for start
   validTelegramCRCFound = false;  // init telegram record
   validCrcInFound       = false;  // init Crcin record
@@ -3931,7 +3931,7 @@ int FindCharInArrayRev(const char array[], char c, int len)               // Fin
 /*
   find character forwarding for len bytes
 */
-int FindCharInArrayFwd(const char array[], char c, int len)               // Find character >=0 found, -1 failed
+int FindCharInArrayFwd(const char array[], char c, int len) {              // Find character >=0 found, -1 failed
 {
     for (int i = 0; i < len+1 ; i++)   // forward
   {
@@ -4251,11 +4251,11 @@ void SetupDS18B20() {
   Read and get DS18B20 temperatures to tempDev[]
 */
 void processTemperatures() {
-// 29jun25: v49 issue sometimes a sensor is not reading and filled als -127.0°C
-//    Sending temperatures:   23.50   23.81   23.69   -127.00 23.56   25.25 
-//      voltage or poor grounding can cause unreliable readings DS18B20_SENSOR @ D3 = GPIO0
-//      strangely the new esp8266 has about 4 volt on its gpio0
-//      bypass for the issue is when < -126 , we ignore the setting
+  // 29jun25: v49 issue sometimes a sensor is not reading and filled als -127.0°C
+  //    Sending temperatures:   23.50   23.81   23.69   -127.00 23.56   25.25 
+  //      voltage or poor grounding can cause unreliable readings DS18B20_SENSOR @ D3 = GPIO0
+  //      strangely the new esp8266 has about 4 volt on its gpio0
+  //      bypass for the issue is when < -126 , we ignore the setting
 
   bool bTemp_Reading_State = true;    // assume temperatures OK
 
