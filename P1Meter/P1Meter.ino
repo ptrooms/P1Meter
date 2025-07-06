@@ -4,6 +4,17 @@
 // issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
 // tbd: cleaout no longer needed code
 /*
+  error: 06jul25 13u00 
+      ESP8266-ResetReason: Hardware Watchdog
+      Found Temp ghost device at 5 but could not detect address.
+      ESP8266-ResetReason: Software Watchdog
+      Crash after line: --> ESP8266-chip-size: 4194304 , ESP8#'+/37;?BFJNRVZ^bfjnrvz
+      (ESP8266-sdk-version: 2.2.1(cfd48f3) )
+
+  V52 06jul25:
+    tbd: activate antifreeze for 1 hour when any of the temperature sensors goes below threshold 10-12°C
+    tbd: alarm flashing blueleds ??
+    tbd: read/write countersmqtt
   V51 03jul25: skipped 50 trying to centralise p1mqtt which irratically corrupts things
     added RX2 check availabiluy, we must have 1 read overy 7 mqttcnt record, else error:004 with successcount (bGot)
     added verboseLevel (int  verboseLeve) do minimize data, default as it was, we van incease by command 'v'
@@ -1151,7 +1162,7 @@ void setup()
   Serial.println ("ESP8266-sketch-md5: "+   String(ESP.getSketchMD5()));
   Serial.println ("ESP8266-chip-size: "+    String(ESP.getFlashChipRealSize()));
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
-  Serial.println ("ESP8266-getChipId: "+    ESP.getChipId()); 
+  Serial.println ("ESP8266-getChipId: "+    ESP.getChipId());             // sudden crash...
 
   WiFi.printDiag(Serial);   // print data  
   strcpy(mqttServer1,mqttServer );         // v45 initialise for reference
