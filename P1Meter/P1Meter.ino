@@ -561,6 +561,26 @@
 #define P1_VERSION_TYPE "t1"    // "t1" test "p1" production
 #endif
 
+/*
+  Define debug using Macros https://forum.arduino.cc/t/sketch-espconn-error/1028011
+    DEBUG_PRINTLN("ESPConn - Looks not connected.");
+    DEBUG_PRINT("Sending: ");
+    str = esp.readStringUntil(':'); DEBUG_PRINT(str);
+    DEBUG_WRITE_BYTES(data, length); DEBUG_PRINTLN();
+*/
+#define DEBUG
+#ifdef DEBUG
+  #define DEBUG_PRINTLN(x) Serial.println(x)
+  #define DEBUG_PRINT(x) Serial.print(x)
+  #define DEBUG_WRITE_BYTES(x, y) Serial.write(x, y)
+  #define DEBUG_WRITE(x) Serial.write(x)
+#else
+  #define DEBUG_PRINTLN(x)
+  #define DEBUG_PRINT(x)
+  #define DEBUG_WRITE_BYTES(x, y)
+  #define DEBUG_WRITE(x)
+#endif
+
 
 // communication mode settings, is the Startbit RISING edge or (inverted) FALLING edge
 #ifdef TEST_MODE
@@ -806,6 +826,11 @@ bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogR
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
 long mqttCnt = 0;                    // updated with each publish as of 19nov19
+long p1MissingCnt = 0;         // v52 updated when we failed to read any P1
+long p1CrcFailCnt = 0;         // v52 updated when we Crc failed
+long p1RecoverCnt = 0;         // v52 updated when we successfully recovered P1
+long p1FailRxCnt  = 0;         // v52 updated P1 does not seem to be connnected
+long p1ReadRxCnt  = 0;         // v52 updated P1 has read an ok Crc
 bool validTelegramCRCFound  = false;     // Set by DdecodeTelegram if Message CRC = valid and send with Mqtt
 bool validTelegram2CRCFound = false;    // v46 Set by readTelegram2 to check validity of RX2 record
 // P1smartmeter timestate messages
@@ -1802,7 +1827,7 @@ void loop()
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
     } else {    // reliabilitty intervalP1cnt=360>0
-
+      p1FailRxCnt++;  // v52 count failed RJ11 connections
       // report to error mqtt, // V20 candidate for a callable error routine
       // tbd: consider to NOT send values
       // char mqttOutput[128]; // v51 not used as we do 
@@ -2094,9 +2119,15 @@ void readTelegram() {
         
         // print validity status of processed for debug reasons.
         if (validTelegramCRCFound) {
-          Serial.print((String) "_C");      // print checked OK
+              Serial.print((String) "_C");      // print checked OK
         } else {
-          if (validCrcInFound) Serial.print((String) "_R"); else Serial.print((String) "Z_");  // v45 print failed or recovered
+          if (validCrcInFound) {
+              Serial.print((String) "_R");  // v52 count Recoveries
+              p1RecoverCnt++ ; 
+          } else {
+              Serial.print((String) "Z_");  // v45 print failed or recovered
+              p1CrcFailCnt++ ;              // v52 count Crc fails
+          } 
         }
 
  #ifdef NoTx2Function
@@ -2723,6 +2754,13 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       waterReadCounter = 0 ;     // Zero the Water counters
       waterReadHotCounter = 0 ;  // Zero the WaterHot counter
       mqttCnt = 0;               // Zero mqttCnt
+
+      p1MissingCnt = 0;      // v52 updated when we failed to read any P1
+      p1CrcFailCnt = 0;      // v52 updated when we Crc failed
+      p1RecoverCnt = 0;      // v52 updated when we successfully recovered P1
+      p1FailRxCnt  = 0;      // v52 updated P1 does not seem to be connnected
+      p1ReadRxCnt  = 0;      // v52 updated P1 has read an ok Crc
+
       waterTriggerTime  = currentMicros;     // initialise debounce ro current looptime
       waterTriggerState = LOW;   // reset debounce
       waterReadState    = LOW;   // read watersensor pin
@@ -2786,127 +2824,10 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
-
     } else  if ((char)payload[0] == 'h') {       // v51 check call functions of pointers and data
-        // String mqttMsg = "test1234:a" ;  // start of Json error message        
-        // const char* mqttMsg = nullptr; // to check for mullptr
-        publishMqtt(mqttErrorTopic, (String) "H-test" + __LINE__ 
-            + ", c++ version="  + __cplusplus); // v51 with (String) ok marking version=201103 (C++11)
-
-        String arduinoString = "Temperature: %.1f°C";
-        char buffer[50];
-        float temp = 23.5f;
-        // Simple conversion - preferred method
-        snprintf(buffer, sizeof(buffer), arduinoString.c_str(), temp);
-        publishMqtt(mqttErrorTopic, buffer);      // v51:   CurrentPowerConsumption: %lu
-
-        char output5[128];     // use snprintf to format data
-        String msg5 = "{\"currentTime\":\"%d\", \"CurrentPowerConsumption\":%lu }";   // warning %s iso %d will crash
-        snprintf(output5, sizeof(output5), msg5.c_str(), millis(), CurrentPowerConsumption);
-        publishMqtt(mqttErrorTopic, output5);      // v51:   CurrentPowerConsumption: %lu
-
-      // v51 test this snprint construction , crashes
-        char output4[] = "secs:123456 51:51:51";     // use snprintf to format data
-        unsigned long allSeconds = currentMillis / 1000;  // take time of mailoop
-          int runHours = (allSeconds / 3600) % 24;
-          int secsRemaining = allSeconds % 3600;
-          int runMinutes = secsRemaining / 60;
-          int runSeconds = secsRemaining % 60;
-        snprintf(output4, sizeof(output4), "secs:%06d %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
-        publishMqtt(mqttErrorTopic, output4);      // v51:   CurrentPowerConsumption: %lu
-
-        char msgpub3[128];     // allocate a message buffer
-        char output3[128];     // use snprintf to format data
-        // std::string msg3 -->  std::string' has no member named 'concat' and so on
-        // class String {  --- The string class in /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/WString.h
-        //      --> https://cplusplus.com/reference/string/wstring/
-
-        
-        String msg3 = "{"; // build mqtt frame 
-        msg3.concat("\"currentTime\":\"%d\"");                  // %s is string whc will crash
-        msg3.concat(",\"CurrentPowerConsumption\":%lu }");    // P1
-        msg3.toCharArray(msgpub3, 64);   
-        msg3.toCharArray(msgpub3, sizeof(msgpub3)); // v51 convert/move/vast to char[]
-        publishMqtt(mqttErrorTopic, msg3);       // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
-        publishMqtt(mqttErrorTopic, msgpub3);    // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
-
-      // const char* dst = src.c_str(); // returns const char* to an ASCIIZ (NUL-terminated) representation of the value   
-      // const char* dst = src.data();  // returns const char* to the string's internal buffer
-      //   const char* output3_data = msg3.data();  // C native returns const char* to the string's internal buffer
-      //   const char* output3_str  = msg3.str();  // C native returns const char* to the string's internal buffer
-      // snprintf(output3, sizeof(output3), msgpub3, millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
-        snprintf(output3, sizeof(output3), "Millis=%d Power=%d", millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
-        publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
-
-        // snprint: Write formatted output to sized buffer https://cplusplus.com/reference/cstdio/snprintf/
-        // snprintf(output3, sizeof(output3), msgpub3,millis(), CurrentPowerConsumption);  // v51 Aduino crashes
-
-        // snprintf(output3, sizeof(output3), msg3.c_str(), millis(), CurrentPowerConsumption);  // v51 Aduino crashes
-        // publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436        
-        
-        // Serial.println((String)"\n\rv51 snprint" + output3 + "n\r");
-        // publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
-
-      /*
-      // v51 test this snprint construction , crashes
-        char msgpub3[64];     // allocate a message buffer
-        char output3[64];     // use snprintf to format data
-        String msg3 = "{"; // build mqtt frame 
-        msg3.concat("\"currentTime\":\"%s\"");                  // %s is string
-        msg3.concat(",\"CurrentPowerConsumption\":%lu");    // P1
-        msg3.toCharArray(msgpub3, 64);   
-        snprintf(output3, sizeof(output3), msgpub3,         // snprint clearly causes crash !!!!
-                millis(),
-                CurrentPowerConsumption);     
-        publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
-      
-
-      // v51 test thiss construction
-        char msgpub2[32];     // allocate a message buffer
-        char output2[32];     // use snprintf to format data
-        String msg2 = "";      // initialise data
-        msg2.concat("CurrentPowerConsumption: %lu");       // format data
-        msg2.toCharArray(msgpub2, 32);                     // move it to format buffwer
-        sprintf(output2, msgpub2, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-        client.publish(mqttPower, output2);     // v51:   CurrentPowerConsumption: 436
-        publishMqtt(mqttErrorTopic, msg2);      // v51:   CurrentPowerConsumption: %lu
-        publishMqtt(mqttErrorTopic, output2);   // v51:   CurrentPowerConsumption: 436
-      
-      // test these approaches
-        String mqttMsg999 = "{";  // start of Json
-        mqttMsg999.concat("\"error\":999 ,\"msg\":\"Check mqttMsg999\"}");  // v51 ok
-        publishMqtt(mqttErrorTopic, mqttMsg999);
-       
-        publishMqtt(mqttErrorTopic, "constantdata" ); // v51 ok "constantdata", looks as a string
-        publishMqtt(mqttErrorTopic, "constantdata" + __LINE__); // v51 wrongly: "SID set:"
-        publishMqtt(mqttErrorTopic, "constantdata" + (String)__LINE__); // v51 tbd
-
-        publishMqtt(mqttErrorTopic, (String) "String1_" + __LINE__); // v51 with (String) ok
-        publishMqtt(mqttErrorTopic, "string2_" + __LINE__); // v51 wrongly "(null)"
-        
-        String mqttMsg2 = "String3_" + (String) __LINE__ ; // v51 ok 
-        publishMqtt(mqttPower, mqttMsg2); // v51 ok
-        String mqttMsg3 = "string4_" + __LINE__ ;
-        publishMqtt(mqttPower, mqttMsg3); // v51 wrong --> "ntication Failed"
-        publishMqtt(mqttPower, (String) mqttMsg3); // wring --> "ntication Failed"
-
-        char outputData1[32];     // use snprintf to format data
-        sprintf(outputData1, "__LINE__=%lu", __LINE__); // Note: if using multiple values use snprint
-        client.publish(mqttPower, outputData1);        // v51 ok as outputData1 = String'ed
-        
-        char outputData3[16]={}; // define array to veriy behavior, initialised to 0x00
-        outputData3[0]= 'A';     // this convert A to a number
-        outputData3[1]= 'B';     // this convert B to a number
-        outputData3[2]= 'C';     // this convert C to a number
-        outputData3[3]= 'D';     // this convert D to a number
-        if (outputData3[4] == 0x00) outputData3[3] = 'E';   // v51 check behavior of array [4]=0x00 (yes) ABCE
-        outputData3[14]= 'Z';    // this convert to a number
-        outputData3[15]= 0x00;   // this convert to a number
-        client.publish(mqttPower, outputData3);        // v51 works as array is terminated 0x00
-        outputData3[2]= 0x00;     // this convert C to a number
-        client.publish(mqttPower, outputData3);        // v51 array early terminated (yes) "AB"
-      */
-        publishMqtt(mqttErrorTopic, (String) "H-test" + __LINE__); // v51 with (String) ok marking
+          command_testH1();
+    } else  if ((char)payload[0] == 'H') {    // testit c-strings and constants
+          command_testH2();
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\n\r? Help commands "  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
@@ -2914,7 +2835,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
           Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
           Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
-          Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") follow Thermostate"  
+          Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") Thermostate"  
                                                     + (new_ThermostatState == 2 ? " <--" : "" ) );
           Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
                                                     + (new_ThermostatState == 3 ? " <--" : "" ) );
@@ -2934,13 +2855,19 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
-          Serial.println((String)"Z zero counters");
+          Serial.println((String)"Z zero counters "
+                + "( faults: " 
+                + " Miss=" + p1MissingCnt         // v52 failed to read any P1
+                + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
+                + ", Rcvr=" + p1RecoverCnt         // v52 recovered P1 
+                + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
+                + " )" );
           Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
           Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
           Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
           Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
-          Serial.println((String)"M print Masking array");
-          Serial.println((String)"m print Input array");
+          Serial.println((String)"M print Masking array "+ "( MaskX="+ telegram_crcOut_cnt + " )" );   // v52 number of X maskings
+          Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )" );   // v52 number of Times we validated
           Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
           Serial.println((String)"v Verboselevel:"                + "\t" +  verboseLevel );
           
@@ -2964,7 +2891,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 
 
 /* 
-    // -------------------------------------------------------------------------------
+    / -------------------------------------------------------------------------------
     /                        Publish full as JSONPATH record
     / -------------------------------------------------------------------------------
 */
@@ -2973,6 +2900,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
   // int publishP1ToMqttCrc = 0;           // defining here leads tot memory corruption & stalls ??
   publishP1ToMqttCrc = 0;                  // reset
   if (validTelegramCRCFound) publishP1ToMqttCrc = 1; else if (validCrcInFound) publishP1ToMqttCrc = 2; 
+  else p1MissingCnt++;    // v52 count missing Crc (likeley records was not read at all)
   
   mqttCnt++ ;             // update counter
   // Serial.println("Debug4 publishP1ToMqtt");
@@ -3443,6 +3371,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
       if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
       // incoperate CRC reciovery function
       if (validTelegramCRCFound) {   // temporari test√erify on Debug switch
+        p1ReadRxCnt++ ; // Count times we have had a succesfull CRC read
         if (currentCRC == dataInCRC) { // on match build masking array
           // ----------------------------------------------------------------------------------------------
           validCrcInFound = validTelegramCRCFound;            // v45 telegram has CRC OK , so CrcIn is OK
@@ -3453,8 +3382,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
                           telegram_crcOut_cnt++;                // increase mask count
                           if (outputOnSerial) Serial.printf(", ms#%d=%c%c", i, telegram_crcIn[i], telegram_crcOut[i]);
                           telegram_crcOut[i] = 'X' ;            // mask this position
-                        }
                     }
+                }
                 if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
                 getValuesFromP1Record(telegram_crcIn, telegram_crcIn_len);
           } else {                                            // no or length changed masking array
@@ -4572,6 +4501,188 @@ uint32_t getCycleCountIramLocal() {   // ICACHE_RAM_ATTR does no influence speed
   }
 #endif
 
+/*
+  check and test coding of (im)mutable pointers and (im)mutable char/string
+*/
+void command_testH1() {      // used to checkout / test coding
+  #ifdef TEST_MODE      
+    publishMqtt(mqttErrorTopic, (String) "command_testH1 file " + __FILE__ +  ", line" + __LINE__ ); 
+    // read: https://www.geeksforgeeks.org/c/difference-const-char-p-char-const-p-const-char-const-p/
+    char a ='A', b ='B';
+    const char *ptr   = &a;
+
+    Serial.printf( "1a value pointed to by ptr : %c\r\n", *ptr);
+    //*ptr = b; illegal statement (assignment of read-only location *ptr)
+    ptr = &b; // changing the ptr
+    Serial.printf( "1b value pointed to by ptr : %c\r\n", *ptr);  // A
+
+    char *const ptr2  = &a;        
+    Serial.printf( "2a. Value pointed to by ptr2: %c\r\n", *ptr2); // B
+    Serial.printf( "2b. Address ptr2 is pointing to: %d\r\n\r\n", ptr2);  // 1073689560
+    // ptr = &b; // illegal statement, (assignment of read-only variable ptr)
+    *ptr2 = b; // changing the value at the address ptr is pointing to
+    Serial.printf( "2c. Value pointed to by ptr2: %c\r\n", *ptr2);  // B
+    Serial.printf( "2d. Address ptr2 is pointing to: %d\r\n\r\n", ptr2);  // 1073689560
+
+    const char *const ptr3 = &a;
+    Serial.printf( "3a. Value pointed to by ptr3: %c\r\n", *ptr3);  // B
+    Serial.printf( "3b. Address ptr3 is pointing to: %d\r\n\r\n", ptr3);  // 1073689560
+    ptr = &b; // should be illegal statement and does not do anything, ptr3 unchanged 
+    // *ptr = b; // illegal statement, (assignment of read-only location *ptr)
+    Serial.printf( "3c. Value pointed to by ptr3: %c\r\n", *ptr3);  // B
+    Serial.printf( "3d. Address ptr3 is pointing to: %d\r\n\r\n", ptr3);  // 1073689560
+
+    char *var0  = "a2960";          // A mutable pointer to mutable character/string  deprecated conversion
+        // C and C++ differ in the type of the string literal.
+        // In C the type is array of char and in C++ it is constant array of char.
+        // Use   foo((char *)"hello")   or  char *x = (char *)"foo bar";
+    
+    // char *var1  = "b";       //  deprecated conversion
+    char *var1  = (char *)"b";  // A mutable pointer to mutable character/string 
+    // char *var1  = 'b';       //  invalid conversion from 'char' to 'char*'
+
+    const char * var2 = var0;       // Mutable pointer to an immutable string/character
+    char * const var3 = var0;       // Immutable pointer to a mutable string
+    const char * const var4 = var0; // Immutable pointer to an immutable string/character
+    char  var5  = (int) 99;       // cannot use "c"  
+    char  var6  = 99L;            // cannot use "c"  , use format https://en.cppreference.com/w/cpp/language/integer_literal.html
+    char  var7  = 99;             // cannot use "c"  
+    char  var8  = 99ul;             // cannot use "c"  
+    Serial.printf( "4a. Value pointed to by var1: %c\r\n", *var1);  // b  
+    Serial.printf( "4b. Value pointed to by var2: %d\r\n", *var2);  // 97   %d will print numeric a = 97 
+    var2 = var1;
+    Serial.printf( "  4b. mutable ptr var2: %d\r\n", *var2);        // 98   %d will print numeric b = 98 
+    Serial.printf( "4c. Value pointed to by var3: %c\r\n", *var3);  // a    %s will crash
+    Serial.printf( "4d. Value pointed to by var4: %c\r\n", *var4);  // a
+    Serial.printf( "4e. Value pointed to by var5: %c\r\n", var5);   // c
+  #endif
+}
+
+/*
+  Execute test string casting c_str, array, publishmqtt
+*/
+void command_testH2(){    // Execute test string casting c_str, array, publishmqtt
+  #ifdef TEST_MODE      
+    // String mqttMsg = "test1234:a" ;  // start of Json error message        
+    // const char* mqttMsg = nullptr; // to check for mullptr
+    publishMqtt(mqttErrorTopic, (String) "command_testH2 file " + __FILE__ +  ", line" + __LINE__ ); 
+    //         + ", c++ version="  + __cplusplus); // v51 with (String) ok marking version=201103 (C++11)
+    String arduinoString = "Temperature: %.1f°C";
+    char buffer[50];
+    float temp = 23.5f;
+    // Simple conversion - preferred method
+    snprintf(buffer, sizeof(buffer), arduinoString.c_str(), temp);
+    publishMqtt(mqttErrorTopic, buffer);      // v51:   CurrentPowerConsumption: %lu
+
+    char output5[128];     // use snprintf to format data
+    String msg5 = "{\"currentTime\":\"%d\", \"CurrentPowerConsumption\":%lu }";   // warning %s iso %d will crash
+    snprintf(output5, sizeof(output5), msg5.c_str(), millis(), CurrentPowerConsumption);
+    publishMqtt(mqttErrorTopic, output5);      // v51:   CurrentPowerConsumption: %lu
+
+  // v51 test this snprint construction , crashes
+    char output4[] = "secs:123456 51:51:51";     // use snprintf to format data
+    unsigned long allSeconds = currentMillis / 1000;  // take time of mailoop
+      int runHours = (allSeconds / 3600) % 24;
+      int secsRemaining = allSeconds % 3600;
+      int runMinutes = secsRemaining / 60;
+      int runSeconds = secsRemaining % 60;
+    snprintf(output4, sizeof(output4), "secs:%06d %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
+    publishMqtt(mqttErrorTopic, output4);      // v51:   CurrentPowerConsumption: %lu
+
+    char msgpub3[128];     // allocate a message buffer
+    char output3[128];     // use snprintf to format data
+    // std::string msg3 -->  std::string' has no member named 'concat' and so on
+    // class String {  --- The string class in /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/WString.h
+    //      --> https://cplusplus.com/reference/string/wstring/
+
+    
+    String msg3 = "{"; // build mqtt frame 
+    msg3.concat("\"currentTime\":\"%d\"");                  // %s is string whc will crash
+    msg3.concat(",\"CurrentPowerConsumption\":%lu }");    // P1
+    msg3.toCharArray(msgpub3, 64);   
+    msg3.toCharArray(msgpub3, sizeof(msgpub3)); // v51 convert/move/vast to char[]
+    publishMqtt(mqttErrorTopic, msg3);       // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+    publishMqtt(mqttErrorTopic, msgpub3);    // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+
+    // const char* dst = src.c_str(); // returns const char* to an ASCIIZ (NUL-terminated) representation of the value   
+    // const char* dst = src.data();  // returns const char* to the string's internal buffer
+    //   const char* output3_data = msg3.data();  // C native returns const char* to the string's internal buffer
+    //   const char* output3_str  = msg3.str();  // C native returns const char* to the string's internal buffer
+    // snprintf(output3, sizeof(output3), msgpub3, millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
+    snprintf(output3, sizeof(output3), "Millis=%d Power=%d", millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
+    publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
+
+    // snprint: Write formatted output to sized buffer https://cplusplus.com/reference/cstdio/snprintf/
+    // snprintf(output3, sizeof(output3), msgpub3,millis(), CurrentPowerConsumption);  // v51 Aduino crashes
+
+    // snprintf(output3, sizeof(output3), msg3.c_str(), millis(), CurrentPowerConsumption);  // v51 Aduino crashes
+    // publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436        
+    
+    // Serial.println((String)"\n\rv51 snprint" + output3 + "n\r");
+    // publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
+
+  /*
+  // v51 test this snprint construction , crashes
+    char msgpub3[64];     // allocate a message buffer
+    char output3[64];     // use snprintf to format data
+    String msg3 = "{"; // build mqtt frame 
+    msg3.concat("\"currentTime\":\"%s\"");                  // %s is string
+    msg3.concat(",\"CurrentPowerConsumption\":%lu");    // P1
+    msg3.toCharArray(msgpub3, 64);   
+    snprintf(output3, sizeof(output3), msgpub3,         // snprint clearly causes crash !!!!
+            millis(),
+            CurrentPowerConsumption);     
+    publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
+  
+
+  // v51 test thiss construction
+    char msgpub2[32];     // allocate a message buffer
+    char output2[32];     // use snprintf to format data
+    String msg2 = "";      // initialise data
+    msg2.concat("CurrentPowerConsumption: %lu");       // format data
+    msg2.toCharArray(msgpub2, 32);                     // move it to format buffwer
+    sprintf(output2, msgpub2, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    client.publish(mqttPower, output2);     // v51:   CurrentPowerConsumption: 436
+    publishMqtt(mqttErrorTopic, msg2);      // v51:   CurrentPowerConsumption: %lu
+    publishMqtt(mqttErrorTopic, output2);   // v51:   CurrentPowerConsumption: 436
+  
+  // test these approaches
+    String mqttMsg999 = "{";  // start of Json
+    mqttMsg999.concat("\"error\":999 ,\"msg\":\"Check mqttMsg999\"}");  // v51 ok
+    publishMqtt(mqttErrorTopic, mqttMsg999);
+    
+    publishMqtt(mqttErrorTopic, "constantdata" ); // v51 ok "constantdata", looks as a string
+    publishMqtt(mqttErrorTopic, "constantdata" + __LINE__); // v51 wrongly: "SID set:"
+    publishMqtt(mqttErrorTopic, "constantdata" + (String)__LINE__); // v51 tbd
+
+    publishMqtt(mqttErrorTopic, (String) "String1_" + __LINE__); // v51 with (String) ok
+    publishMqtt(mqttErrorTopic, "string2_" + __LINE__); // v51 wrongly "(null)"
+    
+    String mqttMsg2 = "String3_" + (String) __LINE__ ; // v51 ok 
+    publishMqtt(mqttPower, mqttMsg2); // v51 ok
+    String mqttMsg3 = "string4_" + __LINE__ ;
+    publishMqtt(mqttPower, mqttMsg3); // v51 wrong --> "ntication Failed"
+    publishMqtt(mqttPower, (String) mqttMsg3); // wring --> "ntication Failed"
+
+    char outputData1[32];     // use snprintf to format data
+    sprintf(outputData1, "__LINE__=%lu", __LINE__); // Note: if using multiple values use snprint
+    client.publish(mqttPower, outputData1);        // v51 ok as outputData1 = String'ed
+    
+    char outputData3[16]={}; // define array to veriy behavior, initialised to 0x00
+    outputData3[0]= 'A';     // this convert A to a number
+    outputData3[1]= 'B';     // this convert B to a number
+    outputData3[2]= 'C';     // this convert C to a number
+    outputData3[3]= 'D';     // this convert D to a number
+    if (outputData3[4] == 0x00) outputData3[3] = 'E';   // v51 check behavior of array [4]=0x00 (yes) ABCE
+    outputData3[14]= 'Z';    // this convert to a number
+    outputData3[15]= 0x00;   // this convert to a number
+    client.publish(mqttPower, outputData3);        // v51 works as array is terminated 0x00
+    outputData3[2]= 0x00;     // this convert C to a number
+    client.publish(mqttPower, outputData3);        // v51 array early terminated (yes) "AB"
+  */
+    publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__); // v51 with (String) ok marking
+  #endif        
+}
 
 /* leave this for leaer to investigate why runtime-error is not found ...
 void throwExceptionFunction(void) {
