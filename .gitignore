@@ -11,6 +11,7 @@ P1Meter/P1OverrideSettings.h
 notes.txt
 compile_version_notes.txt
 gitignore*
+debug/
 
 ## Program related ##
 P1Meter/*.txt

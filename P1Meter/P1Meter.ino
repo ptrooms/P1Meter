@@ -1,4 +1,4 @@
-// #define TEST_MODE    // set in PlatformIO; 
+#define TEST_MODE       // set for Arduino to prevent default production compilation
 #define DEBUG_ESP_OTA   // v49 wifi restart issues 
 /*  documentation 
     https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
@@ -8,33 +8,41 @@
 */
 
 /* tbd 
-  cleaout no longer needed code
+  cleanout no longer needed code
   error: 06jul25 13u00 
       ESP8266-ResetReason: Hardware Watchdog
       Found Temp ghost device at 5 but could not detect address.
       ESP8266-ResetReason: Software Watchdog
       Crash after line: --> ESP8266-chip-size: 4194304 , ESP8#'+/37;?BFJNRVZ^bfjnrvz
       (ESP8266-sdk-version: 2.2.1(cfd48f3) )
+  tbd: power protection
+        -- check excessive power usage
+  tbd: smart thermostat
+      controls heat based on own thermo couple
+          -- learn feedback time
+  tbd: feed check, 
+      veriy we have commands on a daily basis
+  tbd: activate antifreeze protection 
+      for 1 hour when any of the temperature below average threshold 10-12°C during > 15 minutes
+      check if heat is produced by monitoring warmtelink
+  tbd: alarm flashing blueleds ??
+      design code to alternate flash
+  tbd: read/write countersmqtt: Sents (C__) Misses (Cxx) Fails (Z_) Recovers (R)
+      we have a miss if the P1 RX premature  ends < 340µSec, usually <= 86.016
+      we have a fail if CRC does not match
+      we have a Recver if we coull reconstruct CRC
+      we have an OK if none of the above and we output things 
+
 */
 /* change history
-  V52 06jul25:
-    tbd: power protection
-          -- check excessive power usage
-    tbd: smart thermostat
-        controls heat based on own thermo couple
-            -- learn feedback time
-    tbd: feed check, 
-        veriy we have commands on a daily basis
-    tbd: activate antifreeze protection 
-        for 1 hour when any of the temperature below average threshold 10-12°C during > 15 minutes
-        check if heat is produced by monitoring warmtelink
-    tbd: alarm flashing blueleds ??
-        design code to alternate flash
-    tbd: read/write countersmqtt: Sents (C__) Misses (Cxx) Fails (Z_) Recovers (R)
-        we have a miss if the P1 RX premature  ends < 340µSec, usually <= 86.016
-        we have a fail if CRC does not match
-        we have a Recver if we coull reconstruct CRC
-        we have an OK if none of the above and we output things 
+  V52 06jul25: restart information display
+    print & save restart reason information en report this at first mqttCnt into mqtt Errortopic
+    format localIp() address to string for display 'D', can also IPAddress just as an array of 4 ints.
+    diagnose state display using @-signal loop , &-got rx2 record
+    DEBUG_PRINTxx macros
+    counters for reads, misses, rx2, masks
+    relocated H/h test command_testH1 command_testH2 routines for inline casting etc.etc.
+    added and removed comments
   V51 03jul25: skipped 50 trying to centralise p1mqtt which irratically corrupts things
     added RX2 check availabiluy, we must have 1 read overy 7 mqttcnt record, else error:004 with successcount (bGot)
     added verboseLevel (int  verboseLeve) do minimize data, default as it was, we van incease by command 'v'
@@ -152,6 +160,16 @@
 #define NoTx2Function         // Do no serial out on D4/Gpio2/Blueled2
 #define REQUIRED_DSB18B20_SENSORS 6 // v49 miniomal required DS18B20 sensors
 #define REQUIRED_ANALOG_ADC 10 // v49 minimal required lightlevel for LDR sensor
+
+/*
+  ensure in PlatformIO the set PROD_MODE priotizes the else TEST_MODE
+*/
+#ifdef PROD_MODE
+  #ifdef TEST_MODE
+    #warning "This PROD_MODE is set by platformio to override inline TEST_MODE version."
+    #undef TEST_MODE
+  #endif
+#endif
 
 #ifdef TEST_MODE
   #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
@@ -674,6 +692,11 @@ const char *mqttLogTopic2  = "/log/wl"  P1_VERSION_TYPE;            // 'l' on/of
   #endif  // TEST_MODE 
 #endif  // P1_Override_Settings
 
+/*
+  save restart register for later display / diagnose
+*/
+uint32 save_reason, save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc;       // v52: save restart reason
+
 // administrative timers for loop, check to limit  risks for WDT resets
 unsigned long currentMillis  = 0; // millis() mainloop set at start
 unsigned long currentMicros  = 0; // micros() mainloop set at start
@@ -822,7 +845,6 @@ bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1pow
 bool rx2_function     = true;    // "F" true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
 bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogRX2 /log/wl2
 
-
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
 long mqttCnt = 0;                    // updated with each publish as of 19nov19
@@ -831,6 +853,9 @@ long p1CrcFailCnt = 0;         // v52 updated when we Crc failed
 long p1RecoverCnt = 0;         // v52 updated when we successfully recovered P1
 long p1FailRxCnt  = 0;         // v52 updated P1 does not seem to be connnected
 long p1ReadRxCnt  = 0;         // v52 updated P1 has read an ok Crc
+
+long RX_yieldcount = 3 ;    // v52 if we have  succesive yields to 0 hold reading RJ11 5 times to allow OTA
+
 bool validTelegramCRCFound  = false;     // Set by DdecodeTelegram if Message CRC = valid and send with Mqtt
 bool validTelegram2CRCFound = false;    // v46 Set by readTelegram2 to check validity of RX2 record
 // P1smartmeter timestate messages
@@ -922,7 +947,7 @@ int filteredValueAdc = 0; // average between previous and and published
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 char dummy2[17];       // add some spare bytes
 const char dummy2a[] = {0x0000};    // prevent overwrite
-char telegram[MAXLINELENGTH];       // telegram maxsize bytes for P1 meter
+char telegram[MAXLINELENGTH+32];       // telegram maxsize bytes for P1 meter
 char telegramLast[3];               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
 //DebugCRC int  testTelegramPos  = 0;          // where are we
@@ -933,10 +958,10 @@ int publishP1ToMqttCrc = 0;  // 0=failed, 1=OK, 2=recovered
 bool validCrcInFound = false;         // Set by Decode when Full (recovered) datarecord has valid Crc
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
-char telegram_crcIn[MAXLINELENGTH];   // active telegram that is checked for crc
+char telegram_crcIn[MAXLINELENGTH+32];   // active telegram that is checked for crc
 int  telegram_crcIn_len = 0;          // length of this record
 int  telegram_crcOut_cnt = 0;         // number of times masking was positioned
-char telegram_crcOut[MAXLINELENGTH];  // processed telegram with changed positions to X
+char telegram_crcOut[MAXLINELENGTH+32];  // processed telegram with changed positions to X
 const char dummy2b[] = {0x0000};      // prevent save overwrite
 // int  telegram_crcIn_cnt1 = 0;      // number of times CrcIn was called
 int  telegram_crcOut_len = 0;         // length of this record
@@ -989,7 +1014,7 @@ int  telegram_crcOut_len = 0;         // length of this record
 
 // RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
 #define MAXLINELENGTH2 256
-char telegram2[MAXLINELENGTH2+128+3+19]; // RX2 serial databuffer during outside P1 loop Plus overflow
+char telegram2[MAXLINELENGTH2+32]; // RX2 serial databuffer during outside P1 loop Plus overflow
 // char telegramLast2[3];             // overflow used to catch line termination bracket
 // char telegramLast2o[19];           // overflow-area to prevent memory leak
 bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
@@ -997,7 +1022,7 @@ long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records be
 long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
 long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
 const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak
-char telegram2Record[MAXLINELENGTH2]; // telegram extracted data maxsize for P1 RX2 
+char telegram2Record[MAXLINELENGTH2+32]; // telegram extracted data maxsize for P1 RX2 
 const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak
 
 
@@ -1048,13 +1073,23 @@ PubSubClient client(espClient);   // Use this connection client
   - attach waterpulse interrupt
 */
 
-
+#include <user_interface.h>     // v52: support to display/ger restart reasons
+// rst_info *resetInfo;            // v52: pointer (global)
 
 void setup()
 {
   asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
 
+// struct rst_info *rtc_info = system_get_rst_info();
+// Serial.printf(("reset reason: %x\n", rtc_info->reason);
+
+//    os_printf("epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x\n",
+//    rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+
+rst_info *resetInfo;     // v52: ptr made global
+resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
+ 
 #ifdef NoTx2Function
   pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
 #endif
@@ -1203,12 +1238,24 @@ void setup()
 //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   // #define DEF_PROG_VERSION 1123.240
   ArduinoOTA.begin();
-  Serial.println("Ready version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
-  Serial.println ("getFullVersion:" + ESP.getFullVersion());   
+
+  Serial.printf("Reset reason code: %x\n", resetInfo->reason);     // v52: print restart reason
+  Serial.println((String) "\n\rRestart time " + micros() + " for " + __FILE__ + " cause:" +  resetInfo->reason); // same but nicer
+  Serial.printf("\t epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x\r\n\n",
+        resetInfo->epc1, resetInfo->epc2, resetInfo->epc3, resetInfo->excvaddr, resetInfo->depc); // v52: print registers
+
+  save_reason   = resetInfo->reason;      // v52: save restart reason
+  save_epc1     = resetInfo->epc1;        // v52: save restart register
+  save_epc2     = resetInfo->epc2;
+  save_epc3     = resetInfo->epc3;
+  save_excvaddr = resetInfo->excvaddr;
+  save_depc     = resetInfo->depc;
+
+  Serial.println("Firmware version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
+  Serial.println ("ESP getFullVersion:" + ESP.getFullVersion());   
   Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
-  Serial.print   ("IP address: ");
-  Serial.println(WiFi.localIP());
+  Serial.print   ("IP address: " + String(WiFi.localIP().toString().c_str()) );  // v52: convert,  WiFi.localIP() is a reverse value
   Serial.println ("ESP8266-ResetReason: "+  String(ESP.getResetReason()));
   Serial.println ("ESP8266-free-space: "+   String(ESP.getFreeSketchSpace()));
   Serial.println ("ESP8266-sketch-size: "+  String(ESP.getSketchSize()));
@@ -1619,7 +1666,7 @@ void setup()
 */
 void loop()
 { 
-  if (verboseLevel == 1) Serial.print("\b"); // exit loop to check if we have entered the the buulding
+  if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
   // note this loop() routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
@@ -1648,14 +1695,22 @@ void loop()
     test_WdtTime = currentMillis + 1000;  // next interval
   }
 
-  // Following will trackdown loops
+  // Following will trackdown loops on execeeding serial reads using timeouts RX_yieldcount
   if (currentMillis > (previousLoop_Millis + 1080) ) { // exceeding 1.08 second  ?, warn user
     // yield();
+    if (RX_yieldcount > 0) RX_yieldcount-- ;     // v52 decrease successive yieldcount  with any or valid P1 read
+    if (RX_yieldcount < 1)  RX_yieldcount = 8;   // v52 when < 1, pause P1 serial reads ubtuk yield is again < 4
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
     if (outputOnSerial) {
-      Serial.printf("\r\nLoop %6.3f exceeded at prev %6.3f !!yield1080\n", ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+      Serial.printf("\r\nLoop %6.3f exceeded#%d at prev %6.3f !!yield1080\n", 
+          RX_yieldcount ,     // v52: print yield value
+          ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
     } else {
-      Serial.print("@");  // signal a yieldloop
+      if (RX_yieldcount > 3)  {
+          Serial.print("@");  // signal a yieldloop '@'
+      } else {
+          Serial.print("#");  // v52: yield protection false reads
+      }
     }
   }
   previousLoop_Millis = currentMillis;  // registrate our loop time
@@ -1686,15 +1741,15 @@ void loop()
       mySerial2.flush();        // Clear GJ buffer
       telegramError = 0;        // start with no errors
       // Start secondary serial connection if not yet active
-  #ifdef UseNewSoftSerialLIB
+    #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
       mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-  #else
+    #else
       // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
       mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud
       // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
-  #endif
+    #endif
 
     } else {    // if (!p1SerialActive)
 
@@ -1714,14 +1769,14 @@ void loop()
         // int checkIntervalRx2 = mqttCnt % 7;
         if ( rx2_function && (mqttCnt == 2  || (mqttCnt > 0 && ((mqttCnt % 7) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
-  #ifdef UseNewSoftSerialLIB
+    #ifdef UseNewSoftSerialLIB
           // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
           // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
           mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
-  #else
+    #else
           // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
           mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
-  #endif
+    #endif
         }
         
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
@@ -1806,8 +1861,11 @@ void loop()
   // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
 
   // (p1SerialActive && !p1SerialFinish) , process Telegram data
-  readTelegram();     // read RX1 P1 gpio14 (if serial data available)
- 
+  
+  if (RX_yieldcount < 4) { // assume all if well and we had of have surived any previous yieldcount
+    readTelegram();     // read RX1 P1 gpio14 (if serial data available)
+  }
+
   mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
   ESP.wdtFeed();  // as advised by forums
 
@@ -1842,7 +1900,7 @@ void loop()
       // mqttMsg.toCharArray(mqttOutput, 128);
 
       publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
-        if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
+      if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
       
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
@@ -1863,9 +1921,9 @@ void loop()
     */  
 
       // output on secondary  TX if not already used for loopback
-  #ifndef NoTx2Function
+    #ifndef NoTx2Function
       if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput , disabled as of v37
-  #endif
+    #endif
       // }
 
       forceCheckData = true;  // enforce  mode active
@@ -1875,6 +1933,11 @@ void loop()
       forceCheckData = false; // enforce  mode inactive
 
       mqttP1Published = true;   // assume publish to prevent conditional restart if things are running here
+
+      /*  // v52 disable as we do not want to wait on disconnections !!!!
+      if (RX_yieldcount > 0) RX_yieldcount-- ;     // v52 decrease successive yieldcount  with any or valid P1 read
+      if (RX_yieldcount < 1) RX_yieldcount = 8;   // v52 when < 1, pause P1 serial reads ubtuk yield is again < 4
+      */
     } // else millis exceeded intervalP1 hile enforce mqtt for tempsensors
 
     // If no MQTT poublished in this timout interval, whatever the reason, execute a restart to reset
@@ -2001,7 +2064,8 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n Cycle: %12.9f D%d%s%sC%s%s: %5u start: %11.6f \b\b ", 
+  if (!outputOnSerial) Serial.printf("\r\n Cycl%d: %12.9f D%d%s%sC%s%s: %5u start: %11.6f \b\b ", 
+        RX_yieldcount,    // v52: check countlevel
         ((float)ESP.getCycleCount()/80000000),
           (int) new_ThermostatState, (thermostatReadState ? "d" : "T"),  (thermostatWriteState ? "A" : "i"),
           (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
@@ -2044,6 +2108,8 @@ void readTelegram() {
     // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
     // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
     
+    if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (len-1) );   // v52/test replaced \n into \r
+
     if (outputOnSerial && verboseLevel >= VERBOSE_P1) {     // do we want/need to print the Telegram for Debug
       Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
       for (int cnt = 0; cnt < len; cnt++) {
@@ -2130,9 +2196,9 @@ void readTelegram() {
           } 
         }
 
- #ifdef NoTx2Function
+    #ifdef NoTx2Function
         if (!loopbackRx2Tx2 && blue_led2_Crc) validTelegramCRCFound ? digitalWrite(BLUE_LED2, HIGH) : digitalWrite(BLUE_LED2, LOW) ; // v38 monitoring
- #endif
+    #endif
 
         p1TriggerTime = millis();   // indicate we have a yield
 
@@ -2310,8 +2376,8 @@ void readTelegram2() {
           Process console
         */
         if (bGot_Telegram2Record) {   // v38 print record serial2 if we have catched a record
-          Serial.print("&&&&");     //  v39 print indicator // added 14mar22 to show activeness
-          Serial.print("\b\b\b+3.");     //  v41 print indicator // added 21jun23 to get it stable: Serial.print("\b\b\b+3."); 
+          Serial.print("&&&");     //  v39 print indicator // added 14mar22 to show activeness
+          Serial.print("\b\b+r.");     //  v41 print indicator // added 21jun23 to get it stable: Serial.print("\b\b\b+3."); 
           // 21jun23 Global variables use 41516 bytes (50%) of dynamic memory, leaving 40404 bytes for local variables. Maximum is 81920 bytes
                                          //  v39 print indicator // added 14mar22 to get it stable: Serial.print("\b\b\b.");
           // if (outputOnSerial && ((telegram2_Start >= 0 && telegram2_End > telegram2_Start) || bGot_Telegram2Record) ) {   // v38 print record serial2
@@ -2502,6 +2568,7 @@ void processGpio() {    // Do regular functions of the system
     Serial.print( (String) ", Trg#:" + waterTriggerCnt);    // print ISR call counter   
     Serial.print( (String) ", DbC#:" + waterDebounceCnt);   // print Debounce counter
     Serial.print( (String) ", Int#:" + intervalP1cnt);      // print Interval checking counter
+    Serial.print( (String) ", Yld#:" + RX_yieldcount);      // v52 current yield value
     Serial.println( " ." );
   }
   // publishP1ToMqtt();      // PUBLISH this mqtt
@@ -2628,7 +2695,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           int a = 0;
           int b = 10;
           volatile int c = b / a;
-          // Serial.printf(" e%d ", c); // print used variable 'c'
+          Serial.printf(" error0 %d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
     } else  if ((char)payload[0] == 'E') {    // here
@@ -2637,7 +2704,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           int a = 1;
           int b = 10;
           volatile int c = b / a;
-          // Serial.printf(" E%d ", c); // print used variable 'c'
+          Serial.printf(" error0 E%d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
 
@@ -2824,12 +2891,13 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
-    } else  if ((char)payload[0] == 'h') {       // v51 check call functions of pointers and data
-          command_testH1();
+    } else  if ((char)payload[0] == 'h') {
+          command_testH1();       // v51 check call functions of pointers and data
     } else  if ((char)payload[0] == 'H') {    // testit c-strings and constants
-          command_testH2();
+          // command_testH2();    //  v51: Execute test string casting c_str, array, publishmqtt
+          command_testH3();       // v52: check mqtt empty strings
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
-          Serial.println((String)"\n\r? Help commands "  + __FILE__ 
+          Serial.println((String)"\n\r? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
                                                         + ", compiled " __DATE__ + " " + __TIME__ );
           // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
@@ -2840,7 +2908,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
                                                     + (new_ThermostatState == 3 ? " <--" : "" ) );
           Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
-          Serial.println((String)"D debug (" + (IPAddress) local_IP + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
+          Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
           Serial.println((String)"L log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"e force exception1");
           Serial.println((String)"E force exception2");
@@ -2871,7 +2939,15 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
           Serial.println((String)"v Verboselevel:"                + "\t" +  verboseLevel );
           
-          Serial.println((String)"--------------------");
+          Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
+          
+          /* // cannot do here as resetInfo is not defined and cannot be not globalised
+          Serial.printf("Restart reason: 0x%08x epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x" , 
+            resetInfo->reason, resetInfo->epc1, resetInfo->epc2, resetInfo->epc3, resetInfo->excvaddr, resetInfo->depc); // v52: print registers
+          */
+          Serial.printf("\t restart reason 0x%08x  epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x ",
+                             save_reason, save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
+          Serial.println();
           Serial.println("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)");          // v51 print portstatus 
           Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
                                 + "\t" + WATERSENSOR_READ  + "=WATERSENSOR_READ:" + !digitalRead(WATERSENSOR_READ) 
@@ -3237,20 +3313,38 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
     Send data to Mqtt topic v51
 */
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
+  // note: to check for occurance on "const char* " , use strstr that searches 
+  if (!mqttTopic || strstr(mqttTopic,"!") ) {
+    if (mqttTopic) Serial.println((String) "\n\r\t mqttTopic is empty.");
+    if (strstr(mqttTopic,"!") && outputOnSerial) Serial.println((String) "\n\r\t" + mqttTopic + "prohibits output.");
+    return; // check empty of ! in topic
+  }    
+  
   Serial.print("^");     // signal write mqtt entered
   if (outputOnSerial) {  // debug
     if (verboseLevel >= VERBOSE_MQTT) {
-      Serial.print((String) "\n\r[" + mqttTopic + ":" + payLoad + ".");
+      Serial.println((String) "\n\r[" + mqttTopic + ":" + payLoad + ".");
     } else {
       Serial.print("{");        // print mqtt start operation
     }
   }
+
+  if (mqttCnt == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
+    char output[128];
+    snprintf(output, sizeof(output), 
+          "{\"info\":000, \"mqttCnt=\":%d ,\"msg\":\"restart reason 0x%08x"
+          ", epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x \"}",
+          mqttCnt , save_reason, 
+          save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
+    publishMqtt(mqttErrorTopic, output); // report to /error/P1 topic
+  }
+
   if (mqttTopic and payLoad) {    // check for not nullpointer
     char mqttOutput[MAXLINELENGTH];
     payLoad.toCharArray(mqttOutput, MAXLINELENGTH);
     if (client.connected()) {
       client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
-    }
+    }   
   } else {
     if (outputOnSerial) {  // debug
       Serial.println("_Error in publishMqtt, nullreference fault_");  // display error on debug
@@ -3372,6 +3466,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
       // incoperate CRC reciovery function
       if (validTelegramCRCFound) {   // temporari test√erify on Debug switch
         p1ReadRxCnt++ ; // Count times we have had a succesfull CRC read
+        RX_yieldcount = 3; // assume all if well and we had of have surived any yieldcount
         if (currentCRC == dataInCRC) { // on match build masking array
           // ----------------------------------------------------------------------------------------------
           validCrcInFound = validTelegramCRCFound;            // v45 telegram has CRC OK , so CrcIn is OK
@@ -4681,6 +4776,15 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
     client.publish(mqttPower, outputData3);        // v51 array early terminated (yes) "AB"
   */
     publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__); // v51 with (String) ok marking
+  #endif        
+}
+
+void command_testH3(){    // check for null pointers en !mqtttopic
+  #ifdef TEST_MODE
+    publishMqtt(mqttErrorTopic, "TestH3a");      // v51:   CurrentPowerConsumption: %lu
+    publishMqtt("", "TestH3b");      // v51:   CurrentPowerConsumption: %lu
+    const char *mqttErrorTopic_h3 = "/error!/"  P1_VERSION_TYPE;
+    publishMqtt(mqttErrorTopic_h3, "TestH3c");      // v51:   CurrentPowerConsumption: %lu
   #endif        
 }
 
