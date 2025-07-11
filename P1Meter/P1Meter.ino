@@ -34,8 +34,11 @@
       we have an OK if none of the above and we output things 
 
 */
+
 /* change history
   V52 06jul25: restart information display
+    command 'S'/'s' serialStopP1 serialStopRX2 (prohibit serial data)
+    RX_yieldcount ignore serial if too many failures
     print & save restart reason information en report this at first mqttCnt into mqtt Errortopic
     format localIp() address to string for display 'D', can also IPAddress just as an array of 4 ints.
     diagnose state display using @-signal loop , &-got rx2 record
@@ -817,7 +820,8 @@ long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active w
 int  telegramError    = false;   // indicate the P1 Telegram contains non-printable data ((e=...)
 // -------------------------------------------------------------------------------------------------- DEBUG output
 
-#define VERBOSE_MAX  5    // maximum after we cylced to 0
+#define VERBOSE_MAX  6    // maximum after we cylced to 0
+#define VERBOSE_CORE 6    // Do not process any serial
 #define VERBOSE_MQTT 5    // print all below and MQTT
 #define VERBOSE_P1   4    // print all below and P1
 #define VERBOSE_RX2  3    // print all below and RX2 Warmtelink
@@ -844,6 +848,8 @@ bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
 bool rx2_function     = true;    // "F" true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
 bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogRX2 /log/wl2
+bool serialStopP1     = false;   // 'S' stop read/inputting serial1 P1 data  (v52)
+bool serialStopRX2    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
@@ -1747,7 +1753,7 @@ void loop()
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
     #else
       // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-      mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud
+      if (!serialStopP1) mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
       // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
     #endif
 
@@ -1772,10 +1778,10 @@ void loop()
     #ifdef UseNewSoftSerialLIB
           // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
           // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-          mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+          if (!serialStopRX2) mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
     #else
           // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
+          if (!serialStopRX2) mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
     #endif
         }
         
@@ -1890,7 +1896,7 @@ void loop()
       // tbd: consider to NOT send values
       // char mqttOutput[128]; // v51 not used as we do 
       String mqttMsg = "{";  // start of Json
-      mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 rj11 serial not connected\""); 
+      mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 rj11 serial not reading\""); 
       // String mqttMsg = "Error, "; // build mqtt frame 
       // mqttMsg.concat("serial not connected ");  
       // mqttMsg,concat("interval="); // build mqtt frame 
@@ -1900,11 +1906,13 @@ void loop()
       // mqttMsg.toCharArray(mqttOutput, 128);
 
       publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
-      if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
+      if (outputMqttLog && !serialStopP1)
+          publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
       
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
-      Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\n\r",   
+      if (!serialStopP1)
+         Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\n\r",   
                           ((float)  micros() / 1000000), 
                           intervalP1cnt,
                           previousMillis,
@@ -2056,7 +2064,7 @@ void readTelegram() {
  #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
   if ( mySerial.P1active())  return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
  #endif  
-  if (!mySerial.available()) return ;  // quick return if no data
+  if (!mySerial.available() || serialStopP1 ) return ;  // quick return if no data, v52
 
   if (outputOnSerial)    {
     if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + " s=s123..\b\b\b\b\b") ; // print message line
@@ -2108,7 +2116,7 @@ void readTelegram() {
     // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
     // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
     
-    if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (len-1) );   // v52/test replaced \n into \r
+    if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (len-1) + ']' );   // v52/test replaced \n into \r
 
     if (outputOnSerial && verboseLevel >= VERBOSE_P1) {     // do we want/need to print the Telegram for Debug
       Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
@@ -2242,7 +2250,10 @@ void readTelegram2() {
     if (mySerial.P1active()) return ;   // return if P1 is active
  #endif  
 
+
   bGot_Telegram2Record  = false;      // v38 check RX2 seen
+  
+  if (serialStopRX2) return;    // v52 return if we have stopped this serial
 
   int lenTelegram2 = 0;
   /*
@@ -2891,6 +2902,13 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+    } else  if ((char)payload[0] == 'S') {  // v52 serial stop activating P1
+        serialStopP1 = !serialStopP1;
+        if (outputOnSerial) Serial.print((String) " Serial P1=" + (!serialStopP1  ? "Active" : "disabled") + " )" ) ;
+    } else  if ((char)payload[0] == 's') {  // serial stop activating RX2
+        serialStopRX2 = !serialStopRX2; 
+        if (outputOnSerial) Serial.print((String) " Serial RX2=" + (!serialStopRX2  ? "Active" : "disabled") + " )" ) ;
+
     } else  if ((char)payload[0] == 'h') {
           command_testH1();       // v51 check call functions of pointers and data
     } else  if ((char)payload[0] == 'H') {    // testit c-strings and constants
@@ -2927,8 +2945,9 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                 + "( faults: " 
                 + " Miss=" + p1MissingCnt         // v52 failed to read any P1
                 + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
-                + ", Rcvr=" + p1RecoverCnt         // v52 recovered P1 
+                + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
                 + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
+                + ", Yld="+  RX_yieldcount        // V52 Yeield count 0-3-8 yes/no process serial data
                 + " )" );
           Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
           Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
@@ -2937,6 +2956,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"M print Masking array "+ "( MaskX="+ telegram_crcOut_cnt + " )" );   // v52 number of X maskings
           Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )" );   // v52 number of Times we validated
           Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
+          Serial.println((String)"S ON/off serial1 P1 (" + (!serialStopP1  ? "Yes" : "No") + " )" );
+          Serial.println((String)"s ON/off serial2 RX2 (" + (!serialStopRX2  ? "Yes" : "No") + " )" );
           Serial.println((String)"v Verboselevel:"                + "\t" +  verboseLevel );
           
           Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
