@@ -202,14 +202,16 @@ int SoftwareSerial::peek() {
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // Advance the starting point for the samples but compensate for the
    // initial delay which occurs before the interrupt is delivered
+   //    midships: wait=(80000000/115200)+((80000000/115200)/3)−500=425
+   //    tbd: could change to rec |= digitalRead(m_rxPin) ? 0x80 : 0x00;
    unsigned long wait = m_bitTime + m_bitTime/3 - 500;
    unsigned long start = ESP.getCycleCount();
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAIT;
+     WAIT;     // { while (ESP.getCycleCount()-start < wait); wait += m_bitTime;
      rec >>= 1;
-     if (digitalRead(m_rxPin))
-       rec |= 0x80;
+     rec |= digitalRead(m_rxPin) ? 0x80 : 0x00;    // v52: always execute operation
+     // if (digitalRead(m_rxPin)) rec |= 0x80;
    }
    if (m_invert) rec = ~rec;
    // Stop bit
