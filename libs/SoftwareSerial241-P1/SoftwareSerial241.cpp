@@ -245,6 +245,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
+     else                     // v52 balance isr rxread always doing or operation
+       rec |= 0x00;
    }
    if (m_invert) rec = ~rec;
    // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
@@ -291,6 +293,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
+     else                     // v52 balance isr rxread2 always doing or operation
+       rec |= 0x00;
    }
    if (m_invert) rec = ~rec;
    // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
