@@ -178,6 +178,7 @@
   #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
   #define P1_BAUDRATE2 115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
 #else
+  // note: 115250 < baudrate < 115150 will increase errors and misreads
   #define P1_BAUDRATE  115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
   #define P1_BAUDRATE2 115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
 #endif
@@ -850,6 +851,8 @@ bool rx2_function     = true;    // "F" true  -> false , use v38 RX2 processing 
 bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogRX2 /log/wl2
 bool serialStopP1     = false;   // 'S' stop read/inputting serial1 P1 data  (v52)
 bool serialStopRX2    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
+long rx2ReadInterval  = 7;       // 's' decreases also de readinterval
+bool doReadAnalog    = true;     // 'a' yes/no read analog port for value
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
@@ -1773,7 +1776,7 @@ void loop()
 
         // Only activate myserial2  atdesignated times
         // int checkIntervalRx2 = mqttCnt % 7;
-        if ( rx2_function && (mqttCnt == 2  || (mqttCnt > 0 && ((mqttCnt % 7) == 0)) ) ) {  // only use RX2 port at these intervals
+        if ( rx2_function && (mqttCnt == 2  || (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
     #ifdef UseNewSoftSerialLIB
           // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
@@ -2665,7 +2668,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 
 
   */
-  if ((char)payload[0] != '\x00' && (char)payload[1] == '\x00' )  {   // only single command supported for now
+  if ((char)payload[0] != '\x00' && 
+      ( (char)payload[1] == '\x00' || (char)payload[2] == '\x00' ) )  {   // only single/double command supported for now
     if         ((char)payload[0] == '0') {
       new_ThermostatState = 0;                   // Heating on
       if (outputOnSerial) Serial.print("Thermostat will be switched off.");
@@ -2696,8 +2700,9 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       Serial.print(" MqttLogging2 ");
       if (!outputMqttLog2)  Serial.print("OFF\n\r ");
       if (outputMqttLog2)   Serial.println("\nON ");
-    } else  if ((char)payload[0] == 'v') {                                            // Restart
-      verboseLevel++ ;
+    } else  if ((char)payload[0] == 'v') {
+      if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') verboseLevel =  (int)payload[1] - 48;   // set number myself
+      else verboseLevel++ ;
       if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
       if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
     } else  if ((char)payload[0] == 'e') {
@@ -2905,9 +2910,21 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'S') {  // v52 serial stop activating P1
         serialStopP1 = !serialStopP1;
         if (outputOnSerial) Serial.print((String) " Serial P1=" + (!serialStopP1  ? "Active" : "disabled") + " )" ) ;
-    } else  if ((char)payload[0] == 's') {  // serial stop activating RX2
-        serialStopRX2 = !serialStopRX2; 
-        if (outputOnSerial) Serial.print((String) " Serial RX2=" + (!serialStopRX2  ? "Active" : "disabled") + " )" ) ;
+    } else  if ((char)payload[0] == 's') {  // v52 serial stop activating RX2
+        if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') rx2ReadInterval = (int)payload[1] - 48;   // set number myself
+        else serialStopRX2 = !serialStopRX2;
+        // if (rx2ReadInterval < 1) rx2ReadInterval = 7;   // reset back to 7 (actual 6*12=72secs)
+        if (outputOnSerial) Serial.print((String) " Serial RX2=" + rx2ReadInterval  
+                            + " (" + (!serialStopRX2  ? "Active" : "disabled") + " )" ) ;
+    } else  if ((char)payload[0] == 'a') {  // v52 manipulate analog read value
+        // nowValueAdc = 0;
+        if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') nowValueAdc = (((int)payload[1] - 48) * 100);   // set number myself
+        else if ((char)payload[1] == '-') doReadAnalog = false;
+        else if ((char)payload[1] == '+') doReadAnalog = true;
+        else doReadAnalog = !doReadAnalog;
+
+        if (outputOnSerial) Serial.print((String) " Analog=" + nowValueAdc  
+                            + " (" + (doReadAnalog  ? "Active" : "disabled") + " )" ) ;
 
     } else  if ((char)payload[0] == 'h') {
           command_testH1();       // v51 check call functions of pointers and data
@@ -2956,9 +2973,10 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"M print Masking array "+ "( MaskX="+ telegram_crcOut_cnt + " )" );   // v52 number of X maskings
           Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )" );   // v52 number of Times we validated
           Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
-          Serial.println((String)"S ON/off serial1 P1 (" + (!serialStopP1  ? "Yes" : "No") + " )" );
-          Serial.println((String)"s ON/off serial2 RX2 (" + (!serialStopRX2  ? "Yes" : "No") + " )" );
-          Serial.println((String)"v Verboselevel:"                + "\t" +  verboseLevel );
+          Serial.println((String)"S ON/off serial1 P1 \t" + (!serialStopP1  ? "Yes" : "No") );
+          Serial.println((String)"s ON/off/{0-9} serial2 RX2:"+ rx2ReadInterval  +" \t" + (!serialStopRX2  ? "Yes" : "No") );
+          Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
+          Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
           
           Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
           
@@ -3305,7 +3323,7 @@ bool processThermostat(bool myOperation)    // my operation is currently readed 
 int processAnalogRead()   // read adc analog A0 pin and smooth it with previous read (addtwo /2)
 { // return filtervalue
   pastValueAdc = nowValueAdc;
-  nowValueAdc = analogRead(ANALOG_IN);      // A0 pin
+  if (doReadAnalog) nowValueAdc = analogRead(ANALOG_IN);      // A0 pin, v52 yes/no reading
   // nowValueAdc = 123;
   filteredValueAdc = (pastValueAdc + nowValueAdc) / 2;  // smooth values by avarageing
   if (outputOnSerial and thermostatReadState) {  // debug
