@@ -36,6 +36,12 @@
 */
 
 /* change history
+  V52 13jul25: restart information display
+     protection "suspend @getValuesFromP1Record while mqttCnt < 5" unneeded, now commented
+    'e0'  = divide error
+    'e1'  = infinite loop fault
+    'E'   = Enforce read fault in Reading P1 data
+    testing serial processing on stable 2.4.1 and less stable 2.7.1
   V52 06jul25: restart information display
     command 'S'/'s' serialStopP1 serialStopRX2 (prohibit serial data)
     RX_yieldcount ignore serial if too many failures
@@ -852,7 +858,8 @@ bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogR
 bool serialStopP1     = false;   // 'S' stop read/inputting serial1 P1 data  (v52)
 bool serialStopRX2    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
 long rx2ReadInterval  = 7;       // 's' decreases also de readinterval
-bool doReadAnalog    = true;     // 'a' yes/no read analog port for value
+bool doReadAnalog     = true;    // 'a' yes/no read analog port for value
+bool doForceFaultP1   = false;   // 'E' yes/no force fault in Read telegram
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
@@ -1173,6 +1180,7 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   // WiFi.setSleepMode(WIFI_MODEM_SLEEP); // Disable sleep (Esp8288/Arduino core and sdk default)
       
   Serial.println("Settingup WifiSTAtion.");  // wait 5 seconds before retry
+  
   WiFi.mode(WIFI_STA);            // Client mode
   WiFi.setSleepMode(WIFI_NONE_SLEEP); // 09jul23 try to get Wifi stable disable sleep
 
@@ -1264,14 +1272,15 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   Serial.println ("ESP getFullVersion:" + ESP.getFullVersion());   
   Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
-  Serial.print   ("IP address: " + String(WiFi.localIP().toString().c_str()) );  // v52: convert,  WiFi.localIP() is a reverse value
+  Serial.println ("IP address: " + String(WiFi.localIP().toString().c_str()) );  // v52: convert,  WiFi.localIP() is a reverse value
   Serial.println ("ESP8266-ResetReason: "+  String(ESP.getResetReason()));
   Serial.println ("ESP8266-free-space: "+   String(ESP.getFreeSketchSpace()));
   Serial.println ("ESP8266-sketch-size: "+  String(ESP.getSketchSize()));
   Serial.println ("ESP8266-sketch-md5: "+   String(ESP.getSketchMD5()));
   Serial.println ("ESP8266-chip-size: "+    String(ESP.getFlashChipRealSize()));
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
-  Serial.println ("ESP8266-getChipId: "+    ESP.getChipId());             // sudden crash...
+  Serial.println ("ESP8266-getChipId: "+    String(ESP.getChipId()));             // sudden crash...
+  Serial.println ("ESP8266-FreeHeap: "+     String(ESP.getFreeHeap()));
 
   WiFi.printDiag(Serial);   // print data  
   strcpy(mqttServer1,mqttServer );         // v45 initialise for reference
@@ -1305,13 +1314,14 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   Serial.printf ("Test FloatingPoint support\n", mqttCnt);
   // asm(".global _printf_float"); // setin in Setup()
   // read: https://en.cppreference.com/w/c/io/fprintf
-  Serial.printf ("\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);   // strange lont number 2681....8192.0
-  Serial.printf ("\t12.345 ValeUu2 = %3u_\n", 12.345);        // strange 3607772529_
-  Serial.printf ("\t9.0453 Value4.2f = %4.2f\n", 9.0453);     // 9.05
-  Serial.printf ("\t9.1 Value4.1f = %4.1f\n", 9.1);           //  9.1
-  Serial.printf ("\t9.12340 Value5.1f = %5.2f\n", 9.12340);   //  9.12
-  Serial.printf ("\t 9.5 Value4.1f = %6.1f\n", 9.5);          //    9.5
-  Serial.printf ("\t1234.567 Value6.1f = %6.6f\n", 1234.567); // 1234.567000
+  Serial.printf ("\r\tmqttCnt ValueD = %05d\n", mqttCnt);   // strange lont number 2681....8192.0
+  Serial.printf ("\r\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);   // strange lont number 2681....8192.0
+  Serial.printf ("\r\t12.345 ValeUu2 = %3u_\n", 12.345);        // strange 3607772529_
+  Serial.printf ("\r\t9.0453 Value4.2f = %4.2f\n", 9.0453);     // 9.05
+  Serial.printf ("\r\t9.1 Value4.1f = %4.1f\n", 9.1);           //  9.1
+  Serial.printf ("\r\t9.12340 Value5.1f = %5.2f\n", 9.12340);   //  9.12
+  Serial.printf ("\r\t 9.5 Value4.1f = %6.1f\n", 9.5);          //    9.5
+  Serial.printf ("\r\t1234.567 Value6.1f = %6.6f\n\r", 1234.567); // 1234.567000
 #endif
 
 #ifdef TEST_CALCULATE_TIMINGS
@@ -2705,7 +2715,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       else verboseLevel++ ;
       if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
       if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
-    } else  if ((char)payload[0] == 'e') {
+    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '1' ) {
         Serial.print("## forcing divide error");
         while (true) {
           int a = 0;
@@ -2714,7 +2724,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.printf(" error0 %d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
-    } else  if ((char)payload[0] == 'E') {    // here
+    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '2' ) {
         Serial.print("## forcing infinite loop");
         while (true) {
           int a = 1;
@@ -2723,7 +2733,11 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.printf(" error0 E%d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
-
+    } else  if ((char)payload[0] == 'E') {       // v52 enforce Read fault to check recovering
+      doForceFaultP1   = !doForceFaultP1 ;       // swap
+      Serial.print("\t doForceFaultP1=");
+      if (!doForceFaultP1)  Serial.println("OFF\t");
+      if (doForceFaultP1)   Serial.println("ON\t");
     } else  if ((char)payload[0] == 'b') {    // here
         p1Baudrate = p1Baudrate - 50 ;
         Serial.print((String)"Decreasing Baudrate to " + p1Baudrate);
@@ -2945,8 +2959,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
           Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
           Serial.println((String)"L log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-          Serial.println((String)"e force exception1");
-          Serial.println((String)"E force exception2");
+          Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
+          Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
           Serial.println((String)"b Baud decrease gpio14:"        + "\t" +  p1Baudrate);
           Serial.println((String)"B Baud increase gpio14"         + "\t" +  p1Baudrate);
           Serial.println((String)"l Stoplog "+ mqttLogTopic);
@@ -2958,7 +2972,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
-          Serial.println((String)"Z zero counters "
+          Serial.println((String)"Z zero counters " + 
                 + "( faults: " 
                 + " Miss=" + p1MissingCnt         // v52 failed to read any P1
                 + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
@@ -3499,7 +3513,9 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
       char messageCRC[5];
       strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
       messageCRC[4] = 0;                                // make it an end of string
+
       validTelegramCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
+      if (doForceFaultP1) validTelegramCRCFound = false;    // v52 enforce P1 error
       
       if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
       // incoperate CRC reciovery function
@@ -3543,7 +3559,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
         // ----------------------------------------------------------------------------------------------
       } else {    // we have a CRC error on running CRC, try to recover using using created mask
         
-        if  (telegram_crcIn_len == telegram_crcOut_len) {    // if length of error is equal , try to unmask differences  ?
+        if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if length of error is equal , try to unmask differences  ?
             for (int i=0; i < telegram_crcIn_len; i++) {
                 if (telegram_crcOut[i] != 'X' && telegram_crcIn[i] != telegram_crcOut[i] ) {   // Unmask the error ??
                   if (outputOnSerial) {
@@ -3714,7 +3730,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // if (telegram[len - 3] != ')' ) client.publish(mqttErrorTopic, telegram ); // log invalid
   // if (telegram[len - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
 
-  if (   telegram[0] != '0' && telegram[0] != '1' && telegram[1] != '-' ) return endOfMessage; // if not start wih 0- or 1-
+  if (   telegram[0] != '0' && telegram[0] != '1' && telegram[1] != '-' ) return endOfMessage; // if subrecord not start wih 0- or 1-
 
   // if ( !(telegram[len - 3] == ')' || telegram[len - 4] == ')' )) return endOfMessage; // if not terminated by bracket then return
   if ( !(telegram[len - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
@@ -3817,7 +3833,7 @@ void RecoverTelegram_crcIn() {
     if (CurrentPowerConsumption2    != CurrentPowerConsumption)    Serial.printf("\n\r\t..RCurrentPowerConsumption2=%d/%d"   , CurrentPowerConsumption2   , CurrentPowerConsumption    );
     if (CurrentPowerProduction2     != CurrentPowerProduction)     Serial.printf("\n\r\t..RCurrentPowerProduction2=%d/%d"    , CurrentPowerProduction2    , CurrentPowerProduction     );
   }
-  // moving unconditional  fields from recoverty record (todo: candidate to do this always)
+  // moving unconditional  fields from recovery record (todo: candidate to do this always)
   currentTime  = currentTime2;
   strncpy(currentTimeS2, currentTimeS, 6);
   powerConsumptionLowTariff2  = powerConsumptionLowTariff;
@@ -3832,11 +3848,13 @@ void RecoverTelegram_crcIn() {
 // ---------------------------------------
 /*
   v45 Get field values from full P1  record 2872
+
 */
 void  getValuesFromP1Record(char buf[], int len) {  // 716
   // return;
   // if (mqttCnt == 3) Serial.printf(" mqttcount=%d len=%d ", mqttCnt, len ); // mqttcount=3 len=716
-  if (mqttCnt < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong
+  // if (mqttCnt < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong here, v52 disabled
+
   int f = 0;
   // InitialiseValues();         // Data record, ensure we start fresh with newly values in coming records
   f = FindWordInArrayFwd(buf, "0-0:1.0.0(", len, 9);
