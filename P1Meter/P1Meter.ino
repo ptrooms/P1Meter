@@ -36,8 +36,9 @@
 */
 
 /* change history
-  V52 13jul25 02u35 renamed to master
-  V52 13jul25: restart information display
+  V53 new version on V52 renamed to master
+    - initialised , note: v52 version (2.5GB) saved into /media/pafoxp/movies1/save_platformio/code-P1Meter
+  V52 13jul25: restart information display, 13jul25 02u35 renamed to master
      protection "suspend @getValuesFromP1Record while mqttCnt < 5" unneeded, now commented
     'e0'  = divide error
     'e1'  = infinite loop fault
@@ -193,13 +194,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1152.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1153.241 // current version (displayed in mqtt record)
       #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2152.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2153.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
