@@ -1785,17 +1785,22 @@ void loop()
       p1SerialFinish = false; // and let transaction finish
       mySerial2.end();          // Stop- if any - GJ communication
       mySerial2.flush();        // Clear GJ buffer
+      if (loopbackRx2Mode > 0) Serial.print((String) "_}" ); // v54 print incoming
+      
       telegramError = 0;        // start with no errors
       // Start secondary serial connection if not yet active
+      if (!serialStopP1) {
     #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
       mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
       // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
     #else
       // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-      if (!serialStopP1) mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
+
+        mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
       // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
     #endif
+      }        
 
     } else {    // if (!p1SerialActive)
 
@@ -1804,7 +1809,13 @@ void loop()
         // if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." ); // v47 superfluous after preceding debug line
         // --> end of p1 read electricity
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
-        if (!outputOnSerial) Serial.printf("\t endP1: %11.6f (%6.0f)__\b\b\t", ((float)micros() / 1000000), ((float)micros() - startMicros));
+        if (!outputOnSerial) {
+            unsigned long diffMicros  = micros() - startMicros; // micros() time readTelegram()
+            if (startMicros == 0) diffMicros = 0; // v54 startMicros = 0 if no P1 read executed
+            Serial.printf("\t endP1: %11.6f (%9.6f)__\b\b\t", 
+                ( (float) micros()    / 1000000UL ), 
+                ( (float) diffMicros / 1000000UL ) ); 
+        }                
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
@@ -1815,14 +1826,17 @@ void loop()
         // int checkIntervalRx2 = mqttCnt % 7;
         if ( rx2_function && (mqttCnt == 2  || (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
-    #ifdef UseNewSoftSerialLIB
-          // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-          // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-          if (!serialStopRX2) mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
-    #else
-          // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          if (!serialStopRX2) mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
-    #endif
+        if (!serialStopRX2) {
+          #ifdef UseNewSoftSerialLIB
+            // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+            // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+            mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+          #else
+            // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+            mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
+          #endif
+            if (loopbackRx2Mode > 0) Serial.print((String) "{_" ); // v54 print incoming
+          }
         }
         
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
@@ -1959,13 +1973,16 @@ void loop()
             
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
-      if (!serialStopP1)
+      if (!serialStopP1 && loopbackRx2Mode == 0) {
          if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
          Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\n\r",   
                           ((float)  micros() / 1000000), 
                           intervalP1cnt,
                           previousMillis,
                           currentMillis);
+      } else {
+        Serial.print(".\n\r:") ;        // v54: if no RJ11 message print some indication
+      }                          
     /*    
       // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
       Serial.print("\n\r# !!# ESP P1 rj11 Active interval checking ");   // v45: add carriage-return
@@ -2330,11 +2347,18 @@ void readTelegram2() {
 
     while (mySerial2.available() && loopTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
        // type casting https://www.geeksforgeeks.org/cpp/cpp-program-for-int-to-char-conversion/
-      if (loopbackRx2Mode > 0) Serial.print((String)  + char(mySerial2.peek()) ); // v53 print incoming
+      // if (loopbackRx2Mode > 0) Serial.print((String)  + char(mySerial2.peek()) ); // v54 print incoming
       // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
-      int len = mySerial2.readBytesUntil(0, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      int len = 0;
+      if (loopbackRx2Mode > 0) {
+        len = mySerial2.readBytesUntil(0, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      } else {        
+        len = mySerial2.readBytesUntil(13, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      }        
+      if (loopbackRx2Mode > 0 && len > 0) Serial.println((String) + "..len=" + len + ":\'" + telegram2 + "\'.." ); // v54 print incoming
+      
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
       lenTelegram2 = lenTelegram2 + len;
       if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
@@ -2474,14 +2498,11 @@ void readTelegram2() {
                 if (outputOnSerial) {   // print serial record count, total receivwed length, calculated CRC
                   Serial.printf(" s=%c, e=%c, crt=%s, cr1=%x, ;", telegram2Record[startChar],telegram2Record[endChar], messageCRC2, currentCRC2) ;    // debug print calculated CRC
                 }
-                if (outputOnSerial) {   // before and after crc
-                  currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar));   // ignore header, v48-casting
-                  Serial.printf(" cr0=%x,", currentCRC2) ;    // debug print calculated CRC
-                  currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar)-1); // ignore header & trailer, v48-casting
-                  Serial.printf(" cr-1=%x,", currentCRC2) ;    // debug print calculated CRC
 
-                }
-
+                currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar));   // ignore header, v48-casting
+                if (outputOnSerial) Serial.printf(" cr0=%x,", currentCRC2) ;    // debug print calculated CRC
+                currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar)-1); // ignore header & trailer, v48-casting
+                if (outputOnSerial || loopbackRx2Mode > 0) Serial.printf(" cr0=%x,", currentCRC2) ;    // v53 debug print calculated CRC
           }
 
 
@@ -2832,6 +2853,11 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'T') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
       if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') {
          loopbackRx2Mode = (((int)payload[1] - 48) * 1);  // set number myself
+         // T1 enforces debug diagnose to verify serial processing
+         if (loopbackRx2Mode == 1) {
+            outputOnSerial = false;   // disable debug details as we focus on serial input display
+            rx2ReadInterval = 1;     // process this for any RX2 loop
+         }
         /* 
             Playing here with myserial is useless
             as this is inner class and does not  reflect upper routines
