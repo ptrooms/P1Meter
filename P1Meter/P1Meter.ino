@@ -8,8 +8,9 @@
 */
 
 /* tbd 
+  documentation for mqtt commands
   cleanout no longer needed code
-  error: 06jul25 13u00 
+    error: 06jul25 13u00 (using faulty esp, port0 > 3.6volts) 
       ESP8266-ResetReason: Hardware Watchdog
       Found Temp ghost device at 5 but could not detect address.
       ESP8266-ResetReason: Software Watchdog
@@ -36,6 +37,24 @@
 */
 
 /* change history
+  v54 from master to restart porting 2.4.1. where we left off
+  v53 unstable branch when we have (inactive) conditional prints which crashed, detached
+  V53 new version on V52 renamed to master
+    - using 2.4.1 i stable, 2.7.1 is less reliable
+      perhaps timing is different. TBI
+    
+    - initialised , note: v52 version (2.5GB) saved into /media/pafoxp/movies1/save_platformio/code-P1Meter
+      Force up to dat branch to be master: 
+        read: [https://www.geeksforgeeks.org/git/how-to-replace-master-branch-with-another-branch-in-git/]
+        git remote -v
+        git checkout v52        // ensure on branch
+        git pull origin v52     // sync
+        git branch -D master    // delete master
+        git branch -m master    // rename current to master
+        git push origin master --force  // force sync
+        git fetch origin        // get back
+        git checkout master     // checkout master
+        git log                 // check log status
   V52 13jul25 02u35 renamed to master
   V52 13jul25: restart information display
      protection "suspend @getValuesFromP1Record while mqttCnt < 5" unneeded, now commented
@@ -193,13 +212,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1152.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1154.241 // current version (displayed in mqtt record)
       #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2152.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2154.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -613,14 +632,16 @@
 
 // communication mode settings, is the Startbit RISING edge or (inverted) FALLING edge
 #ifdef TEST_MODE
-bool bSERIAL_INVERT = false;  // Simulatated P1 meter is USB interface of a PC to GPIO, does not required invert
+bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
+bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
 #else
-bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
+bool bSERIAL_INVERT  = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
+bool bSERIAL2_INVERT = true;  // GJ meter is inverted (output RX2 does pulldown Gpio) v53
 #endif
 
 // #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232  < 03okt22
 // #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
-#define bSERIAL2_INVERT true // GJ meter is as far as we  know normal  serial (FALSE) RS232 @direct p1 03okt22
+// #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal  serial (FALSE) RS232 @direct p1 03okt22
 
 
 // hardware PIN settings, change accordingly , total esp8266 pins 17
@@ -851,6 +872,7 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
+int  loopbackRx2Mode  = 0;       //   '0' Testloopback RX2 to TX2 (OFF, 1 test-check input research timeing) 
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
@@ -1753,7 +1775,11 @@ void loop()
   } else {                         // else we are allowed to do other acivities
     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
-
+/* 
+        =========================================
+        Try to read connected P1
+        =========================================
+      */         
       if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial started at " + currentMillis);
       p1SerialActive = !p1SerialActive ; // indicate we have started
       p1SerialFinish = false; // and let transaction finish
@@ -1905,7 +1931,18 @@ void loop()
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
     } else {    // reliabilitty intervalP1cnt=360>0
+
+      /*
+        ====================================
+          we have 10 seconds of no P1 reads 
+        ====================================
+      */
       p1FailRxCnt++;  // v52 count failed RJ11 connections
+      p1SerialFinish = true;  // v53: enforce to accomodate faults normal set at  processing P1 record
+      p1SerialActive = true; // v53: enforce to accomodate faults normal set at  processing P1 record
+      // mySerial.end();         // v53: enforce finish , done at line 1775
+      // mySerial.flush();       // v53: enforce flush the buffer (if any) line 1775
+
       // report to error mqtt, // V20 candidate for a callable error routine
       // tbd: consider to NOT send values
       // char mqttOutput[128]; // v51 not used as we do 
@@ -1918,14 +1955,12 @@ void loop()
       mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
       // mqttMsg.toCharArray(mqttOutput, 128);
-
       publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
-      if (outputMqttLog && !serialStopP1)
-          publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
-      
+            
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
       if (!serialStopP1)
+         if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
          Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\n\r",   
                           ((float)  micros() / 1000000), 
                           intervalP1cnt,
@@ -2282,7 +2317,7 @@ void readTelegram2() {
   // 30mar21: no data available .....
   if (mySerial2.available())   {
     if (outputOnSerial && verboseLevel >= VERBOSE_RX2)    {
-      Serial.print("\n\r Rx2N="); // print message line
+      Serial.print((String) "\n\r Rx2N:" + loopbackRx2Mode + "="); // print message line
     }
     memset(telegram2, 0,       sizeof(telegram2));        // initialise telegram array to 0
     // memset(telegramLast2, 0,   sizeof(telegramLast2));    // initialise array to 0
@@ -2294,7 +2329,8 @@ void readTelegram2() {
     int telegram2_Pos   = 0;
 
     while (mySerial2.available() && loopTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
-       
+       // type casting https://www.geeksforgeeks.org/cpp/cpp-program-for-int-to-char-conversion/
+      if (loopbackRx2Mode > 0) Serial.print((String)  + char(mySerial2.peek()) ); // v53 print incoming
       // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
@@ -2790,14 +2826,48 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
   #endif
                    Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
                 }
+} else  if ((char)payload[0] == 't') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
+          Serial.print((String) " p:" + mySerial2.peek() + "=" + char(mySerial2.peek()) + " " );
+          // mySerial2.flush();        // Clear GJ buffer
+    } else  if ((char)payload[0] == 'T') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
+      if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') {
+         loopbackRx2Mode = (((int)payload[1] - 48) * 1);  // set number myself
+        /* 
+            Playing here with myserial is useless
+            as this is inner class and does not  reflect upper routines
 
-    } else  if ((char)payload[0] == 'T') {
+         if        (loopbackRx2Mode == 1 ) { // redefine myserial2
+            SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, !bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
+            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 - 10);
+            Serial.print((String) " RX2 baudrateB1 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                    + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
+                    + ", p1Baudrate2=" + p1Baudrate2  
+            );
+          } else if (loopbackRx2Mode == 2 ) {
+            SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2,  bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
+            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 + 10);
+            Serial.print((String) " RX2 baudrateB2 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                    + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
+                    + ", p1Baudrate2=" + p1Baudrate2  
+            );
+          }
+          // print loopTelegram2cnt ???
+        */
+      } else {
       loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
+      Serial.print((String) " RX1 baudrateA1=" + mySerial.baudRate() // v53: print diagse status if resetted myserial2
+                            + " RX2 baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                            + " loopbackRx2Tx2=" + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")
+                            + " " );
+      }
+
       // mySerial2.begin( 1200);    // GJ meter port   1200 baud
       // mySerial2.println("..echo.."); // echo back
+
       if (outputOnSerial) {
-        Serial.print("RX2TX2 looptest=");
-        Serial.print(loopbackRx2Tx2 == true ? "ON" : "OFF");
+        Serial.print((String) "RX2TX2 looptest=" 
+              + (loopbackRx2Tx2 == true ? "ON" : "OFF") 
+              + " mode:" + loopbackRx2Mode);
       }
 
   /* Does not operate, as serial isetup during setup
@@ -2969,7 +3039,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
                                                                          + (blue_led2_Water ? "Y" : "N") 
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
-          Serial.println((String)"T rx2 loopback to BlueLed:"     + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")   );
+          Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
+                                                                  + ", mode:" + loopbackRx2Mode );
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -2979,7 +3050,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                 + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
                 + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
                 + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
-                + ", Yld="+  RX_yieldcount        // V52 Yeield count 0-3-8 yes/no process serial data
+                + ", Yld="+  RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
++ ", lT2="+  loopTelegram2cnt     // V53 print current loopTelegram2cnt
                 + " )" );
           Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
           Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
