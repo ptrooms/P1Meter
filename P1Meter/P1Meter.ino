@@ -36,6 +36,7 @@
 */
 
 /* change history
+  V52 13jul25 02u35 renamed to master
   V52 13jul25: restart information display
      protection "suspend @getValuesFromP1Record while mqttCnt < 5" unneeded, now commented
     'e0'  = divide error
