@@ -8,8 +8,9 @@
 */
 
 /* tbd 
+  documentation for mqtt commands
   cleanout no longer needed code
-  error: 06jul25 13u00 
+  error: 06jul25 13u00 (using faulty esp, port0 > 3.6volts)
       ESP8266-ResetReason: Hardware Watchdog
       Found Temp ghost device at 5 but could not detect address.
       ESP8266-ResetReason: Software Watchdog
@@ -37,7 +38,22 @@
 
 /* change history
   V53 new version on V52 renamed to master
+    - using 2.4.1 i stable, 2.7.1 is less reliable
+      perhaps timing is different. TBI
+    
     - initialised , note: v52 version (2.5GB) saved into /media/pafoxp/movies1/save_platformio/code-P1Meter
+      Force up to dat branch to be master: 
+        read: [https://www.geeksforgeeks.org/git/how-to-replace-master-branch-with-another-branch-in-git/]
+        git remote -v
+        git checkout v52        // ensure on branch
+        git pull origin v52     // sync
+        git branch -D master    // delete master
+        git branch -m master    // rename current to master
+        git push origin master --force  // force sync
+        git fetch origin        // get back
+        git checkout master     // checkout master
+        git log                 // check log status
+
   V52 13jul25: restart information display, 13jul25 02u35 renamed to master
      protection "suspend @getValuesFromP1Record while mqttCnt < 5" unneeded, now commented
     'e0'  = divide error
@@ -614,14 +630,16 @@
 
 // communication mode settings, is the Startbit RISING edge or (inverted) FALLING edge
 #ifdef TEST_MODE
-bool bSERIAL_INVERT = false;  // Simulatated P1 meter is USB interface of a PC to GPIO, does not required invert
+bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
+bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
 #else
-bool bSERIAL_INVERT = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
+bool bSERIAL_INVERT  = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
+bool bSERIAL2_INVERT = true;  // GJ meter is inverted (output RX2 does pulldown Gpio) v53
 #endif
 
 // #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232  < 03okt22
 // #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
-#define bSERIAL2_INVERT true // GJ meter is as far as we  know normal  serial (FALSE) RS232 @direct p1 03okt22
+// #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal  serial (FALSE) RS232 @direct p1 03okt22
 
 
 // hardware PIN settings, change accordingly , total esp8266 pins 17
@@ -852,6 +870,7 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
+int  loopbackRx2Mode  = 0;       //   '0' Testloopback RX2 to TX2 (OFF, 1 test-check input research timeing) 
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
@@ -1055,8 +1074,8 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
 #ifdef UseNewSoftSerialLIB
   //  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
-SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
+  SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
+  SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
 #else
   /// @param baud the TX/RX bitrate
   /// @param config sets databits, parity, and stop bit count
@@ -1066,8 +1085,8 @@ SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 ba
   /// @param bufCapacity the capacity for the received bytes buffer
   /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
   // 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
 // Wifi https://docs.arduino.cc/language-reference/en/functions/wifi/client/
@@ -1754,7 +1773,11 @@ void loop()
   } else {                         // else we are allowed to do other acivities
     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
-
+      /* 
+        =========================================
+        Try to read connected P1
+        =========================================
+      */         
       if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial started at " + currentMillis);
       p1SerialActive = !p1SerialActive ; // indicate we have started
       p1SerialFinish = false; // and let transaction finish
@@ -1762,20 +1785,63 @@ void loop()
       mySerial2.flush();        // Clear GJ buffer
       telegramError = 0;        // start with no errors
       // Start secondary serial connection if not yet active
-    #ifdef UseNewSoftSerialLIB
-      // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-      mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
-      // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-    #else
-      // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-      if (!serialStopP1) mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
-      // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
-    #endif
+      #ifdef UseNewSoftSerialLIB
+        // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+        mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+        // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
+      #else
+        // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+        if (!serialStopP1) mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
+        // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
+      #endif
 
     } else {    // if (!p1SerialActive)
+      if (loopbackRx2Tx2 && loopbackRx2Mode == 3) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // print message line v53 check if called
+      
+// ----------------------------------------------------------------------------------------------------      
+      // Serial.print((String) "."); // v53 check crashing , unconditional single line does not crash
+
+
+      for (int i=0;i<1;i++) {
+        if (false) Serial.print((String) "."); // v53 check crashing insde loop , true doe if false does not crash 
+      }
+
+      // if (mqttCnt == 100) Serial.println((String) "crash0"); // v53 check mqttCnt == 100, does crash
+
+      // if (outputOnSerial) Serial.println((String) "crash0"); // v53 check true for crashing , single line does crash
+      
+      // if (loopbackRx2Tx2) Serial.print((String) "."); // v53 check crashing , line does crash
+      
+      // if (loopbackRx2Tx2) {
+              // Serial.print((String) "."); // v53 check crashing , line inside {} does crash
+      // }              
+
+      // if (true) Serial.print((String) "."); // v53 check crashing , if true does crash
+      
+      // if (false) Serial.print((String) "."); // v53 check crashing , if false does not crash 
+
+      // if (!false) Serial.print((String) "."); // v53 check crashing , if !false does crash 
+
+      // if (loopbackRx2Tx2 && loopbackRx2Mode == 3) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // this added crashes also
+      
+      // if (!outputOnSerial) Serial.println((String) "crash0"); // v53 check crashing , single line does
+      
+      // if (!outputOnSerial) Serial.println((String) "crash1"); // v53 check crashing , dual line does   
+      // if (!outputOnSerial) Serial.println((String) "crash2"); // v53 check crashing    
+
+      // if (!outputOnSerial) Serial.println((String) "crash1"); // v53 check crashing , triple line
+      // if (!outputOnSerial) Serial.println((String) "crash2"); // v53 check crashing    
+      // if (!outputOnSerial) Serial.println((String) "crash3"); // v53 check crashing    
+
+      // if (!outputOnSerial) Serial.println((String) "0"); // v53 check crashing , single line less one does
+      
+// ----------------------------------------------------------------------------------------------------
 
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
+        if (loopbackRx2Tx2 && loopbackRx2Mode == 4) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // print message line v53 check if called
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
+        // if (outputOnSerial) Serial.println((String) "crash0"); // v53 check crashing
+
         // if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." ); // v47 superfluous after preceding debug line
         // --> end of p1 read electricity
         // if (!outputOnSerial) Serial.print((String) "\t stopped:" + micros() + " ("+ (micros()-currentMicros) +")" + "\t");
@@ -1786,20 +1852,44 @@ void loop()
         mySerial.flush();  // Clear P1 buffer
         loopTelegram2cnt = 0;  // allow readtelegram2  for a maximum of "6 loops" of actual receives
 
+        // ESP.wdtFeed();  // as advised by forums, v53 pevent crashing ??
+        // if (mqttCnt == 3) Serial.print( "\n\r activating RX2...3... ");  // v53 debug if this section is called
+
+
+
+                
         // Only activate myserial2  atdesignated times
         // int checkIntervalRx2 = mqttCnt % 7;
+
         if ( rx2_function && (mqttCnt == 2  || (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
-    #ifdef UseNewSoftSerialLIB
-          // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-          // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-          if (!serialStopRX2) mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
-    #else
-          // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          if (!serialStopRX2) mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
-    #endif
+          // if (mqttCnt < 10) Serial.print((String) "\n\r activating RX2 baud" + p1Baudrate2 + " at mqtt#" );  // v53 debug if this section is called
+          #ifdef UseNewSoftSerialLIB
+                // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+                // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+                if (!serialStopRX2) mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+          #else
+                // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+                if (!serialStopRX2) mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
+          #endif
+          
+          // if (mqttCnt < 10) Serial.print((String) " for begin..." + mySerial2.baudRate() + " " );  // v53 debug crash if called
+
+          
+          // if (mqttCnt == 4) {
+              // Serial.print( (long) mySerial2.baudRate() );  // v53 , called single else it crashes
+              // Serial.print( (String) " at mqttCnt=" + mqttCnt );  // v53 , called single else it crashes
+          // Serial.print( (String) " at mqttCnt=" + mqttCnt );  // v53 , called single else it crashes
+          // Serial.print( (String) " at mqttCnt=" + mqttCnt );  // v53 , called single else it crashes
+          // ESP.wdtFeed();
+          // int test234 = 5;
+          // Serial.print( (String) "a" + test234 );  // v53 , called single else it crashes
+          // Serial.print( (String) "a" );  // v53 , called single else it crashes
+          // Serial.print( (String) "" );  // v53 , called single else it crashes
+              // }
+
         }
-        
+
         previousP1_Millis = currentMillis;  // indicate time we have stopped.
         previousMillis    = currentMillis;  // initialise our start counter for the overall proces.
       } else {  // p1SerialFinish
@@ -1850,26 +1940,26 @@ void loop()
     }      
 
     /*
-    if ( (waterTriggerCnt == 1) && (debounce_time > waterReadDebounce * 1000)) {    // was 100 but we must accomodate mS
-      // we are in hold read interrupt mode , re-establish interrupts
-      waterDebounceCnt++;                // administrate usage  for report
-      attachWaterInterrupt();
-      waterTriggerTime = currentMicros;  // reset our trigger counter
-      waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
-    } else {  // check if we must add a pulse counter
-      if ( (waterTriggerTime != 0) && (debounce_time > waterReadDebounce * 1000) ) { // debounce_time (mSec
-        waterTriggerTime = 0;                        // reset counter for next trigger
-        // waterTriggerCnt  = 0;                     // reset ISR counter
-        if (waterReadState != waterTriggerState) {   // switchsetting) {  // read switch state
-          waterReadState = waterTriggerState ;       // stabilize switch
-          if (!waterReadState) waterReadCounter++;   // count this as pulse if switch went LOW
-          if (!waterReadState && !lightReadState) waterReadHotCounter++; // count this as pulse if switch went LOW
-          // accomodate/enforce stability
-          if ( waterReadState) pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage our external pull-up
-          if (!waterReadState) pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external pull-up
-        } // if waterReadState
-      } // else waterTriggerCnt = 1
-    }
+      if ( (waterTriggerCnt == 1) && (debounce_time > waterReadDebounce * 1000)) {    // was 100 but we must accomodate mS
+        // we are in hold read interrupt mode , re-establish interrupts
+        waterDebounceCnt++;                // administrate usage  for report
+        attachWaterInterrupt();
+        waterTriggerTime = currentMicros;  // reset our trigger counter
+        waterTriggerCnt  = 2;              // Leave at 2 so the ISR routine can increase it to 3
+      } else {  // check if we must add a pulse counter
+        if ( (waterTriggerTime != 0) && (debounce_time > waterReadDebounce * 1000) ) { // debounce_time (mSec
+          waterTriggerTime = 0;                        // reset counter for next trigger
+          // waterTriggerCnt  = 0;                     // reset ISR counter
+          if (waterReadState != waterTriggerState) {   // switchsetting) {  // read switch state
+            waterReadState = waterTriggerState ;       // stabilize switch
+            if (!waterReadState) waterReadCounter++;   // count this as pulse if switch went LOW
+            if (!waterReadState && !lightReadState) waterReadHotCounter++; // count this as pulse if switch went LOW
+            // accomodate/enforce stability
+            if ( waterReadState) pinMode(WATERSENSOR_READ, INPUT_PULLUP); // Improve voltage our external pull-up
+            if (!waterReadState) pinMode(WATERSENSOR_READ, INPUT);        // Weaken our external pull-up
+          } // if waterReadState
+        } // else waterTriggerCnt = 1
+      }
     */
     
     // old dlocation of  cechking for incoming mqtt  commands
@@ -1879,7 +1969,7 @@ void loop()
   }   // if-else allow other activities
   //  ------------------------------------------------------------------------------------------------------------------------- END of allowOtherActivities
 
-  // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
+  readTelegram2();    // v53 read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
 
   // (p1SerialActive && !p1SerialFinish) , process Telegram data
   
@@ -1906,7 +1996,18 @@ void loop()
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
     } else {    // reliabilitty intervalP1cnt=360>0
+
+      /*
+        ====================================
+          we have 10 seconds of no P1 reads 
+        ====================================
+      */
       p1FailRxCnt++;  // v52 count failed RJ11 connections
+      p1SerialFinish = true;  // v53: enforce to accomodate faults normal set at  processing P1 record
+      p1SerialActive = true; // v53: enforce to accomodate faults normal set at  processing P1 record
+      // mySerial.end();         // v53: enforce finish , done at line 1775
+      // mySerial.flush();       // v53: enforce flush the buffer (if any) line 1775
+
       // report to error mqtt, // V20 candidate for a callable error routine
       // tbd: consider to NOT send values
       // char mqttOutput[128]; // v51 not used as we do 
@@ -1919,35 +2020,33 @@ void loop()
       mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
       // mqttMsg.toCharArray(mqttOutput, 128);
-
       publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
-      if (outputMqttLog && !serialStopP1)
-          publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
       
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
       if (!serialStopP1)
+         if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
          Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\n\r",   
                           ((float)  micros() / 1000000), 
                           intervalP1cnt,
                           previousMillis,
                           currentMillis);
-    /*    
-      // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
-      Serial.print("\n\r# !!# ESP P1 rj11 Active interval checking ");   // v45: add carriage-return
-      Serial.print(intervalP1cnt );
-      Serial.print(", timeP:");
-      Serial.print(previousMillis);
-      Serial.print(", time2:");
-      Serial.print(currentMillis); // print message line
-      Serial.println("."); // print message line
-    */  
+      /*    
+        // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
+        Serial.print("\n\r# !!# ESP P1 rj11 Active interval checking ");   // v45: add carriage-return
+        Serial.print(intervalP1cnt );
+        Serial.print(", timeP:");
+        Serial.print(previousMillis);
+        Serial.print(", time2:");
+        Serial.print(currentMillis); // print message line
+        Serial.println("."); // print message line
+      */  
 
       // output on secondary  TX if not already used for loopback
-    #ifndef NoTx2Function
-      if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput , disabled as of v37
-    #endif
-      // }
+      #ifndef NoTx2Function
+        if (!loopbackRx2Tx2) mySerial2.println((String)"t=" + currentMillis + " ." );  // testoutput , disabled as of v37
+      #endif
+        // }
 
       forceCheckData = true;  // enforce  mode active
       validTelegramCRCFound  = false;   // Enforce we (might) have a CRC error
@@ -2260,15 +2359,18 @@ void readTelegram() {
   process the secondary serial input port, to be used  in future for 1200Baud GJ meter
 */
 void readTelegram2() {
-  // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
+  if (loopbackRx2Tx2 && loopbackRx2Mode == 5) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // print message line v53 check if called
+
  #ifdef UseP1SoftSerialLIB
     if (mySerial.P1active()) return ;   // return if P1 is active
  #endif  
 
-
+  if (loopbackRx2Tx2 && loopbackRx2Mode == 6) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // print message line v53 check if called
   bGot_Telegram2Record  = false;      // v38 check RX2 seen
   
   if (serialStopRX2) return;    // v52 return if we have stopped this serial
+
+  if (loopbackRx2Tx2 && loopbackRx2Mode == 7) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // print message line v53 check if called
 
   int lenTelegram2 = 0;
   /*
@@ -2281,9 +2383,13 @@ void readTelegram2() {
   */
 
   // 30mar21: no data available .....
+  if (loopbackRx2Tx2 && loopbackRx2Mode == 8) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // print message line v53 check if called
+
   if (mySerial2.available())   {
+    if (loopbackRx2Tx2 && loopbackRx2Mode == 9) Serial.print((String) "Rx"+ loopbackRx2Mode + " "); // print message line v53 check if called
+
     if (outputOnSerial && verboseLevel >= VERBOSE_RX2)    {
-      Serial.print("\n\r Rx2N="); // print message line
+      Serial.print((String) "\n\r Rx2N:" + loopbackRx2Mode + "="); // print message line
     }
     memset(telegram2, 0,       sizeof(telegram2));        // initialise telegram array to 0
     // memset(telegramLast2, 0,   sizeof(telegramLast2));    // initialise array to 0
@@ -2295,7 +2401,8 @@ void readTelegram2() {
     int telegram2_Pos   = 0;
 
     while (mySerial2.available() && loopTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
-       
+      // type casting https://www.geeksforgeeks.org/cpp/cpp-program-for-int-to-char-conversion/
+      if (loopbackRx2Mode > 0) Serial.print((String)  + char(mySerial2.peek()) ); // v53 print incoming
       // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
@@ -2529,9 +2636,9 @@ void readTelegram2() {
 
         } // bGot_Telegram2Record
         
- #ifndef NoTx2Function
+      #ifndef NoTx2Function
         if (loopbackRx2Tx2) mySerial2.println(telegram2); // echo back , disabled as of v37
- #endif
+      #endif
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
@@ -2791,14 +2898,48 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
   #endif
                    Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
                 }
+    } else  if ((char)payload[0] == 't') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
+          Serial.print((String) " p:" + mySerial2.peek() + "=" + char(mySerial2.peek()) + " " );
+          // mySerial2.flush();        // Clear GJ buffer
+    } else  if ((char)payload[0] == 'T') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
+      if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') {
+         loopbackRx2Mode = (((int)payload[1] - 48) * 1);  // set number myself
+        /* 
+            Playing here with myserial is useless
+            as this is inner class and does not  reflect upper routines
 
-    } else  if ((char)payload[0] == 'T') {
-      loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
+         if        (loopbackRx2Mode == 1 ) { // redefine myserial2
+            SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, !bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
+            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 - 10);
+            Serial.print((String) " RX2 baudrateB1 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                    + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
+                    + ", p1Baudrate2=" + p1Baudrate2  
+            );
+          } else if (loopbackRx2Mode == 2 ) {
+            SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2,  bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
+            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 + 10);
+            Serial.print((String) " RX2 baudrateB2 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                    + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
+                    + ", p1Baudrate2=" + p1Baudrate2  
+            );
+          }
+          // print loopTelegram2cnt ???
+        */
+      } else {
+        loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
+        Serial.print((String) " RX1 baudrateA1=" + mySerial.baudRate() // v53: print diagse status if resetted myserial2
+                            + " RX2 baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                            + " loopbackRx2Tx2=" + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")
+                            + " " );
+      }
+
       // mySerial2.begin( 1200);    // GJ meter port   1200 baud
       // mySerial2.println("..echo.."); // echo back
+
       if (outputOnSerial) {
-        Serial.print("RX2TX2 looptest=");
-        Serial.print(loopbackRx2Tx2 == true ? "ON" : "OFF");
+        Serial.print((String) "RX2TX2 looptest=" 
+              + (loopbackRx2Tx2 == true ? "ON" : "OFF") 
+              + " mode:" + loopbackRx2Mode);
       }
 
   /* Does not operate, as serial isetup during setup
@@ -2970,7 +3111,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
                                                                          + (blue_led2_Water ? "Y" : "N") 
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
-          Serial.println((String)"T rx2 loopback to BlueLed:"     + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")   );
+          Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
+                                                                  + ", mode:" + loopbackRx2Mode );
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -2980,7 +3122,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                 + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
                 + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
                 + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
-                + ", Yld="+  RX_yieldcount        // V52 Yeield count 0-3-8 yes/no process serial data
+                + ", Yld="+  RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
+                + ", lT2="+  loopTelegram2cnt     // V53 print current loopTelegram2cnt
                 + " )" );
           Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
           Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
