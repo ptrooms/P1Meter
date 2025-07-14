@@ -38,6 +38,17 @@
 
 /* change history
   v54 from master to restart porting 2.4.1. where we left off
+    - 2.4.1 CRC succesfull, see NL article [https://gathering.tweakers.net/forum/list_message/82920194#82920194]
+    - 'T' command (diagnose data):
+          loopbackRx2Mode  0-9 , no data: swap/switch
+          loopbackRx2Mode == 1 --> switch off debug (outputOnSerial), activate RX2 read evey second (rx2ReadInterval = 1)
+          If set > 0: we produce diagnostic data when RX2 is read  {_   _}
+            length/telegram2 record
+          If set > 5: when CRC is valid, we output the hexbytes and reset back to 0
+          If set = 3: we print crc and record
+          If set = 2: we print crc and first 20 bytes of header in hex
+          If set = 1: we print echoback the RX2 to debug console
+    - Note: on PROD_MODE we process serialdata inverted, using TEST_MODE this is standard (1=rising).
   v53 unstable branch when we have (inactive) conditional prints which crashed, detached
   V53 new version on V52 renamed to master
     - using 2.4.1 i stable, 2.7.1 is less reliable
@@ -872,7 +883,7 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
-int  loopbackRx2Mode  = 0;       //   '0' Testloopback RX2 to TX2 (OFF, 1 test-check input research timeing) 
+int  loopbackRx2Mode  = 0;       // '0' Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
@@ -2502,6 +2513,16 @@ void readTelegram2() {
                 messageCRC2[4] = 0;
                 unsigned int currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2_org)+startChar,(endChar-startChar)+1); // include \header+!trailer '!' into CRC, v48-casting
                 validTelegram2CRCFound = (strtol(messageCRC2, NULL, 16) == currentCRC2);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
+
+                if ( validTelegram2CRCFound && loopbackRx2Mode == 5 ) {   // v55 debug/print one validated hex characters
+                  Serial.println("");
+                  Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
+                  for (int i = startChar ; i  < ((endChar-startChar)+1+4); i++ ) {
+                    Serial.printf(" %02x", telegram2_org[i]);
+                  }
+                  Serial.println((String) "\r\n\t start=" + startChar + ", len=" + ((endChar-startChar)+1) );
+                  loopbackRx2Mode = 0;   // stop debug
+                }
                 
                 if (outputOnSerial || loopbackRx2Mode == 3) {   // print serial record count, total receivwed length, calculated CRC
                   Serial.printf(" s=%c, e=%c, crt=%s, cr1=%x, ;", telegram2Record[startChar],telegram2Record[endChar], messageCRC2, currentCRC2) ;    // debug print calculated CRC
@@ -2514,7 +2535,7 @@ void readTelegram2() {
                   Serial.printf(" Crc=%x,", currentCRC2) ;    // v54 debug print calculated CRC after the end-sign valididated
                   */
                 }
-                if (loopbackRx2Mode == 2) {   // header printdata v54
+                if (loopbackRx2Mode == 2) {   // diagnose header printdata v54
                     Serial.print((String)"\r\n\t" + (validTelegram2CRCFound ? "Valid" : "Invalid" )  + "CRC, Rx2head:");       // v54 print CRC check
                     for (int i = 0; i < 20; i++) {                // v54 header hex bytes
                        Serial.printf("%02x ", telegram2_org[i]); 
