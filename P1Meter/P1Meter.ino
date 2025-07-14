@@ -37,6 +37,8 @@
 */
 
 /* change history
+  v55 comments new line
+    - this version looks to be very unstable
   v54 from master to restart porting 2.4.1. where we left off
     - 2.4.1 CRC succesfull, see NL article [https://gathering.tweakers.net/forum/list_message/82920194#82920194]
     - 'T' command (diagnose data):
@@ -47,7 +49,7 @@
           If set > 5: when CRC is valid, we output the hexbytes and reset back to 0
           If set = 3: we print crc and record
           If set = 2: we print crc and first 20 bytes of header in hex
-          If set = 1: we print echoback the RX2 to debug console
+          If set = 1: we print echo while reading RX2 to debug console {_  }..len=3:'abc'.. _}  
     - Note: on PROD_MODE we process serialdata inverted, using TEST_MODE this is standard (1=rising).
   v53 unstable branch when we have (inactive) conditional prints which crashed, detached
   V53 new version on V52 renamed to master
@@ -223,13 +225,13 @@
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1154.241 // current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 1155.241 // current version (displayed in mqtt record)
       #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
       #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
   #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2154.241 //  current version (displayed in mqtt record)
+  #define DEF_PROG_VERSION 2155.241 //  current version (displayed in mqtt record)
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
