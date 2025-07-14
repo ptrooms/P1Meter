@@ -1789,17 +1789,16 @@ void loop()
       
       telegramError = 0;        // start with no errors
       // Start secondary serial connection if not yet active
-      if (!serialStopP1) {
-    #ifdef UseNewSoftSerialLIB
-      // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-      mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
-      // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-    #else
-      // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-
-        mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
-      // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
-    #endif
+        if (!serialStopP1) {
+        #ifdef UseNewSoftSerialLIB
+          // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+          mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
+        #else
+          // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+          mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
+          // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
+        #endif
       }        
 
     } else {    // if (!p1SerialActive)
@@ -1981,7 +1980,7 @@ void loop()
                           previousMillis,
                           currentMillis);
       } else {
-        Serial.print(".\n\r:") ;        // v54: if no RJ11 message print some indication
+         Serial.print(".\n\r:") ;        // v54: if no RJ11 message print some indication
       }                          
     /*    
       // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
@@ -2352,11 +2351,12 @@ void readTelegram2() {
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
       int len = 0;
-      if (loopbackRx2Mode > 0) {
-        len = mySerial2.readBytesUntil(0, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      } else {        
+      #ifdef PROD_MODE
+        len = mySerial2.readBytesUntil(00, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      #else 
         len = mySerial2.readBytesUntil(13, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      }        
+      #endif          
+
       if (loopbackRx2Mode > 0 && len > 0) Serial.println((String) + "..len=" + len + ":\'" + telegram2 + "\'.." ); // v54 print incoming
       
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
@@ -2500,9 +2500,9 @@ void readTelegram2() {
                 }
 
                 currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar));   // ignore header, v48-casting
-                if (outputOnSerial) Serial.printf(" cr0=%x,", currentCRC2) ;    // debug print calculated CRC
+                if (outputOnSerial || loopbackRx2Mode > 0) Serial.printf(" cr0=%x,", currentCRC2) ;    // debug print calculated CRC
                 currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2Record)+startChar+1,(endChar-startChar)-1); // ignore header & trailer, v48-casting
-                if (outputOnSerial || loopbackRx2Mode > 0) Serial.printf(" cr0=%x,", currentCRC2) ;    // v53 debug print calculated CRC
+                if (outputOnSerial) Serial.printf(" cr0=%x,", currentCRC2) ;    // v53 debug print calculated CRC
           }
 
 
@@ -2819,39 +2819,37 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       }
 
     } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //herev38
-                if (blue_led2_Water) {
-                    blue_led2_Water = !blue_led2_Water;
-                    blue_led2_HotWater = !blue_led2_HotWater;          
-  #ifdef NoTx2Function                    
-                    if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);   // OFF
-  #endif                    
-                    Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
-                    // Serial.print(""); // stability test v43 // extra
-                    // Serial.print(""); // stability test v43
-                    Serial.print("."); // stability test v43
+      if (blue_led2_Water) {
+          blue_led2_Water = !blue_led2_Water;
+          blue_led2_HotWater = !blue_led2_HotWater;          
+        #ifdef NoTx2Function                    
+          if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);   // OFF
+        #endif                    
+          Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
+          // Serial.print(""); // stability test v43 // extra
+          // Serial.print(""); // stability test v43
+          Serial.print("."); // stability test v43
 
-                    // Serial.print("BlueLed2 = HotWater.");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
-                    // Serial.print(""); // stability test v38    // stability deactive v44
-                    // Serial.print("."); // stability test v38   // stability deactive v44
-                } else if (blue_led2_HotWater) {
-                    blue_led2_HotWater = !blue_led2_HotWater;
-                    blue_led2_Crc = !blue_led2_Crc;
-                    Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Crc check to BleuLed2 , initial On
-                } else if (blue_led2_Crc) {
-                    blue_led2_Crc = !blue_led2_Crc;
-                    Serial.print("BlueLed2 = Off");            // BlueLed2 Off
-                } else {
-                   blue_led2_Water = !blue_led2_Water;
-  #ifdef NoTx2Function                                       
-                   if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
-  #endif
-                   Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
-                }
-} else  if ((char)payload[0] == 't') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
-          Serial.print((String) " p:" + mySerial2.peek() + "=" + char(mySerial2.peek()) + " " );
-          // mySerial2.flush();        // Clear GJ buffer
+          // Serial.print("BlueLed2 = HotWater.");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
+          // Serial.print(""); // stability test v38    // stability deactive v44
+          // Serial.print("."); // stability test v38   // stability deactive v44
+      } else if (blue_led2_HotWater) {
+          blue_led2_HotWater = !blue_led2_HotWater;
+          blue_led2_Crc = !blue_led2_Crc;
+          Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Crc check to BleuLed2 , initial On
+      } else if (blue_led2_Crc) {
+          blue_led2_Crc = !blue_led2_Crc;
+          Serial.print("BlueLed2 = Off");            // BlueLed2 Off
+      } else {
+          blue_led2_Water = !blue_led2_Water;
+        #ifdef NoTx2Function                                       
+          if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
+        #endif
+          Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
+      }
+       // Clear GJ buffer
     } else  if ((char)payload[0] == 'T') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
-      if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') {
+      if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') {
          loopbackRx2Mode = (((int)payload[1] - 48) * 1);  // set number myself
          // T1 enforces debug diagnose to verify serial processing
          if (loopbackRx2Mode == 1) {
@@ -2880,31 +2878,31 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           // print loopTelegram2cnt ???
         */
       } else {
-      loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
-      Serial.print((String) " RX1 baudrateA1=" + mySerial.baudRate() // v53: print diagse status if resetted myserial2
-                            + " RX2 baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
-                            + " loopbackRx2Tx2=" + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")
-                            + " " );
+         loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
+         Serial.print((String) " RX1 baudrateA1=" + mySerial.baudRate() // v53: print diagse status if resetted myserial2
+                             + " RX2 baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                             + " loopbackRx2Tx2=" + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")
+                             + " " );
       }
 
       // mySerial2.begin( 1200);    // GJ meter port   1200 baud
       // mySerial2.println("..echo.."); // echo back
 
       if (outputOnSerial) {
-        Serial.print((String) "RX2TX2 looptest=" 
+         Serial.print((String) "RX2TX2 looptest=" 
               + (loopbackRx2Tx2 == true ? "ON" : "OFF") 
               + " mode:" + loopbackRx2Mode);
       }
 
-  /* Does not operate, as serial isetup during setup
-    } else  if ((char)payload[0] == 't') {
-      bSERIAL_INVERT = !bSERIAL_INVERT ; // switch between invert/noninvert
-      if (outputOnSerial) {
-        Serial.print("P1rx=");
-        if (bSERIAL_INVERT)  Serial.print("Positive P1 serial.");
-        if (!bSERIAL_INVERT) Serial.print("Negative P1 serial.");
-      }
-  */
+      /* Does not operate, as serial isetup during setup
+        } else  if ((char)payload[0] == 't') {
+          bSERIAL_INVERT = !bSERIAL_INVERT ; // switch between invert/noninvert
+          if (outputOnSerial) {
+            Serial.print("P1rx=");
+            if (bSERIAL_INVERT)  Serial.print("Positive P1 serial.");
+            if (!bSERIAL_INVERT) Serial.print("Negative P1 serial.");
+          }
+      */
 
     } else  if ((char)payload[0] == 'W') {
       useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
