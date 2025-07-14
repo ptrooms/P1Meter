@@ -3,9 +3,24 @@
 All notable changes to this project will be documented in this file.
 Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 
-Note: upto V24 we developed on Vxx. starting now we develop on development 
+Note : upto V66 we developed on Vxx, master is production. 
+Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
-
+## [v21.54] - Major release fully stable
+	- lot's of changes since, see source code for details. Highlights:
+	- working version V52 now made to new master
+	- added code to test/check serial offline (desktesting)
+	- Tested Platformio eespressif platform 2.5.3. (Arduino 2.7.1) (v55)
+	- extended PlatformIO coices for OTA/Production/TestMode using Arduino 2.4.1 and 2.7.1
+	- working version V52 now made to new master
+	- CRC16 operational on Warmtelink (v52)
+	- Added mltiple commands cia mqtt to test/diagnose/control operation, use ? for summary. (v49)
+	- centralised MQTT publish to routine (v51)
+	- Improved stability to anticipate records failures 
+	- P1 telegram recovery by using masking of earliers successes.
+	- Migrated to new esp8266 NodeCPU.
+	- Resolved/stabilised Water tapping measurements.
+	- Improved Wifi stabilty by disabling WifiSleep Persistency"
 ## [v21.42] - redo production stable PlatformIO
 	- v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to hget wifi stable see https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html
 	- v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count

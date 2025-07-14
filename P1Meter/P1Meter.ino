@@ -38,7 +38,9 @@
 
 /* change history
   v55a - debug to checkout code differences
-  
+    - 2.7.1  started to use on production, LGTM
+    - 2.4.1. PROD_MODE require about 10-17 (unused) "delay()"" to arrange that code goes stable.
+            if not the use of an printf() statement (in section line 2585) causes a ridiculous instability
   v55 comments new line
     - this version looks to be very unstable
   v54 from master to restart porting 2.4.1. where we left off
@@ -1210,9 +1212,10 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
 
   /*
     Added 2021-04-26 22:06:55 to test/check wifi issues
+    v55: test WiFi.persistent(false); to check if this affects stability of code changes
   */
-  // WiFi.persistent(false); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083) since 29jun25 causes bootloop
-  WiFi.persistent(true); // Do not overwrites the FLASH if the settings are the same https://github.com/esp8266/Arduino/issues/1054#issuecomment-2662968960
+  WiFi.persistent(false); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083) since 29jun25 causes bootloop
+  // WiFi.persistent(true); // Do not overwrites the FLASH if the settings are the same https://github.com/esp8266/Arduino/issues/1054#issuecomment-2662968960
   // WiFi.disconnect(true); // Delete SDK wifi config (after is has connected)
   delay(200);
   // WiFi.mode(WIFI_STA); // Disable AP mode
@@ -2518,16 +2521,77 @@ void readTelegram2() {
                 unsigned int currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2_org)+startChar,(endChar-startChar)+1); // include \header+!trailer '!' into CRC, v48-casting
                 validTelegram2CRCFound = (strtol(messageCRC2, NULL, 16) == currentCRC2);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
 
+              
+
                 if ( validTelegram2CRCFound && loopbackRx2Mode == 5 ) {   // v55 debug/print one validated hex characters
                   Serial.println("");
                   Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
+
                   for (int i = startChar ; i  < ((endChar-startChar)+1+4); i++ ) {
-                    Serial.printf(" %02x", telegram2_org[i]);
+                    
+                    // diagnose instability of code.....
+                    // Serial.print(telegram2_org[i]);             // 001 only, is stable
+                    // -------------------------------------------------------------------------------------
+                    
+                    // Serial.print(telegram2_org[i]);             // 002 try to unlock, just somewhat more stable
+
+                    /*
+                    Serial.print(telegram2_org[i]);             // 003 try to unlock, instable
+                    Serial.print(telegram2_org[i]);
+                    */
+                    
+
+                    // ---------------------------------------------------------------------------- keep below
+                    // Serial.printf(" %02x", telegram2_org[i]);      // 000-005 causing unstablity
+                    // ---------------------------------------------------------------------------- keep above
+
+                    // Serial.print(telegram2_org[i]);             // 004 after try to unlock, instable
+
+                    /*
+                      asm(                    // 005 try to insert unsued code, no effect
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                        "NOP;"
+                      );
+                    */                      
+                  /* // move020 to void command_testH3() to check if location influnces things
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding here wihout printf above , stable
+                    delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+                    delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+                    delay(0);     // 008 adding 009 test remove, add 011 unstable
+                    delay(0);     // 008 adding 009 test remove, add 011 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // add13 + add 014 stable (rx2-70%)
+                    delay(0);     // add14 + add015 stable (rx2=40%)
+                    delay(0);     // add15 + add016 less stable (rx2=20%)
+                    delay(0);     // add16 + add017 stable (rx2=50%)
+                    delay(0);     // add17 + add018 stable  (rx2=10%)
+                    delay(0);     // add18 + add019 stable  (rx2=75%)
+                  */
+                    Serial.printf(" %d", telegram2_org[i]);      // 000-005, 008 causing unstablity
                   }
+                  
                   Serial.println((String) "\r\n\t start=" + startChar + ", len=" + ((endChar-startChar)+1) );
                   loopbackRx2Mode = 0;   // stop debug
                 }
-                
+
                 if (outputOnSerial || loopbackRx2Mode == 3) {   // print serial record count, total receivwed length, calculated CRC
                   Serial.printf(" s=%c, e=%c, crt=%s, cr1=%x, ;", telegram2Record[startChar],telegram2Record[endChar], messageCRC2, currentCRC2) ;    // debug print calculated CRC
                   /* below are incorrect
@@ -2539,10 +2603,12 @@ void readTelegram2() {
                   Serial.printf(" Crc=%x,", currentCRC2) ;    // v54 debug print calculated CRC after the end-sign valididated
                   */
                 }
+                // delay(0);     // 007 adding here wihout printf above , stable. With printf to no avail
                 if (loopbackRx2Mode == 2) {   // diagnose header printdata v54
                     Serial.print((String)"\r\n\t" + (validTelegram2CRCFound ? "Valid" : "Invalid" )  + "CRC, Rx2head:");       // v54 print CRC check
                     for (int i = 0; i < 20; i++) {                // v54 header hex bytes
                        Serial.printf("%02x ", telegram2_org[i]); 
+
                     }
                     Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
                 }
@@ -4985,6 +5051,34 @@ void command_testH3(){    // check for null pointers en !mqtttopic
     const char *mqttErrorTopic_h3 = "/error!/"  P1_VERSION_TYPE;
     publishMqtt(mqttErrorTopic_h3, "TestH3c");      // v51:   CurrentPowerConsumption: %lu
   #endif        
+  /* v55 021 - disabl all code below, after activating WiFi.persistent(false);
+      doesnot change things: code goes unstable if below is removed
+  */
+                    // 020 move to here
+                    delay(0);     // 008 adding here without printf above , stable
+                    delay(0);     // 008 adding here without printf above , stable
+                    delay(0);     // 008 adding here without printf above , stable
+                    delay(0);     // 008 adding here without printf above , stable
+                    delay(0);     // 008 adding here without printf above , stable
+                    delay(0);     // 008 adding here without printf above , stable
+                    delay(0);     // 008 adding here without printf above , stable
+                    delay(0);     // 008 adding here without printf above , stable
+                    // ---------------------------- 009 line 2585 added printf (unstable) 
+                    delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+                    delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+                    delay(0);     // 008 adding 009 test remove, add 011 unstable
+                    delay(0);     // 008 adding 009 test remove, add 011 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    delay(0);     // add13 + add 014 stable (rx2-70%)
+                    // delay(0);     // add14 + add015 stable (rx2=40%), remove 021
+                    // delay(0);     // add15 + add016 less stable (rx2=20%), remove 021
+                    // delay(0);     // add16 + add017 stable (rx2=50%), remove 021
+                    // delay(0);     // add17 + add018 stable  (rx2=10%), remove 021
+                    // delay(0);     // add18 + add019 stable  (rx2=75%), remove 021
+  
 }
 
 /* leave this for leaer to investigate why runtime-error is not found ...
