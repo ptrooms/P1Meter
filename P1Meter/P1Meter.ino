@@ -663,11 +663,16 @@
 
 // communication mode settings, is the Startbit RISING edge or (inverted) FALLING edge
 #ifdef TEST_MODE
-bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
-bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
+  bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
+  bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
 #else
-bool bSERIAL_INVERT  = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
-bool bSERIAL2_INVERT = true;  // GJ meter is inverted (output RX2 does pulldown Gpio) v53
+  #ifdef DUP_MODE
+    bool bSERIAL_INVERT  = false; // v53a Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
+    bool bSERIAL2_INVERT = false; // v53a Simulated GJ meter is USB interface , does not require invert v53
+  #else
+    bool bSERIAL_INVERT  = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
+    bool bSERIAL2_INVERT = true;  // GJ meter is inverted (output RX2 does pulldown Gpio) v53
+  #endif
 #endif
 
 // #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232  < 03okt22
@@ -2574,32 +2579,102 @@ void readTelegram2() {
                         "NOP;"
                         "NOP;"
                       );
+                    */     
+                  // // teststable2-only
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   // ---------------------------- 009 line 2585 added printf (unstable) 
+                  //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+                  //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+
+                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // add13 + add 014 stable (rx2-70%)
+
+                  // // teststable3&2
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   delay(0);     // 008 adding here without printf above , stable
+                  //   // ---------------------------- 009 line 2585 added printf (unstable) 
+                  //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+                  //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+
+                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                  //   delay(0);     // add13 + add 014 stable (rx2-70%)
+
+
+                    //  // teststable0
+                    //  // move020 to void command_testH3() to check if location influnces things
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding here wihout printf above , stable
+                    //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+                    //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+                    //   delay(0);     // 008 adding 009 test remove, add 011 unstable
+                    //   delay(0);     // 008 adding 009 test remove, add 011 unstable
+                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
+                    //   delay(0);     // add13 + add 014 stable (rx2-70%)
+                    //   delay(0);     // add14 + add015 stable (rx2=40%)
+                    //   delay(0);     // add15 + add016 less stable (rx2=20%)
+                    //   delay(0);     // add16 + add017 stable (rx2=50%)
+                    //   delay(0);     // add17 + add018 stable  (rx2=10%)
+                    //   delay(0);     // add18 + add019 stable  (rx2=75%)
+                    
+                   /*
+                      if (false) {
+                        // delay(0);     // 008 adding here without printf above , unstable
+                        // delay(0);     // 008 adding here without printf above , unstable
+                        // delay(0);     // 008 adding here without printf above , unstable
+                        // delay(0);     // 008 adding here without printf above , unstable
+                        // delay(0);     // 008 adding here without printf above , unstable 30% (comment = 22c2 problem)
+                        delay(0);     // 008 adding here without printf above , unstable 20%
+                        delay(0);     // 008 adding here without printf above , untstale 25%
+                        delay(0);     // 008 adding here wihout printf above , stable
+                        delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+                        delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+                        delay(0);     // 008 adding 009 test remove, add 011 unstable
+                        delay(0);     // 008 adding 009 test remove, add 011 unstable
+                        delay(0);     // 008 adding 009 test remove, add 010 unstable
+                        delay(0);     // 008 adding 009 test remove, add 010 unstable
+                        delay(0);     // 008 adding 009 test remove, add 010 unstable
+                        delay(0);     // 008 adding 009 test remove, add 010 unstable
+                        delay(0);     // add13 + add 014 stable (rx2-70%
+                      }
                     */                      
-                  /* // move020 to void command_testH3() to check if location influnces things
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding here wihout printf above , stable
-                    delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                    delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-                    delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // add13 + add 014 stable (rx2-70%)
-                    delay(0);     // add14 + add015 stable (rx2=40%)
-                    delay(0);     // add15 + add016 less stable (rx2=20%)
-                    delay(0);     // add16 + add017 stable (rx2=50%)
-                    delay(0);     // add17 + add018 stable  (rx2=10%)
-                    delay(0);     // add18 + add019 stable  (rx2=75%)
-                  */
-                    Serial.printf(" %d", telegram2_org[i]);      // 000-005, 008 causing unstablity
+                    // no zzzzz = instable
+                    // z     = instable 20%
+                    // zz    = instable
+                    // zzz   = less 50% instable
+                    // zzzz  = very 60% instable
+                    Serial.printf(" %02x", telegram2_org[i]);      // 000-005, 008 causing unstablity
                   }
                   
                   Serial.println((String) "\r\n\t start=" + startChar + ", len=" + ((endChar-startChar)+1) );
@@ -5065,10 +5140,12 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
     const char *mqttErrorTopic_h3 = "/error!/"  P1_VERSION_TYPE;
     publishMqtt(mqttErrorTopic_h3, "TestH3c");      // v51:   CurrentPowerConsumption: %lu
   #endif        
-  /* v55 021 - disabl all code below, after activating WiFi.persistent(false);
+  /* v55 022 - disabl all code below, after activating WiFi.persistent(false);
+              // production unstable, test looks fine (on RX2 noninverted at least)
+  
       doesnot change things: code goes unstable if below is removed
-  */
-                    // 020 move to here
+*/
+// maken unstable teststable1 , active with of without 2 or 3 from printf  results in stable
                     delay(0);     // 008 adding here without printf above , stable
                     delay(0);     // 008 adding here without printf above , stable
                     delay(0);     // 008 adding here without printf above , stable
@@ -5080,6 +5157,7 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
                     // ---------------------------- 009 line 2585 added printf (unstable) 
                     delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
                     delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+
                     delay(0);     // 008 adding 009 test remove, add 011 unstable
                     delay(0);     // 008 adding 009 test remove, add 011 unstable
                     delay(0);     // 008 adding 009 test remove, add 010 unstable
@@ -5087,12 +5165,15 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
                     delay(0);     // 008 adding 009 test remove, add 010 unstable
                     delay(0);     // 008 adding 009 test remove, add 010 unstable
                     delay(0);     // add13 + add 014 stable (rx2-70%)
+
+
+
                     // delay(0);     // add14 + add015 stable (rx2=40%), remove 021
                     // delay(0);     // add15 + add016 less stable (rx2=20%), remove 021
                     // delay(0);     // add16 + add017 stable (rx2=50%), remove 021
                     // delay(0);     // add17 + add018 stable  (rx2=10%), remove 021
                     // delay(0);     // add18 + add019 stable  (rx2=75%), remove 021
-  
+/* */  
 }
 
 /* leave this for leaer to investigate why runtime-error is not found ...
