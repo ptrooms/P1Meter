@@ -8,6 +8,7 @@
 */
 
 /* tbd 
+  change verboselevel == 1 to ==2 that will print lenbgths of P1 records print
   documentation for mqtt commands
   cleanout no longer needed code
     error: 06jul25 13u00 (using faulty esp, port0 > 3.6volts) 
@@ -38,6 +39,9 @@
 
 /* change history
   v55a - debug to checkout code differences
+    - introducing DUP_MODE to identically replicate TESYT/PROD_MODE with
+         reference DUP_MODE with TEST_MODE ip 185 = ip 185 with prefix e1 and version 3xxxx
+         reference DUP_MODE with PROD_MODE ip 35  = ip 185 with prefix d1 and version 4xxxx
     - 2.7.1  started to use on production, LGTM
     - 2.4.1. PROD_MODE require about 10-17 (unused) "delay()"" to arrange that code goes stable.
             if not the use of an printf() statement (in section line 2585) causes a ridiculous instability
@@ -228,14 +232,24 @@
 
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
-  #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-  #define DEF_PROG_VERSION 1155.241 // current version (displayed in mqtt record)
-      #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
-      #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
+  #ifdef DUP_MODE
+    #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
+    #define DEF_PROG_VERSION 3155.241 // current version (displayed in mqtt record)
+  #else
+    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
+    #define DEF_PROG_VERSION 1155.241 // current version (displayed in mqtt record)
+  #endif
+  #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
+  #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
-  #define P1_VERSION_TYPE "p1"      // "p1" production
-  #define DEF_PROG_VERSION 2155.241 //  current version (displayed in mqtt record)
+  #ifdef DUP_MODE
+    #define P1_VERSION_TYPE "d1"      // "p1" production
+    #define DEF_PROG_VERSION 4155.241 //  current version (displayed in mqtt record)
+  #else
+    #define P1_VERSION_TYPE "p1"      // "p1" production
+    #define DEF_PROG_VERSION 2155.241 //  current version (displayed in mqtt record)
+  #endif
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
@@ -5044,7 +5058,7 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
   #endif        
 }
 
-void command_testH3(){    // check for null pointers en !mqtttopic
+void command_testH3(){    // publish mqtt records in TEST_MODE
   #ifdef TEST_MODE
     publishMqtt(mqttErrorTopic, "TestH3a");      // v51:   CurrentPowerConsumption: %lu
     publishMqtt("", "TestH3b");      // v51:   CurrentPowerConsumption: %lu
