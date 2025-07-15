@@ -8,6 +8,8 @@
 */
 
 /* tbd 
+  sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
+      -- strange as wifi proces during setup() before was OK
   change verboselevel == 1 to ==2 that will print lenbgths of P1 records print
   documentation for mqtt commands
   cleanout no longer needed code
@@ -38,7 +40,7 @@
 */
 
 /* change history
-  v55a - debug to checkout code differences
+  v55a - debug to checkout code differences for: teststable
     - introducing DUP_MODE to identically replicate TESYT/PROD_MODE with
          reference DUP_MODE with TEST_MODE ip 185 = ip 185 with prefix e1 and version 3xxxx
          reference DUP_MODE with PROD_MODE ip 35  = ip 185 with prefix d1 and version 4xxxx
@@ -1020,8 +1022,8 @@ int filteredValueAdc = 0; // average between previous and and published
 
 
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
-char dummy2[17];       // add some spare bytes
-const char dummy2a[] = {0x0000};    // prevent overwrite
+// char dummy2[17];       // add some spare bytes, v55b remove
+// const char dummy2a[] = {0x0000};    // prevent overwrite, v55b remove
 char telegram[MAXLINELENGTH+32];       // telegram maxsize bytes for P1 meter
 char telegramLast[3];               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
@@ -1037,7 +1039,7 @@ char telegram_crcIn[MAXLINELENGTH+32];   // active telegram that is checked for 
 int  telegram_crcIn_len = 0;          // length of this record
 int  telegram_crcOut_cnt = 0;         // number of times masking was positioned
 char telegram_crcOut[MAXLINELENGTH+32];  // processed telegram with changed positions to X
-const char dummy2b[] = {0x0000};      // prevent save overwrite
+// const char dummy2b[] = {0x0000};      // prevent save overwrite, v55b remove
 // int  telegram_crcIn_cnt1 = 0;      // number of times CrcIn was called
 int  telegram_crcOut_len = 0;         // length of this record
 // int  telegram_crcIn_cnt2 = 0;      // number of times CrcIn was called
@@ -1098,8 +1100,8 @@ bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trai
 long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records before loop
 long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
 long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
-const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak
-const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak
+// const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak, v55b remove
+// const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak, v55b remove
 
 
 // Callback mqtt value which is used to received data
@@ -1113,8 +1115,8 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
 #ifdef UseNewSoftSerialLIB
   //  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
-SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
+  SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
+  SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
 #else
   /// @param baud the TX/RX bitrate
   /// @param config sets databits, parity, and stop bit count
@@ -1124,8 +1126,8 @@ SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 ba
   /// @param bufCapacity the capacity for the received bytes buffer
   /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
   // 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
 // Wifi https://docs.arduino.cc/language-reference/en/functions/wifi/client/
@@ -1199,8 +1201,9 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   
   // prepare wdt
   ESP.wdtDisable();
-  // ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S
-  ESP.wdtEnable(33000); // allow three passses missing
+  
+  ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S , v55b activated
+  // ESP.wdtEnable(33000); // allow three passses missing, v55b disabled
 
   Serial.begin(115200);
   Serial.println("Booting");              // message to serial log
@@ -2101,11 +2104,11 @@ void mqtt_reconnect() {                 // mqtt read usage doc https://pubsubcli
         }
         doCritical();  // do critical process to maintain basic Thermostat & OTA functions
       }
- #ifdef TEST_MODE            
+#ifdef TEST_MODE            
       if (mqttConnectDelay < 11000) {      // v45 check if we are below backup time (2+5+8=15sec)  testmode
- #else
+#else
       if (mqttConnectDelay <=27000) {      // v45 check if we are below backup time (2+5+8+11+14+17+20+23+26+29=155sec) production
- #endif      
+#endif      
         mqttConnectDelay = mqttConnectDelay + 3000; // increase retry
         Serial.print((String) "... try again in " + (mqttConnectDelay / 1000) + " seconds...\r\n");
       } else {
@@ -3239,7 +3242,10 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           command_testH1();       // v51 check call functions of pointers and data
     } else  if ((char)payload[0] == 'H') {    // testit c-strings and constants
           // command_testH2();    //  v51: Execute test string casting c_str, array, publishmqtt
-          command_testH3();       // v52: check mqtt empty strings
+          if ( (char)payload[1] == '1') command_testH1();    // v52: check mqtt empty strings
+          if ( (char)payload[2] == '2') command_testH2();    // v52: check mqtt empty strings
+          if ( (char)payload[3] == '3') command_testH3();    // v55 
+          if ( (char)payload[4] == '4') command_testH4();    // v55a redudant delay()
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\n\r? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
@@ -3349,7 +3355,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
   // Buffers
     // char msgpub[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360  04apr21 to #define 480
-    char output[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480
+
 
     String msg = "{"; // build mqtt frame 
     // msg.concat("\"currentTime\": %lu");                // P1 19nov19 17u12 remove superflous comma
@@ -3469,6 +3475,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
   //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
   //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
     // snprintf(output, sizeof(output), msgpub ,
+    char output[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480, moved to here
+    memset(output, 0, sizeof(output));  // initialise , v55b tto initialise
     snprintf(output, sizeof(output), msg.c_str(),
             // currentTime,                // metertime difference 52 seconds can also use millis()
             currentTimeS,               // meter time in string format from timedate record
@@ -4154,9 +4162,10 @@ void  getValuesFromP1Record(char buf[], int len) {  // 716
 
   int f = 0;
   // InitialiseValues();         // Data record, ensure we start fresh with newly values in coming records
-  f = FindWordInArrayFwd(buf, "0-0:1.0.0(", len, 9);
+                                                          //     01234567890123456789012
+  f = FindWordInArrayFwd(buf, "0-0:1.0.0(", len, 9);      // =  "0-0:1.0.0(250106212048W)"
   // Serial.printf(" f=%d ", f ); // mqttcount=3 len=716
-  if (buf[f+22] == 'S' || buf[f+22] == 'W') {  // check for Summer or Wintertime
+  if (( buf[f+22] == 'S' || buf[f+22] == 'W') && buf[f+23] == ')' )  {  // check for Summer or Wintertime
     char resDate[16];     // maximum prefix of timestamp message
     memset(resDate, 0, sizeof(resDate));       // Pointer to the block of memory to fill.
     if (strncpy(resDate, buf +f+16, 6)) {  // start buffer+10+1 for 6 bytes
@@ -4306,7 +4315,7 @@ long getValue(char *buffer, int maxlen)
   {
     if (isNumber(res, l))         // is this all numeric ?
     {
-      return (1000 * atof(res));  // Convert Character String to Float mulitplied by 1000 (remove comma)
+      return (1000 * atof(res));  // Convert Character String to Float multiplied by 1000 (to remove comma)
     }
   }
   return 0;
@@ -4466,6 +4475,7 @@ bool CheckData()        //
   if (outputMqttLog) {  // if we LOG status old values not yet set
     // char msgpub[MAXLINELENGTH];
     char output[MAXLINELENGTH];
+    memset(output, 0, sizeof(output));      // init v55b
     String msg = "{ checkdata, ";
     msg.concat("\"currentTime\": %lu,");              // %lu is unsigned long
     msg.concat("\"CurrentPowerConsumption\": %lu,");
@@ -4550,6 +4560,7 @@ bool CheckData()        //
   if (outputMqttPower2)    // output currrent power, flatnumber
   {
     char output[32];     // use snprintf to format data
+    memset(output, 0, sizeof(output));      // init v55b
     String msg = "";      // initialise data
     msg.concat("CurrentPowerConsumption: %lu");       // format data
     // rm char msgpub[32];     // allocate a message buffer    
@@ -4775,19 +4786,20 @@ void WaterTrigger0_ISR()
 
         // implement  secondary debounce routine to check ISR compliance
         ISR_time = millis();
-        if (ISR_time - last_ISR_time > 500) {
+        if ((ISR_time - last_ISR_time) > 500) {
             last_ISR_time = ISR_time;
             ISR_time_cnt++ ;          // increase our change counter      
         }
 
         if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) "i" );    
-        interval_delay(1); // V47 wait 20ms --> implemented by flat plain while loop, all other types forbidden in ISR
+        interval_delay(1); // V47 wait 1ms --> implemented by flat plain while loop, all other types forbidden in ISR
         if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
             waterTriggerState = !waterTriggerState; // revert to make the same
 
             waterTriggerCnt++ ;             // increase our call counter
-            long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-            waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+            // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+            // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+            waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
             if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
               detachWaterInterrupt();
@@ -4826,8 +4838,9 @@ void WaterTrigger1_ISR()
         waterTriggerState = digitalRead(WATERSENSOR_READ); // read possible unstable watersensor pin
 
         waterTriggerCnt++ ;             // increase our call counter
-        long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-        waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+        // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+        // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+        waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
       #ifdef NoTx2Function
         if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // monitor by invert BLUE ked
@@ -4865,8 +4878,9 @@ void WaterTrigger2_ISR()
         waterTriggerState = digitalRead(WATERSENSOR_READ); // read possible unstable watersensor pin
 
         waterTriggerCnt++ ;             // increase our call counter
-        long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-        waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+        // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+        // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+        waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
         if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
@@ -5145,26 +5159,25 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
   
       doesnot change things: code goes unstable if below is removed
 */
-// maken unstable teststable1 , active with of without 2 or 3 from printf  results in stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    delay(0);     // 008 adding here without printf above , stable
-                    // ---------------------------- 009 line 2585 added printf (unstable) 
-                    delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                    delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-
-                    delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    delay(0);     // add13 + add 014 stable (rx2-70%)
+// // make table teststable1 , active with of without 2 or 3 from printf  results in stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     delay(0);     // 008 adding here without printf above , stable
+//                     // ---------------------------- 009 line 2585 added printf (unstable) 
+//                     delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+//                     delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+//                     delay(0);     // 008 adding 009 test remove, add 011 unstable
+//                     delay(0);     // 008 adding 009 test remove, add 011 unstable
+//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+//                     delay(0);     // add13 + add 014 stable (rx2-70%)
 
 
 
@@ -5175,6 +5188,26 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
                     // delay(0);     // add18 + add019 stable  (rx2=75%), remove 021
 /* */  
 }
+
+void command_testH4(){    // code to maken things stable teststable
+                          // we remoived some unused protection arrays, improved ISR-time, 
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable0
+                    delay(0);     // v55b , stable4
+                    delay(0);     // v55b , stable2
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable0
+                    delay(0);     // v55b , stable2
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable10 <-- very very good at this state
+                    // v55b continue to test here if things become unstable ......
+                    delay(0);     // v55b , 
+                    // // delay(0);     // stable but did caused a runtime crash 
+
+}
+
+
 
 /* leave this for leaer to investigate why runtime-error is not found ...
 void throwExceptionFunction(void) {
