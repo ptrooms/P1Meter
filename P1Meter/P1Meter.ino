@@ -5233,44 +5233,22 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 
 void command_testH4(){    // code to maken things stable teststable
                     // we remoived some unused protection arrays, improved ISR-time, 
-
-                    delay(0);     //  1   v55b , stable1
-                    delay(0);     //  2   v55b , stable0
-                    delay(0);     //  3   v55b , stable4
-                    delay(0);     //  4   v55b , stable2
-                    delay(0);     //  5   v55b , stable1
-                    delay(0);     //  6   v55b , stable1
-                    delay(0);     //  7   v55b , stable0
-                    delay(0);     //  8   v55b , stable2
-                    delay(0);     //  9   v55b , stable1
-                    // // ------------------------------------------------------------
-                    delay(0);     // 10   v55b , stable8 <-- very very good
+delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable0
+                    delay(0);     // v55b , stable4
+                    delay(0);     // v55b , stable2
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable0
+                    delay(0);     // v55b , stable2
+                    delay(0);     // v55b , stable1
+                                        // ------------------------------------------------------------
+                    delay(0);     // v55b , stable8 <-- very very good
                     // v55b continue to test here if things become better or worse
-                    delay(0);     // 11   v55b , stable6 
-                    delay(0);     // 12   v55b , stable7
-                    delay(0);     // 13   v55b , stable10 <-- better P1>95% RX2=50%
-                    delay(0);     // 14   v55b , stable9  <-- even better P1>95% RX2=70%
-                    // ------------------------------------------------------------
-                    // delay(0);     // 15   v55c , Sizing stack_end=40 , stack_start=1073688920, stack_size=144 , getFreeHeap=29544, program_size=6228, program_end=0
-                    // delay(0);     // 16   v55c
-                    // delay(0);     // 17   v55c                    
-
-                    delay(0);     //  1   v55b , stable1
-                    delay(0);     //  2   v55b , stable0
-                    delay(0);     //  3   v55b , stable4
-                    delay(0);     //  4   v55b , stable2
-                    delay(0);     //  5   v55b , stable1
-                    delay(0);     //  6   v55b , stable1
-                    delay(0);     //  7   v55b , stable0
-                    delay(0);     //  8   v55b , stable2
-                    delay(0);     //  9   v55b , stable1
-                    // // ------------------------------------------------------------
-                    delay(0);     // 10   v55b , stable8 <-- very very good
-                    // v55b continue to test here if things become better or worse
-                    delay(0);     // 11   v55b , stable6 
-                    delay(0);     // 12   v55b , stable7
-                    delay(0);     // 13   v55b , stable10 <-- better P1>95% RX2=50%
-                    delay(0);     // 14   v55b , stable9  <-- even better P1>95% RX2=70%
+                    delay(0);     // v55b , stable6 
+                    delay(0);     // v55b , stable7
+                    delay(0);     // v55b , stable10 <-- even better P1>95% RX2=50%
+                    delay(0);     // v55b , stable9  <-- even better P1>95% RX2=70%
                     // ------------------------------------------------------------
 
 
