@@ -5234,21 +5234,21 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 void command_testH4(){    // code to maken things stable teststable
                     // we remoived some unused protection arrays, improved ISR-time, 
 delay(0);     // v55b , stable1
-                    delay(0);     // v55b , stable0
-                    delay(0);     // v55b , stable4
-                    delay(0);     // v55b , stable2
-                    delay(0);     // v55b , stable1
-                    delay(0);     // v55b , stable1
-                    delay(0);     // v55b , stable0
-                    delay(0);     // v55b , stable2
-                    delay(0);     // v55b , stable1
+                    delay(0);     // v55d added  1 from v55b , stable0
+                    delay(0);     // v55d added  2 from v55b , stable4
+                    delay(0);     // v55d added  3 from v55b , stable2
+                    delay(0);     // v55d added  4 from v55b , stable1
+                    delay(0);     // v55d added  5 from v55b , stable1
+                    delay(0);     // v55d added  6 from v55b , stable0
+                    delay(0);     // v55d added  7 from v55b , stable2
+                    delay(0);     // v55d added  8 from v55b , stable1
                                         // ------------------------------------------------------------
-                    delay(0);     // v55b , stable8 <-- very very good
+                    delay(0);     // v55d added  9 from v55b , stable1 <-- very very good on v55b
                     // v55b continue to test here if things become better or worse
-                    delay(0);     // v55b , stable6 
-                    delay(0);     // v55b , stable7
-                    delay(0);     // v55b , stable10 <-- even better P1>95% RX2=50%
-                    delay(0);     // v55b , stable9  <-- even better P1>95% RX2=70%
+                    delay(0);     // v55d added 10 from v55b , stable6 
+                    delay(0);     // v55d added 11 from v55b , stable7
+                    delay(0);     // v55d added 12 from v55b , stable10 <-- even better P1>95% RX2=50% on v55b
+                    delay(0);     // v55d added 13 from v55b , stable9  <-- the best P1>95% RX2=70% on v55b
                     // ------------------------------------------------------------
 
 
