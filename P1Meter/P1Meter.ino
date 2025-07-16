@@ -2418,6 +2418,15 @@ void readTelegram2() {
       #endif          
 
       if (loopbackRx2Mode > 0 && len > 0) Serial.println((String) + "..len=" + len + ":\'" + telegram2 + "\'.." ); // v54 print incoming
+      if (loopbackRx2Mode == 4) {   // diagnose header printdata v54
+          Serial.print((String)"\r\n\t  hexlineT4="  );       // v54 print CRC check
+          for (int i = 0; i < len; i++) {                // v54 header hex bytes
+              Serial.printf("%02x ", telegram2[i]); 
+
+          }
+      }
+      
+
       
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
       lenTelegram2 = lenTelegram2 + len;
@@ -2714,10 +2723,14 @@ void readTelegram2() {
                 }
                 // delay(0);     // 007 adding here wihout printf above , stable. With printf to no avail
                 if (loopbackRx2Mode == 2) {   // diagnose header printdata v54
-                    Serial.print((String)"\r\n\t" + (validTelegram2CRCFound ? "Valid" : "Invalid" )  + "CRC, Rx2head:");       // v54 print CRC check
-                    for (int i = 0; i < 20; i++) {                // v54 header hex bytes
+                    Serial.print((String)"\r\n\t" + (validTelegram2CRCFound ? "Valid" : "Invalid" )  
+                        + "CRC, Rx2head " // v54 print CRC check
+                        + ", startChar=" + (char) telegram2Record[startChar] + (int) startChar
+                        + ", endChar="   + (char) telegram2Record[endChar]   + (int) endChar
+                        + ", data=\r\n"
+                        );
+                    for (int i = 0; i < 100 && i <= endChar; i++) {                // v54 header hex bytes
                        Serial.printf("%02x ", telegram2_org[i]); 
-
                     }
                     Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
                 }
@@ -5241,6 +5254,24 @@ void command_testH4(){    // code to maken things stable teststable
                     // delay(0);     // 15   v55c , Sizing stack_end=40 , stack_start=1073688920, stack_size=144 , getFreeHeap=29544, program_size=6228, program_end=0
                     // delay(0);     // 16   v55c
                     // delay(0);     // 17   v55c                    
+
+                    delay(0);     //  1   v55b , stable1
+                    delay(0);     //  2   v55b , stable0
+                    delay(0);     //  3   v55b , stable4
+                    delay(0);     //  4   v55b , stable2
+                    delay(0);     //  5   v55b , stable1
+                    delay(0);     //  6   v55b , stable1
+                    delay(0);     //  7   v55b , stable0
+                    delay(0);     //  8   v55b , stable2
+                    delay(0);     //  9   v55b , stable1
+                    // // ------------------------------------------------------------
+                    delay(0);     // 10   v55b , stable8 <-- very very good
+                    // v55b continue to test here if things become better or worse
+                    delay(0);     // 11   v55b , stable6 
+                    delay(0);     // 12   v55b , stable7
+                    delay(0);     // 13   v55b , stable10 <-- better P1>95% RX2=50%
+                    delay(0);     // 14   v55b , stable9  <-- even better P1>95% RX2=70%
+                    // ------------------------------------------------------------
 
 
 
