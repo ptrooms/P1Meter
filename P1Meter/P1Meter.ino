@@ -40,6 +40,8 @@
 */
 
 /* change history
+  v55c - woes completely on serial
+  v55b = perfectly tuned
   v55a - debug to checkout code differences for: teststable
     - introducing DUP_MODE to identically replicate TESYT/PROD_MODE with
          reference DUP_MODE with TEST_MODE ip 185 = ip 185 with prefix e1 and version 3xxxx
