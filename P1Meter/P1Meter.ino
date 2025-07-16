@@ -5238,6 +5238,7 @@ void command_testH4(){    // code to maken things stable teststable
                     // we removed some unused protection arrays, improved ISR-time, 
     
     // 16jul25 v55c was OK, we now on v55d re-added the 14 delays from v55b
+    // things go un stable
 
                     delay(0);     // v55d added  0 from v55b , stable1
                     delay(0);     // v55d added  1 from v55b , stable0
@@ -5248,14 +5249,18 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v55d added  6 from v55b , stable0
                     delay(0);     // v55d added  7 from v55b , stable2
                     delay(0);     // v55d added  8 from v55b , stable1
-                                        // ------------------------------------------------------------
-                    delay(0);     // v55d added  9 from v55b , stable1 <-- very very good on v55b
-                    // v55b continue to test here if things become better or worse
+                    // ------ using above woes during init
+                    //                     // ------------------------------------------------------------
+                    delay(0);     // v55d added  9 from v55b , stable1 <-- very very good on v55b v55d not nice
+                    // // v55b continue to test here if things become better or worse
                     delay(0);     // v55d added 10 from v55b , stable6 
-                    delay(0);     // v55d added 11 from v55b , stable7
-                    delay(0);     // v55d added 12 from v55b , stable10 <-- even better P1>95% RX2=50% on v55b
+                    delay(0);     // v55d added 11 from v55b , stable7 v55d slighly better
+                    delay(0);     // v55d added 12 from v55b , stable10 <-- even better P1>95% RX2=50% on v55b v55d good
                     delay(0);     // v55d added 13 from v55b , stable9  <-- the best P1>95% RX2=70% on v55b
-                    // ------------------------------------------------------------
+                    // // ------------------------------------------------------------
+                    delay(0);     // v55d added 14 reasonable, rx2 not that good
+                    delay(0);     // v55d added 15 somewha improved
+                    
 
 
 
