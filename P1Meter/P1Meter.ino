@@ -40,6 +40,16 @@
 */
 
 /* change history
+  v55b - back to v55b
+  v55f - restored back to v55b
+  v55e - erratic
+  v55d - works good, based on v55c but added some serial.debugs, a bit worse than v55b
+    - production:  epc1=0x401031f1, epc2=0x00000000, epc3=0x00000000, excvaddr=0x00000000,depc=0x00000000
+    - remove to ...../debug/SoftwareSerial
+    - commented
+    - reduplicated from v55b
+    - time 1 cycled updated from 497 to 500 in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp
+  v55c - woes completely on serial
   v55b = perfectly tuned
   v55a - debug to checkout code differences for: teststable
     - introducing DUP_MODE to identically replicate TESYT/PROD_MODE with
@@ -1157,21 +1167,21 @@ PubSubClient client(espClient);   // Use this connection client
 
 void setup()
 {
-  asm(".global _printf_float");            // include floating point support
+    asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
 
-// struct rst_info *rtc_info = system_get_rst_info();
-// Serial.printf(("reset reason: %x\n", rtc_info->reason);
+  // struct rst_info *rtc_info = system_get_rst_info();
+  // Serial.printf(("reset reason: %x\n", rtc_info->reason);
 
-//    os_printf("epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x\n",
-//    rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+  //    os_printf("epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x\n",
+  //    rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
 
-rst_info *resetInfo;     // v52: ptr made global
-resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
- 
-#ifdef NoTx2Function
-  pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
-#endif
+  rst_info *resetInfo;     // v52: ptr made global
+  resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
+  
+  #ifdef NoTx2Function
+    pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
+  #endif
 
 
   // pinMode(THERMOSTAT_READ, INPUT);      // Declare Pin mode INPUT read always low
@@ -1184,9 +1194,9 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   pinMode(THERMOSTAT_WRITE, OUTPUT);       // Declare Pin mode OUTPUT to control Heat-Valve
 
   digitalWrite(BLUE_LED, LOW);             //Turn the LED ON  (active-low)
-#ifdef NoTx2Function
-  digitalWrite(BLUE_LED2, HIGH);           //Turn the LED OFF  (inactive-high)
-#endif
+  #ifdef NoTx2Function
+    digitalWrite(BLUE_LED2, HIGH);           //Turn the LED OFF  (inactive-high)
+  #endif
 
   // Thermostats initialisation
   thermostatReadState   = digitalRead(THERMOSTAT_READ); // read current room state
@@ -1196,9 +1206,9 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   // Lightread initialisation
   lightReadState   = digitalRead(LIGHT_READ); // read Hotwater valve state
 
-#ifdef NoTx2Function
-  if (blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState);  // debug readstate1
-#endif
+  #ifdef NoTx2Function
+    if (blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState);  // debug readstate1
+  #endif
   
   // prepare wdt
   ESP.wdtDisable();
@@ -1317,7 +1327,7 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   });
   Serial.println("ArduinoOTA.begin() activated." );
   
-//    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
+  //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   // #define DEF_PROG_VERSION 1123.240
   ArduinoOTA.begin();
 
@@ -1374,364 +1384,364 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
   Serial.print(intervalP1 );
   Serial.print(" mSecs,");
 
-#ifdef TEST_PRINTF_FLOAT
-  // Test float functions
-  Serial.printf ("Test FloatingPoint support\n", mqttCnt);
-  // asm(".global _printf_float"); // setin in Setup()
-  // read: https://en.cppreference.com/w/c/io/fprintf
-  Serial.printf ("\r\tmqttCnt ValueD = %05d\n", mqttCnt);   // strange lont number 2681....8192.0
-  Serial.printf ("\r\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);   // strange lont number 2681....8192.0
-  Serial.printf ("\r\t12.345 ValeUu2 = %3u_\n", 12.345);        // strange 3607772529_
-  Serial.printf ("\r\t9.0453 Value4.2f = %4.2f\n", 9.0453);     // 9.05
-  Serial.printf ("\r\t9.1 Value4.1f = %4.1f\n", 9.1);           //  9.1
-  Serial.printf ("\r\t9.12340 Value5.1f = %5.2f\n", 9.12340);   //  9.12
-  Serial.printf ("\r\t 9.5 Value4.1f = %6.1f\n", 9.5);          //    9.5
-  Serial.printf ("\r\t1234.567 Value6.1f = %6.6f\n\r", 1234.567); // 1234.567000
-#endif
+  #ifdef TEST_PRINTF_FLOAT
+    // Test float functions
+    Serial.printf ("Test FloatingPoint support\n", mqttCnt);
+    // asm(".global _printf_float"); // setin in Setup()
+    // read: https://en.cppreference.com/w/c/io/fprintf
+    Serial.printf ("\r\tmqttCnt ValueD = %05d\n", mqttCnt);   // strange lont number 2681....8192.0
+    Serial.printf ("\r\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);   // strange lont number 2681....8192.0
+    Serial.printf ("\r\t12.345 ValeUu2 = %3u_\n", 12.345);        // strange 3607772529_
+    Serial.printf ("\r\t9.0453 Value4.2f = %4.2f\n", 9.0453);     // 9.05
+    Serial.printf ("\r\t9.1 Value4.1f = %4.1f\n", 9.1);           //  9.1
+    Serial.printf ("\r\t9.12340 Value5.1f = %5.2f\n", 9.12340);   //  9.12
+    Serial.printf ("\r\t 9.5 Value4.1f = %6.1f\n", 9.5);          //    9.5
+    Serial.printf ("\r\t1234.567 Value6.1f = %6.6f\n\r", 1234.567); // 1234.567000
+  #endif
 
-#ifdef TEST_CALCULATE_TIMINGS
+  #ifdef TEST_CALCULATE_TIMINGS
 
-  unsigned long start3e = ESP.getCycleCount();  // initialize
-  unsigned long start3f = ESP.getCycleCount();  // initialize
-  unsigned long start3  = ESP.getCycleCount(); 
-  start3  = ESP.getCycleCount()+1; 
-  for (int i = 0; i < 100; i++) {
-    asm(
-      "NOP;"
-    );
-  }
-  start3  = ESP.getCycleCount()+1; 
-  for (int i = 0; i < 1; i++) {
-    asm(
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-    );
-  }
-  start3e = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
-  for (int i = 0; i < 1; i++) {
-    asm(
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-      "NOP;"
-    );
-  }
-  start3f = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
-  // 10.000xnop1 vs nop2 Start3=2109430182, start3e=2109480889(nop1=50707), start3f=2109541239(nop2=60350) .
-  // 10nops vs 20nops Start3=2782556574, start3e=2782556936(nop1=362), start3f=2782557306(nop2=370) . Only 8 cycles difference (compiler optimized?)
-  Serial.println((String) "\n Start3=" + start3 + ", start3e=" + start3e + "(nop10=" + (start3e - start3) + ")" + ", start3f=" + start3f + "(nop20=" + (start3f - start3e) + ") .");
-
-  // serial test timings
-  // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
-  // 8bitstart TestRead4Rx start4=3405964740, end4=3405970810,  diff4=6070, wait4=6673, bittime4=694  = 72,84 µS =  8.5 bits
-  // 4bitSStop TestRead4Rx start4= 668982987, end4= 668987238,  diff4=4251, wait4=4591, bittime4=694
-  // 1bitStart TestRead4Rx start4=4090473783, end4=4090475689,  diff4=1906, wait4=2509, bittime4=694
-  // 1bitWait  TestRead4Rx start4=1430700974, end4=1430701833,  diff4=859,  wait4=1121, bittime4=694
-  // 8bitOnly  TestRead4Rx start4=1597461092, end4=1597462357,  diff4=1265, wait4=427,  bittime4=694
-  // 4bitOnly  TestRead4Rx start4=2339998248, end4=2339999243,  diff4=995,  wait4=427,  bittime4=694
-  // 2BitOnly  TestRead4Rx start4=3978366322, end4=3978367168,  diff4=846,  wait4=427,  bittime4=694
-  // 1bitOnly  TestRead4Rx start4=2601377338, end4=2601377762,  diff4=424,  wait4=427,  bittime4=694  (time to read 1 bit = 424 cycles)
-  // noloop:   TestRead4Rx start4= 547644023, end4= 547644025,  diff4=2,    wait4=427,  bittime4=694
-  // waitonly: TestRead4Rx start4= 625878073, end4= 625878512,  diff4=439,  wait4=1121, bittime4=694  (427+694=1121)
-
-  // Setup our test skeleton
-    #define WAITtest4  { while (ESP.getCycleCount()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
-    Serial.println((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
-    int m_rxPin4 = SERIAL_RX;     // gpio14
-    unsigned long speed4 = 115200;
-    unsigned long m_bitTime4 = ESP.getCpuFreqMHz()*1000000/speed4;
-    int m_buffSize4 = 66; // test
-    bool m_overflow4 = false;
-    bool m_P1active4 = false;
-    bool m_highSpeed4 = true;
-    // simulate the serial routine for 1byte   
-    unsigned long wait4 = m_bitTime4 + m_bitTime4/3 - 498;		// offset 501=425 offset 498=427cycles 115k2@80MHz
-    
-    // below a 1:1 copy of the serial routine of plerup, this to check/simulate the time for. 
-    unsigned long start4 = ESP.getCycleCount();
-    uint8_t rec = 0;
-    // WAITtest4;    // wait/skip startbit 427 cycles
-    for (int i = 0; i < 8; i++) {  // this routine takes 424 cycles without any wait and for-test-consumes 12cyles
-      WAITtest4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
-      rec >>= 1;
-      if (digitalRead(m_rxPin4)) rec |= 0x80;
-    }
-    WAITtest4; // stopbit while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
-    if (m_rxPin4) rec = ~rec;   // simulate the invert
-    unsigned int m_inPos4 = 10;
-    unsigned int m_outPos4 = 5;
-    int next4 = (m_inPos4 +1) % m_buffSize4;  // (10+1) % 66 = 11
-    if (next4 != m_outPos4) {
-        if (rec == '/') m_P1active4 = true ;   // 26mar21 Ptro P1 messageing has started by header
-        if (rec == '!') m_P1active4 = false; // 26mar21 Ptro P1 messageing has ended due valid trailer
-        // m_buffer[m_inPos4] = rec;
-        m_inPos4 = next4;
-    } else {
-        m_P1active4 = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
-        m_overflow4 = true;
-    }
-    
-    unsigned long start4e = ESP.getCycleCount();
-    Serial.println((String)" TestRead4Rx start4=" + start4 + ", end4="+ start4e 
-            + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 
-            + ", bittime4=" + m_bitTime4 );   // v51: start4=1171498770, end4=1171504757, diff4=5987, wait4=6673, bittime4=694
-
-
-    // calculate getCycleCnt
-    wait4 = m_bitTime4 + m_bitTime4/3 - 498;
-    start4 = ESP.getCycleCount(); 
-    start4e = ESP.getCycleCount();  // delta between these two = 348 cycles
-    // TestIramWait0 start4=1709979665, end4=1709979667, diff4=2, wait4=427, bittime4=694
-    Serial.println((String)" TestIramWait0 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
-    start4 = ESP.getCycleCount();
-    // while loop here takes 91 cycles
-    { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
-    start4e = ESP.getCycleCount();
-    // TestIramWait1 start4=594504443, end4=594504882,   diff4=439, wait4=1121, bittime4=694
-    Serial.println((String)" TestIramWait1 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
-
-    // Test inline assembled copy of GetCycleCount
-    for (int i = 0; i < 3; i++) {
-      wait4 = m_bitTime4 + m_bitTime4/3 - 498;
-      start4 = getCycleCountIramLocal();
-      // while loop here takes 91 cycles
-      // { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
-      start4e = getCycleCountIramLocal();
-      // TestIramWait3 start4=1713581182, end4=1713581184, diff4=2, wait4=427, bittime4=69
-      Serial.println((String)" TestIramWait3 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
-      start4 = getCycleCountIramLocal();
-      { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
-      start4e = getCycleCountIramLocal();
-      // TestIramWait4 start4=1714171078, end4=1714171510, diff4=432, wait4=1121, bittime4=694
-      Serial.println((String)" TestIramWait4 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
-      
-
-      // getCycleCountIramLocal();   // 9 cycles
-      // TestIramWait5 start4=541067741, end4=541068175, diff4=434, wait4=1121, bittime4=694
-      // { while (getCycleCountIramLocal()-start4 < wait4) ; wait4 += m_bitTime4; }
-
-      start4 = getCycleCountIramLocal();
-      wait4 = start4 + (m_bitTime4 + m_bitTime4/3 - 498);
-      { while (getCycleCountIramLocal() < wait4) ; wait4 += m_bitTime4; }
-      start4e = getCycleCountIramLocal();
-      // TestIramWait7 start4=3440482983, end4=3440483418, diff4=435, wait4=3440484104, bittime4=694
-      Serial.println((String)" TestIramWait7 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
-     
-    } // for loop
-  
-    wait4 = m_bitTime4 + m_bitTime4/3 - 498;
-    start4 = ESP.getCycleCount();
-    long test4 = 0;
-    for (long i = 0; i < 46; i++) {  // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
-        // long test4 = ESP.getCycleCount(); // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
-        // long test4 = ESP.getCycleCount()+ESP.getCycleCount(); // add/sub@i46=715 , 
-        // long test4 = ESP.getCycleCount()+ESP.getCycleCount()+ESP.getCycleCount(); // triple=808
-        // long test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // quadro46 = 1245    
-        test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // inlinequadro46 = 1245 
-    }
-    start4e = ESP.getCycleCount();
-    // for (int i = 0; i < 1000; i++) = 348
-    // Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test=" + test4 );
-    // TestIramWait9 gc4-1=906115867, gc4-2=906120354, gc4-3=906124820, gc4-4=906128621
-    Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test4=" + test4 );
-
-    // diffs: 3801-4487-4466
-    Serial.println((String)" TestIramWait9 gc4-1=" + ESP.getCycleCount() + ", gc4-2="+ ESP.getCycleCount() + ", gc4-3="+ ESP.getCycleCount() + ", gc4-4="+ ESP.getCycleCount());
-
-    // insert a small loop to stabilize-routine
+    unsigned long start3e = ESP.getCycleCount();  // initialize
+    unsigned long start3f = ESP.getCycleCount();  // initialize
+    unsigned long start3  = ESP.getCycleCount(); 
+    start3  = ESP.getCycleCount()+1; 
     for (int i = 0; i < 100; i++) {
+      asm(
+        "NOP;"
+      );
+    }
+    start3  = ESP.getCycleCount()+1; 
+    for (int i = 0; i < 1; i++) {
+      asm(
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+      );
+    }
+    start3e = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
+    for (int i = 0; i < 1; i++) {
+      asm(
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+      );
+    }
+    start3f = ESP.getCycleCount()+1;  // delta between these two = 348 cycles
+    // 10.000xnop1 vs nop2 Start3=2109430182, start3e=2109480889(nop1=50707), start3f=2109541239(nop2=60350) .
+    // 10nops vs 20nops Start3=2782556574, start3e=2782556936(nop1=362), start3f=2782557306(nop2=370) . Only 8 cycles difference (compiler optimized?)
+    Serial.println((String) "\n Start3=" + start3 + ", start3e=" + start3e + "(nop10=" + (start3e - start3) + ")" + ", start3f=" + start3f + "(nop20=" + (start3f - start3e) + ") .");
+
+    // serial test timings
+    // 8bitSStop TestRead4Rx start4=3666068548, end4=3666075579,  diff4=7031, wait4=7367, bittime4=694  = 87,94 µS = 10   bits
+    // 8bitstart TestRead4Rx start4=3405964740, end4=3405970810,  diff4=6070, wait4=6673, bittime4=694  = 72,84 µS =  8.5 bits
+    // 4bitSStop TestRead4Rx start4= 668982987, end4= 668987238,  diff4=4251, wait4=4591, bittime4=694
+    // 1bitStart TestRead4Rx start4=4090473783, end4=4090475689,  diff4=1906, wait4=2509, bittime4=694
+    // 1bitWait  TestRead4Rx start4=1430700974, end4=1430701833,  diff4=859,  wait4=1121, bittime4=694
+    // 8bitOnly  TestRead4Rx start4=1597461092, end4=1597462357,  diff4=1265, wait4=427,  bittime4=694
+    // 4bitOnly  TestRead4Rx start4=2339998248, end4=2339999243,  diff4=995,  wait4=427,  bittime4=694
+    // 2BitOnly  TestRead4Rx start4=3978366322, end4=3978367168,  diff4=846,  wait4=427,  bittime4=694
+    // 1bitOnly  TestRead4Rx start4=2601377338, end4=2601377762,  diff4=424,  wait4=427,  bittime4=694  (time to read 1 bit = 424 cycles)
+    // noloop:   TestRead4Rx start4= 547644023, end4= 547644025,  diff4=2,    wait4=427,  bittime4=694
+    // waitonly: TestRead4Rx start4= 625878073, end4= 625878512,  diff4=439,  wait4=1121, bittime4=694  (427+694=1121)
+
+    // Setup our test skeleton
+      #define WAITtest4  { while (ESP.getCycleCount()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+      Serial.println((String)"m-bitime 115K2=" + (ESP.getCpuFreqMHz() * 1000000 / 115200)); // = 694 cycles for 115K2@80Mhz
+      int m_rxPin4 = SERIAL_RX;     // gpio14
+      unsigned long speed4 = 115200;
+      unsigned long m_bitTime4 = ESP.getCpuFreqMHz()*1000000/speed4;
+      int m_buffSize4 = 66; // test
+      bool m_overflow4 = false;
+      bool m_P1active4 = false;
+      bool m_highSpeed4 = true;
+      // simulate the serial routine for 1byte   
+      unsigned long wait4 = m_bitTime4 + m_bitTime4/3 - 498;		// offset 501=425 offset 498=427cycles 115k2@80MHz
+      
+      // below a 1:1 copy of the serial routine of plerup, this to check/simulate the time for. 
+      unsigned long start4 = ESP.getCycleCount();
+      uint8_t rec = 0;
+      // WAITtest4;    // wait/skip startbit 427 cycles
+      for (int i = 0; i < 8; i++) {  // this routine takes 424 cycles without any wait and for-test-consumes 12cyles
+        WAITtest4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+        rec >>= 1;
+        if (digitalRead(m_rxPin4)) rec |= 0x80;
+      }
+      WAITtest4; // stopbit while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+      if (m_rxPin4) rec = ~rec;   // simulate the invert
+      unsigned int m_inPos4 = 10;
+      unsigned int m_outPos4 = 5;
+      int next4 = (m_inPos4 +1) % m_buffSize4;  // (10+1) % 66 = 11
+      if (next4 != m_outPos4) {
+          if (rec == '/') m_P1active4 = true ;   // 26mar21 Ptro P1 messageing has started by header
+          if (rec == '!') m_P1active4 = false; // 26mar21 Ptro P1 messageing has ended due valid trailer
+          // m_buffer[m_inPos4] = rec;
+          m_inPos4 = next4;
+      } else {
+          m_P1active4 = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
+          m_overflow4 = true;
+      }
+      
+      unsigned long start4e = ESP.getCycleCount();
+      Serial.println((String)" TestRead4Rx start4=" + start4 + ", end4="+ start4e 
+              + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 
+              + ", bittime4=" + m_bitTime4 );   // v51: start4=1171498770, end4=1171504757, diff4=5987, wait4=6673, bittime4=694
+
+
+      // calculate getCycleCnt
+      wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+      start4 = ESP.getCycleCount(); 
+      start4e = ESP.getCycleCount();  // delta between these two = 348 cycles
+      // TestIramWait0 start4=1709979665, end4=1709979667, diff4=2, wait4=427, bittime4=694
+      Serial.println((String)" TestIramWait0 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+      start4 = ESP.getCycleCount();
+      // while loop here takes 91 cycles
+      { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+      start4e = ESP.getCycleCount();
+      // TestIramWait1 start4=594504443, end4=594504882,   diff4=439, wait4=1121, bittime4=694
+      Serial.println((String)" TestIramWait1 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+
+      // Test inline assembled copy of GetCycleCount
+      for (int i = 0; i < 3; i++) {
+        wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+        start4 = getCycleCountIramLocal();
+        // while loop here takes 91 cycles
+        // { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+        start4e = getCycleCountIramLocal();
+        // TestIramWait3 start4=1713581182, end4=1713581184, diff4=2, wait4=427, bittime4=69
+        Serial.println((String)" TestIramWait3 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+        start4 = getCycleCountIramLocal();
+        { while (getCycleCountIramLocal()-start4 < wait4) if (!m_highSpeed4) optimistic_yield(1); wait4 += m_bitTime4; }
+        start4e = getCycleCountIramLocal();
+        // TestIramWait4 start4=1714171078, end4=1714171510, diff4=432, wait4=1121, bittime4=694
+        Serial.println((String)" TestIramWait4 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+        
+
+        // getCycleCountIramLocal();   // 9 cycles
+        // TestIramWait5 start4=541067741, end4=541068175, diff4=434, wait4=1121, bittime4=694
+        // { while (getCycleCountIramLocal()-start4 < wait4) ; wait4 += m_bitTime4; }
+
+        start4 = getCycleCountIramLocal();
+        wait4 = start4 + (m_bitTime4 + m_bitTime4/3 - 498);
+        { while (getCycleCountIramLocal() < wait4) ; wait4 += m_bitTime4; }
+        start4e = getCycleCountIramLocal();
+        // TestIramWait7 start4=3440482983, end4=3440483418, diff4=435, wait4=3440484104, bittime4=694
+        Serial.println((String)" TestIramWait7 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", wait4=" + wait4 + ", bittime4=" + m_bitTime4 );
+      
+      } // for loop
+    
+      wait4 = m_bitTime4 + m_bitTime4/3 - 498;
+      start4 = ESP.getCycleCount();
+      long test4 = 0;
+      for (long i = 0; i < 46; i++) {  // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
+          // long test4 = ESP.getCycleCount(); // predef10=61cycles, predef100=601cycles, i100=947 , i75=798 , i50=648, i47=630, i46=624
+          // long test4 = ESP.getCycleCount()+ESP.getCycleCount(); // add/sub@i46=715 , 
+          // long test4 = ESP.getCycleCount()+ESP.getCycleCount()+ESP.getCycleCount(); // triple=808
+          // long test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // quadro46 = 1245    
+          test4 = (ESP.getCycleCount()+ESP.getCycleCount())-(ESP.getCycleCount()+ESP.getCycleCount()); // inlinequadro46 = 1245 
+      }
+      start4e = ESP.getCycleCount();
+      // for (int i = 0; i < 1000; i++) = 348
+      // Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test=" + test4 );
+      // TestIramWait9 gc4-1=906115867, gc4-2=906120354, gc4-3=906124820, gc4-4=906128621
+      Serial.println((String)" TestIramWait8 start4=" + start4 + ", end4="+ start4e + ", diff4=" + (start4e-start4) + ", test4=" + test4 );
+
+      // diffs: 3801-4487-4466
+      Serial.println((String)" TestIramWait9 gc4-1=" + ESP.getCycleCount() + ", gc4-2="+ ESP.getCycleCount() + ", gc4-3="+ ESP.getCycleCount() + ", gc4-4="+ ESP.getCycleCount());
+
+      // insert a small loop to stabilize-routine
+      for (int i = 0; i < 100; i++) {
+        int test = 0;
+      }
+
+    // #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
+    // Checktiming for test only
+    unsigned long m_bitTime = ESP.getCpuFreqMHz() * 1000000 / 115200;
+    unsigned long wait = m_bitTime + m_bitTime / 3 - 500;  // 425 115k2@80MHz
+    unsigned long start = ESP.getCycleCount();
+
+    unsigned long startMicro1 = micros();
+    unsigned long startCycle1 = ESP.getCycleCount();
+    unsigned long   endCycle1 = ESP.getCycleCount();
+    unsigned long   endMicro1 = micros();
+    unsigned long  diffCycle1 =  endCycle1 - startCycle1;
+    unsigned long  diffMicro1 =  endMicro1 - startMicro1;
+
+    for (int i = 0; i < 1000; i++) {
       int test = 0;
     }
 
-  // #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
-  // Checktiming for test only
-  unsigned long m_bitTime = ESP.getCpuFreqMHz() * 1000000 / 115200;
-  unsigned long wait = m_bitTime + m_bitTime / 3 - 500;  // 425 115k2@80MHz
-  unsigned long start = ESP.getCycleCount();
-
-  unsigned long startMicro1 = micros();
-  unsigned long startCycle1 = ESP.getCycleCount();
-  unsigned long   endCycle1 = ESP.getCycleCount();
-  unsigned long   endMicro1 = micros();
-  unsigned long  diffCycle1 =  endCycle1 - startCycle1;
-  unsigned long  diffMicro1 =  endMicro1 - startMicro1;
-
-  for (int i = 0; i < 1000; i++) {
-    int test = 0;
-  }
-
-  // check-test native ISR routine
-  cli();   // hold interrupts ( or noInterrupts() )
-  unsigned long startMicro2 = micros();
-  unsigned long startCycle2 = ESP.getCycleCount();
-  unsigned long wait2 = m_bitTime + m_bitTime / 3 - 500; // 425 115k2@80MHz
-  // unsigned long wait = 425; // harcoded
-  unsigned long start2 = ESP.getCycleCount();
-  uint8_t rec2 = 0;
-  unsigned long   endCycle2 = ESP.getCycleCount();
-  unsigned long   endMicro2 = micros();
-  unsigned long  diffCycle2 =  endCycle2 - startCycle2 ;
-  unsigned long  diffMicro2 =  endMicro2 - startMicro2 ;
-  sei();   // resume interrupts   (or interrupts() )     // v51 correction
-  for (int i = 0; i < 1000; i++) {
-    int test = 0;
-  }
-
-  // test  timing for logic test only
-  bool t_P1active1;
-  uint8_t t_rec1 = 0;
-  unsigned long startMicro3 = micros();
-  unsigned long startCycle3 = ESP.getCycleCount();
-  if (t_rec1 == '/') t_P1active1 = true ;   // 26mar21 Ptro P1 messageing has started by header
-  if (t_rec1 == '!') t_P1active1 = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
-  unsigned long   endCycle3 = ESP.getCycleCount();
-  unsigned long   endMicro3 = micros();
-  unsigned long  diffCycle3 =  endCycle3 - startCycle3;
-  unsigned long  diffMicro3 =  endMicro3 - startMicro3;
-
-  for (int i = 0; i < 1000; i++) {
-    int test = 0;
-  }
-
-  // test  timing for printing a byte
-  unsigned long startMicro4 = micros();
-  unsigned long startCycle4 = ESP.getCycleCount();
-  Serial.print(".");
-  unsigned long   endCycle4 = ESP.getCycleCount();
-  unsigned long   endMicro4 = micros();
-  unsigned long  diffCycle4 =  endCycle4 - startCycle4;
-  unsigned long  diffMicro4 =  endMicro4 - startMicro4;
-
-  for (int i = 0; i < 1000; i++) {
-    int test = 0;
-  }
-
-  // check timing for testing P1 Header/Trailer and set State active
-  bool t_P1active5;
-  uint8_t t_rec5 = '/';
-  unsigned long startMicro5 = micros();
-  unsigned long startCycle5 = ESP.getCycleCount();
-  if (t_rec5 == '/') t_P1active5 = true ;   // 26mar21 Ptro P1 messageing has started by header
-  if (t_rec5 == '/') t_P1active5 = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
-  /* // test for loop duration 1 GetCycle 1-2 µSec
-    for (int i=0; i < 1000; i++) {
-        int test=0;
+    // check-test native ISR routine
+    cli();   // hold interrupts ( or noInterrupts() )
+    unsigned long startMicro2 = micros();
+    unsigned long startCycle2 = ESP.getCycleCount();
+    unsigned long wait2 = m_bitTime + m_bitTime / 3 - 500; // 425 115k2@80MHz
+    // unsigned long wait = 425; // harcoded
+    unsigned long start2 = ESP.getCycleCount();
+    uint8_t rec2 = 0;
+    unsigned long   endCycle2 = ESP.getCycleCount();
+    unsigned long   endMicro2 = micros();
+    unsigned long  diffCycle2 =  endCycle2 - startCycle2 ;
+    unsigned long  diffMicro2 =  endMicro2 - startMicro2 ;
+    sei();   // resume interrupts   (or interrupts() )     // v51 correction
+    for (int i = 0; i < 1000; i++) {
+      int test = 0;
     }
-  */
-  unsigned long   endCycle5 = ESP.getCycleCount();
-  unsigned long   endMicro5 = micros();
-  unsigned long  diffCycle5 =  endCycle5 - startCycle5;
-  unsigned long  diffMicro5 =  endMicro5 - startMicro5;
 
-  for (int i = 0; i < 1000; i++) {
-    int test = 0;
-  }
+    // test  timing for logic test only
+    bool t_P1active1;
+    uint8_t t_rec1 = 0;
+    unsigned long startMicro3 = micros();
+    unsigned long startCycle3 = ESP.getCycleCount();
+    if (t_rec1 == '/') t_P1active1 = true ;   // 26mar21 Ptro P1 messageing has started by header
+    if (t_rec1 == '!') t_P1active1 = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
+    unsigned long   endCycle3 = ESP.getCycleCount();
+    unsigned long   endMicro3 = micros();
+    unsigned long  diffCycle3 =  endCycle3 - startCycle3;
+    unsigned long  diffMicro3 =  endMicro3 - startMicro3;
 
-  Serial.println(" Timing for native as reference ");
-  Serial.print((String) "startMicro1=" + startMicro1 +
-               ", startCycle1=" + startCycle1 +
-               ", endCycle1=" +   endCycle1 +
-               ", endMicro1=" +   endMicro1 +
-               ", diffCycle1=" +  diffCycle1 +
-               ", diffMicro1=" +  diffMicro1 +
-               ".\r\n");
-  Serial.println("EOI.");
+    for (int i = 0; i < 1000; i++) {
+      int test = 0;
+    }
 
-  Serial.println(" Timing for ISR Softserial initiation ");
-  Serial.print((String) "startMicro2=" + startMicro2 +
-               ", startCycle2=" + startCycle2 +
-               ", endCycle2=" +   endCycle2 +
-               ", endMicro2=" +   endMicro2 +
-               ", diffCycle2=" +  diffCycle2 +
-               ", diffMicro2=" +  diffMicro2 +
-               ", wait (cycles)=" +       wait2 +
-               ".\r\n");
-  Serial.println("EOI.");
+    // test  timing for printing a byte
+    unsigned long startMicro4 = micros();
+    unsigned long startCycle4 = ESP.getCycleCount();
+    Serial.print(".");
+    unsigned long   endCycle4 = ESP.getCycleCount();
+    unsigned long   endMicro4 = micros();
+    unsigned long  diffCycle4 =  endCycle4 - startCycle4;
+    unsigned long  diffMicro4 =  endMicro4 - startMicro4;
 
-  Serial.println(" Timing instructions for P1 test hdr/trl in ISR Softserial");
-  Serial.print((String) "startMicro3=" + startMicro3 +
-               ", startCycle3=" + startCycle3 +
-               ", endCycle3=" +   endCycle3 +
-               ", endMicro3=" +   endMicro3 +
-               ", diffCycle3=" +  diffCycle3 +
-               ", diffMicro3=" +  diffMicro3 +
-               ".\r\n");
-  Serial.println("EOI3");
+    for (int i = 0; i < 1000; i++) {
+      int test = 0;
+    }
 
-  Serial.println(" Timing instructions for Print a single byte");
-  Serial.print((String) "startMicro4=" + startMicro4 +
-               ", startCycle4=" + startCycle4 +
-               ", endCycle4=" +   endCycle4 +
-               ", endMicro4=" +   endMicro4 +
-               ", diffCycle4=" +  diffCycle4 +
-               ", diffMicro4=" +  diffMicro4 +
-               ".\r\n");
-  Serial.println("EOI4");
+    // check timing for testing P1 Header/Trailer and set State active
+    bool t_P1active5;
+    uint8_t t_rec5 = '/';
+    unsigned long startMicro5 = micros();
+    unsigned long startCycle5 = ESP.getCycleCount();
+    if (t_rec5 == '/') t_P1active5 = true ;   // 26mar21 Ptro P1 messageing has started by header
+    if (t_rec5 == '/') t_P1active5 = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
+    /* // test for loop duration 1 GetCycle 1-2 µSec
+      for (int i=0; i < 1000; i++) {
+          int test=0;
+      }
+    */
+    unsigned long   endCycle5 = ESP.getCycleCount();
+    unsigned long   endMicro5 = micros();
+    unsigned long  diffCycle5 =  endCycle5 - startCycle5;
+    unsigned long  diffMicro5 =  endMicro5 - startMicro5;
 
-  Serial.println(" Timing instructions for P1 set hdr&trl in ISR Softserial");
-  Serial.print((String) "startMicro5=" + startMicro5 +
-               ", startCycle5=" + startCycle5 +
-               ", endCycle5=" +   endCycle5 +
-               ", endMicro5=" +   endMicro5 +
-               ", diffCycle5=" +  diffCycle5 +
-               ", diffMicro5=" +  diffMicro5 +
-               ".\r\n");
-  Serial.println("EOI5\n");
+    for (int i = 0; i < 1000; i++) {
+      int test = 0;
+    }
 
-  Serial.println((String)"P1 ItE logic: " +
-                 (diffCycle3 - diffCycle1) + "Cycles ," +
-                 (diffMicro3 - diffMicro1) + "uSecs " +
-                 ".");
+    Serial.println(" Timing for native as reference ");
+    Serial.print((String) "startMicro1=" + startMicro1 +
+                ", startCycle1=" + startCycle1 +
+                ", endCycle1=" +   endCycle1 +
+                ", endMicro1=" +   endMicro1 +
+                ", diffCycle1=" +  diffCycle1 +
+                ", diffMicro1=" +  diffMicro1 +
+                ".\r\n");
+    Serial.println("EOI.");
 
-  Serial.println((String)"Test for P1 Hdr/Trl: " +
-                 (diffCycle5 - diffCycle3) + "Cycles ," +
-                 (diffMicro5 - diffMicro3) + "uSecs " +
-                 ".");
+    Serial.println(" Timing for ISR Softserial initiation ");
+    Serial.print((String) "startMicro2=" + startMicro2 +
+                ", startCycle2=" + startCycle2 +
+                ", endCycle2=" +   endCycle2 +
+                ", endMicro2=" +   endMicro2 +
+                ", diffCycle2=" +  diffCycle2 +
+                ", diffMicro2=" +  diffMicro2 +
+                ", wait (cycles)=" +       wait2 +
+                ".\r\n");
+    Serial.println("EOI.");
 
-  Serial.println((String)"Test & Set P1active: " +
-                 (diffCycle5 - diffCycle1) + "Cycles ," +
-                 (diffMicro5 - diffMicro1) + "uSecs " +
-                 ".\n");
+    Serial.println(" Timing instructions for P1 test hdr/trl in ISR Softserial");
+    Serial.print((String) "startMicro3=" + startMicro3 +
+                ", startCycle3=" + startCycle3 +
+                ", endCycle3=" +   endCycle3 +
+                ", endMicro3=" +   endMicro3 +
+                ", diffCycle3=" +  diffCycle3 +
+                ", diffMicro3=" +  diffMicro3 +
+                ".\r\n");
+    Serial.println("EOI3");
 
-#endif  // TEST_CALCULATE_TIMINGS
+    Serial.println(" Timing instructions for Print a single byte");
+    Serial.print((String) "startMicro4=" + startMicro4 +
+                ", startCycle4=" + startCycle4 +
+                ", endCycle4=" +   endCycle4 +
+                ", endMicro4=" +   endMicro4 +
+                ", diffCycle4=" +  diffCycle4 +
+                ", diffMicro4=" +  diffMicro4 +
+                ".\r\n");
+    Serial.println("EOI4");
 
-  // intervalP1cnt =  10;        // initialise timeout count
-  // intervalP1  = 30000;        // 30.000 mSec
-  previousMillis    = millis();           // initialise previous interval
-  previousP1_Millis = previousMillis;  // initialise previous interval
-  // attachInterrupt(WATERSENSOR_READ, WaterTrigger_ISR, CHANGE); // trigger at every change
-  // attachWaterInterrupt();
+    Serial.println(" Timing instructions for P1 set hdr&trl in ISR Softserial");
+    Serial.print((String) "startMicro5=" + startMicro5 +
+                ", startCycle5=" + startCycle5 +
+                ", endCycle5=" +   endCycle5 +
+                ", endMicro5=" +   endMicro5 +
+                ", diffCycle5=" +  diffCycle5 +
+                ", diffMicro5=" +  diffMicro5 +
+                ".\r\n");
+    Serial.println("EOI5\n");
 
-  waterTriggerTime = 0;  // ensure and assum no trigger yet
-  test_WdtTime = 0;  // set first loop timer
-  loopcnt = 0;              // set loopcount to 0
-  Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
-//  WiFi.printDiag(Serial);   // print data
-} // setup
+    Serial.println((String)"P1 ItE logic: " +
+                  (diffCycle3 - diffCycle1) + "Cycles ," +
+                  (diffMicro3 - diffMicro1) + "uSecs " +
+                  ".");
+
+    Serial.println((String)"Test for P1 Hdr/Trl: " +
+                  (diffCycle5 - diffCycle3) + "Cycles ," +
+                  (diffMicro5 - diffMicro3) + "uSecs " +
+                  ".");
+
+    Serial.println((String)"Test & Set P1active: " +
+                  (diffCycle5 - diffCycle1) + "Cycles ," +
+                  (diffMicro5 - diffMicro1) + "uSecs " +
+                  ".\n");
+
+  #endif  // TEST_CALCULATE_TIMINGS
+
+    // intervalP1cnt =  10;        // initialise timeout count
+    // intervalP1  = 30000;        // 30.000 mSec
+    previousMillis    = millis();           // initialise previous interval
+    previousP1_Millis = previousMillis;  // initialise previous interval
+    // attachInterrupt(WATERSENSOR_READ, WaterTrigger_ISR, CHANGE); // trigger at every change
+    // attachWaterInterrupt();
+
+    waterTriggerTime = 0;  // ensure and assum no trigger yet
+    test_WdtTime = 0;  // set first loop timer
+    loopcnt = 0;              // set loopcount to 0
+    Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
+  //  WiFi.printDiag(Serial);   // print data
+  } // setup
 
 
 /* 
@@ -1750,7 +1760,7 @@ resetInfo = ESP.getResetInfoPtr();  // v52: get information pointer
 */
 void loop()
 { 
-  if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
+    if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
   // note this loop() routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
@@ -1817,7 +1827,7 @@ void loop()
   } else {                         // else we are allowed to do other acivities
     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
-/* 
+      /* 
         =========================================
         Try to read connected P1
         =========================================
@@ -2075,7 +2085,7 @@ void loop()
 
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have left the building
-}
+  }
 
 /* 
   Reconnect lost mqtt connection
@@ -2402,7 +2412,7 @@ void readTelegram2() {
       #endif          
 
       if (loopbackRx2Mode > 0 && len > 0) Serial.println((String) + "..len=" + len + ":\'" + telegram2 + "\'.." ); // v54 print incoming
-      
+            
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
       lenTelegram2 = lenTelegram2 + len;
       if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
@@ -2858,7 +2868,7 @@ void processGpio() {    // Do regular functions of the system
     Serial.println( " ." );
   }
   // publishP1ToMqtt();      // PUBLISH this mqtt
-}
+} 
 
 /* 
     Mqtt input received, callled whenever a MQTT subscription message arrives
@@ -3247,7 +3257,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           if ( (char)payload[2] == '2') command_testH2();    // v52: check mqtt empty strings
           if ( (char)payload[3] == '3') command_testH3();    // v55 
           if ( (char)payload[4] == '4') command_testH4();    // v55a redudant delay()
-    } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
+              } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\n\r? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
                                                         + ", compiled " __DATE__ + " " + __TIME__ );
@@ -3316,7 +3326,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                                 + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
                                 + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
                                 + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
-    } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
+              } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
 
      if (outputOnSerial) Serial.println();   // ensure crlf
   }
@@ -5191,7 +5201,7 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 }
 
 void command_testH4(){    // code to maken things stable teststable
-                    // we remoived some unused protection arrays, improved ISR-time, 
+                    // we remoived some unused protection arrays, improved ISR-time,
                     delay(0);     // v55b , stable1
                     delay(0);     // v55b , stable0
                     delay(0);     // v55b , stable4
@@ -5201,7 +5211,7 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v55b , stable0
                     delay(0);     // v55b , stable2
                     delay(0);     // v55b , stable1
-                    // ------------------------------------------------------------
+// ------------------------------------------------------------
                     delay(0);     // v55b , stable8 <-- very very good
                     // v55b continue to test here if things become better or worse
                     delay(0);     // v55b , stable6 
