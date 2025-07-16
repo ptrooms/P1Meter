@@ -205,6 +205,10 @@
 // see/for git: https://github.com/ptrooms/P1Meter
 // Update $ git checkout -b v36 on https://github.com/ptrooms/P1Meter.git to correct watercnt errors 
 
+char *stack_start;            // v55c , mark header to determine stacksize
+uint32_t stack_end    = 0;    // v55c , filled at every end of loop() stack_size()
+uint32_t program_size = 0;    // v55c , (uint32_t)&program_end - (uint32_t)&stack_start;
+
 #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
 #define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.1 and use P1serial verion to listen /header & !finish
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
@@ -1154,8 +1158,13 @@ PubSubClient client(espClient);   // Use this connection client
 #include <user_interface.h>     // v52: support to display/ger restart reasons
 // rst_info *resetInfo;            // v52: pointer (global)
 
+char *program_end;        // v55c mark end_of program
+
 void setup()
 {
+  char stack; stack_start = &stack;       // v55c determine stacksize
+  program_size = (uint32_t)&program_end - (uint32_t)&stack_start; // v55c
+
   asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
 
@@ -1816,7 +1825,7 @@ void loop()
   } else {                         // else we are allowed to do other acivities
     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
-/* 
+      /* 
         =========================================
         Try to read connected P1
         =========================================
@@ -2074,6 +2083,7 @@ void loop()
 
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have left the building
+  stack_end = stack_size();   // get stack_size
 }
 
 /* 
@@ -2857,7 +2867,7 @@ void processGpio() {    // Do regular functions of the system
     Serial.println( " ." );
   }
   // publishP1ToMqtt();      // PUBLISH this mqtt
-}
+} 
 
 /* 
     Mqtt input received, callled whenever a MQTT subscription message arrives
@@ -3315,6 +3325,11 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                                 + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
                                 + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
                                 + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
+          Serial.println((String) "Sizing stack_end=" + stack_end   // v55c
+                                + ", stack_size=" + stack_size()        
+                                + ", getFreeHeap=" + ESP.getFreeHeap() 
+                                + ", program_end=" + program_size
+                                );
     } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
 
      if (outputOnSerial) Serial.println();   // ensure crlf
@@ -5205,14 +5220,21 @@ void command_testH4(){    // code to maken things stable teststable
                     // v55b continue to test here if things become better or worse
                     delay(0);     // v55b , stable6 
                     delay(0);     // v55b , stable7
-                    delay(0);     // v55b , stable10 <-- even better P1>95% RX2=50%
+                    delay(0);     // v55b , stable10 <-- better P1>95% RX2=50%
                     delay(0);     // v55b , stable9  <-- even better P1>95% RX2=70%
                     // ------------------------------------------------------------
 
 
 }
 
+/*
+  display stacksize
+*/
 
+uint32_t stack_size() {
+    char stack;
+    return (uint32_t)stack_start - (uint32_t)&stack;
+}
 
 /* leave this for leaer to investigate why runtime-error is not found ...
 void throwExceptionFunction(void) {
@@ -5252,3 +5274,4 @@ void throwExceptionFunction(void) {
         Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
         
  */
+// char *program_end;        // v55c mark end_of program
