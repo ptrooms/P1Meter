@@ -1164,6 +1164,8 @@ PubSubClient client(espClient);   // Use this connection client
 #include <user_interface.h>     // v52: support to display/ger restart reasons
 // rst_info *resetInfo;            // v52: pointer (global)
 
+unsigned long ICACHE_RAM_ATTR command_testH5();
+
 char *program_end;        // v55c mark end_of program
 
 void setup()
@@ -3276,9 +3278,36 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'H') {    // testit c-strings and constants
           // command_testH2();    //  v51: Execute test string casting c_str, array, publishmqtt
           if ( (char)payload[1] == '1') command_testH1();    // v52: check mqtt empty strings
-          if ( (char)payload[2] == '2') command_testH2();    // v52: check mqtt empty strings
-          if ( (char)payload[3] == '3') command_testH3();    // v55 
-          if ( (char)payload[4] == '4') command_testH4();    // v55a redudant delay()
+          if ( (char)payload[1] == '2') command_testH2();    // v52: check mqtt empty strings
+          if ( (char)payload[1] == '3') command_testH3();    // v55 
+          if ( (char)payload[1] == '4') command_testH4();    // v55a redudant delay()
+          if ( (char)payload[1] == '5') {
+              int a = 0;
+              int b = 0;
+              unsigned long time1 = command_testH5();  // get iram cycle count
+              unsigned long time2 = command_testH5();  // get iram cycle count
+              for (int c = 1; c < 100; c++){
+                  b++;
+              }
+              unsigned long time3 = command_testH5();  // get iram cycle count
+              for (int c = 1; c < 50; c++){
+                  b++;
+              }
+              unsigned long time4 = command_testH5();  // get iram cycle count
+
+              unsigned long timeD1 = (time2 - time1);
+              unsigned long timeD3 = (time3 - time2);
+              unsigned long timeD4 = (time4 - time3);
+
+              Serial.println((String) " H5a getcyclecount:" 
+                            // + " time1=" + time1
+                            // + " time2=" + time2                            
+                            // + " time3=" + time3
+                            + " timeD1="  +  timeD1
+                            + " loop100=" + (timeD3 - timeD1)
+                            + " loop050=" + (timeD4 - timeD1)
+                            );
+            }
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\n\r? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
@@ -3735,7 +3764,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
   if (mqttCnt == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
     char output[128];
     snprintf(output, sizeof(output), 
-          "{\"info\":000, \"mqttCnt=\":%d ,\"msg\":\"restart reason 0x%08x"
+          "{\"info\":000, \"mqttCnt=\":%lu ,\"msg\":\"restart reason 0x%08x"
           ", epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x \"}",
           mqttCnt , save_reason, 
           save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
@@ -5094,7 +5123,7 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
       int secsRemaining = allSeconds % 3600;
       int runMinutes = secsRemaining / 60;
       int runSeconds = secsRemaining % 60;
-    snprintf(output4, sizeof(output4), "secs:%06d %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
+    snprintf(output4, sizeof(output4), "secs:%06lu %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
     publishMqtt(mqttErrorTopic, output4);      // v51:   CurrentPowerConsumption: %lu
 
     char msgpub3[128];     // allocate a message buffer
@@ -5117,7 +5146,7 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
     //   const char* output3_data = msg3.data();  // C native returns const char* to the string's internal buffer
     //   const char* output3_str  = msg3.str();  // C native returns const char* to the string's internal buffer
     // snprintf(output3, sizeof(output3), msgpub3, millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
-    snprintf(output3, sizeof(output3), "Millis=%d Power=%d", millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
+    snprintf(output3, sizeof(output3), "Millis=%lu Power=%lu", millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
     publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
 
     // snprint: Write formatted output to sized buffer https://cplusplus.com/reference/cstdio/snprintf/
@@ -5236,10 +5265,53 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 
 void command_testH4(){    // code to maken things stable teststable
                     // we removed some unused protection arrays, improved ISR-time, 
-    
+    /*
+      //      text    data     bss     dec     hex filename
+      //  334952   10256   31992  377200   5c170    
+      
+      int i = 0;                                // v55
+      Serial.printf(" %02x", telegram2_org[i]); // v55d
+      //      text    data     bss     dec     hex filename
+      //  334984   10256   31992  377232   5c190
+
+      Serial.printf(" %02x", telegram2_org[i+1]); // v55d
+      //    text    data     bss     dec     hex filename
+      //  335016   10256   31992  377264   5c1b0 
+
+      Serial.printf(" %02x", telegram2_org[i+1]); // v55d
+      //      text    data     bss     dec     hex filename
+      //  335032   10256   31992  377280   5c1c0 
+      Serial.println(""); // v55d
+      //    text    data     bss     dec     hex filename
+      //  335032   10256   31992  377280   5c1c0
+      Serial.printf(" %02x, %0d, &s", telegram2_org[i+1], i , (char) telegram2_org[i+1] ); // v55d
+      //      text    data     bss     dec     hex filename
+      //  335048   10268   31992  377308   5c1dc
+      Serial.print("123"); // v55d
+      //    text    data     bss     dec     hex filename
+      //  335064   10268   31992  377324   5c1ec   (print "1")
+      //    text    data     bss     dec     hex filename
+      //  335064   10272   31992  377328   5c1f0   (print "123")
+      char dummy[123];
+      //    text    data     bss     dec     hex filename
+      //  335064   10272   31992  377328   5c1f0
+
+        const char *dummy2 = "abcdefghi1....+....2....+....3....+....4....+....5....+....6....";
+        //      text    data     bss     dec     hex filename
+        //  335064   10272   31992  377328   5c1f0
+        int b = 0;
+        for (int a = 0; a < sizeof(dummy2); a++) {
+          b = dummy2[a];
+        }
+        //    text    data     bss     dec     hex filename
+        //  335064   10272   31992  377328   5c1f0    
+        Serial.print ( (String) "b=" + b);
+    */
+
     // 16jul25 v55c was OK, we now on v55d re-added the 14 delays from v55b
     // things go un stable
-
+                    //    text    data     bss     dec     hex filename
+                    //  334952   10256   31992  377200   5c170                    
                     delay(0);     // v55d added  0 from v55b , stable1
                     delay(0);     // v55d added  1 from v55b , stable0
                     delay(0);     // v55d added  2 from v55b , stable4
@@ -5249,21 +5321,39 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v55d added  6 from v55b , stable0
                     delay(0);     // v55d added  7 from v55b , stable2
                     delay(0);     // v55d added  8 from v55b , stable1
-                    // ------ using above woes during init
+                    //    text    data     bss     dec     hex filename
+                    //  335016   10256   31992  377264   5c1b0                    
+                    // // ------ using above woes during init
                     //                     // ------------------------------------------------------------
                     delay(0);     // v55d added  9 from v55b , stable1 <-- very very good on v55b v55d not nice
+                    //   text    data     bss     dec     hex filename
+                    //  335032   10256   31992  377280                     
                     // // v55b continue to test here if things become better or worse
                     delay(0);     // v55d added 10 from v55b , stable6 
+                    //   text    data     bss     dec     hex filename
+                    // 335032   10256   31992  377280   5c1c0                    
                     delay(0);     // v55d added 11 from v55b , stable7 v55d slighly better
+                    //    text    data     bss     dec     hex filename
+                    //  335032   10256   31992  377280   5c1c0                    
                     delay(0);     // v55d added 12 from v55b , stable10 <-- even better P1>95% RX2=50% on v55b v55d good
-                    delay(0);     // v55d added 13 from v55b , stable9  <-- the best P1>95% RX2=70% on v55b
+                    //    text    data     bss     dec     hex filename
+                    //  335048   10256   31992  377296   5c1d0                    
+                    delay(0);     // v55d added 13 from v55b , stable9  <-- the best P1>95% RX2=670% on v55b v55 better
+                    //    text    data     bss     dec     hex filename
+                    //  335048   10256   31992  377296   5c1d0                    
                     // // ------------------------------------------------------------
-                    delay(0);     // v55d added 14 reasonable, rx2 not that good
-                    delay(0);     // v55d added 15 somewha improved
-                    
+                    delay(0);     // v55d added 14 reasonable, rx2=40% not that good
+                    //   text    data     bss     dec     hex filename
+                    //  335048   10256   31992  377296   5c1d0                    
+                    delay(0);     // v55d added 15 somewhat improved to RX2=60%
+                    //   text    data     bss     dec     hex filename
+                    //  335048   10256   31992  377296   5c1d0 
+}
 
-
-
+unsigned long command_testH5() {
+      uint32_t ccount;
+    __asm__ __volatile__("esync; rsr %0,ccount":"=a" (ccount));
+    return ccount;
 }
 
 /*
@@ -5282,35 +5372,4 @@ void throwExceptionFunction(void) {
 */
 
 
-// useless data to be kept for reference
-/*
- * // lwip lower memory no features
-        Executable segment sizes:
-        RODATA : 4500  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        IROM   : 289728          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        BSS    : 28184 )         - zeroed variables      (global, static) in RAM/HEAP 
-        Sketch uses 324608 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34028 bytes (41%) of dynamic memory, leaving 47892 bytes for local variables. Maximum is 81920 bytes.
-  // lwip lower memory no features
-        Executable segment sizes:
-        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.        
-  // removed httpclient
-        Executable segment sizes:
-        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
-        
- */
 // char *program_end;        // v55c mark end_of program

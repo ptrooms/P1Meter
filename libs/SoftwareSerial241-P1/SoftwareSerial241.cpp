@@ -84,7 +84,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    m_overflow = false;
    m_rxEnabled = false;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
-   m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming
+   m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
@@ -225,6 +225,8 @@ int SoftwareSerial::peek() {
 }
 
 // added wait test to prevent overrunning when Clocks are slower (10000 works ok, 2021-05-05 22:01:29: testing #7000)
+// note: wait starts at approx 500
+// getCycleCountIram = cycle counter, which increments with each clock cycle  (doc: v55d)
 #define WAITIram4 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
 #define WAITIram5 { while (wait<7000 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
 // at 115k2 --> m_bittime = 694 cycles
@@ -235,10 +237,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // Advance the starting point for the samples but compensate for the
    // initial delay which occurs before the interrupt is delivered
    // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
-   unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
+   unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
+
+   // failed // unsigned long wait = 427UL;		// 501 // 425 115k2@80MHz   
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
-   unsigned long start = getCycleCountIram();
+   unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
      WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
@@ -283,7 +288,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // Advance the starting point for the samples but compensate for the
    // initial delay which occurs before the interrupt is delivered
    // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
-   unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
+   unsigned long wait = m_bitTime + m_bitTime/3 -    m_bitWait;		// 501 // 425 115k2@80MHz
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
    unsigned long start = getCycleCountIram();
