@@ -677,7 +677,8 @@ uint32_t heap_setup   = 0;    // v55c , (uint32_t)&program_end - (uint32_t)&stac
   bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
   bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
 #else
-  #ifdef DUP_MODE
+  // note: DUP_MODE will invert to allow regular USB/serial, else we'll use the default (inverted polarity of serial-P1)
+  #ifdef DUP_MODE_NOINVERT
     bool bSERIAL_INVERT  = false; // v53a Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
     bool bSERIAL2_INVERT = false; // v53a Simulated GJ meter is USB interface , does not require invert v53
   #else
@@ -1033,8 +1034,8 @@ int filteredValueAdc = 0; // average between previous and and published
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 // char dummy2[17];       // add some spare bytes, v55b remove
 // const char dummy2a[] = {0x0000};    // prevent overwrite, v55b remove
-char telegram[MAXLINELENGTH+32];       // telegram maxsize bytes for P1 meter
-char telegramLast[3];               // used to catch P1meter line termination bracket
+char telegram[MAXLINELENGTH+32] = "";       // telegram maxsize bytes for P1 meter
+char telegramLast[3] = "";               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
 //DebugCRC int  testTelegramPos  = 0;          // where are we
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
@@ -1044,10 +1045,10 @@ int publishP1ToMqttCrc = 0;  // 0=failed, 1=OK, 2=recovered
 bool validCrcInFound = false;         // Set by Decode when Full (recovered) datarecord has valid Crc
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
-char telegram_crcIn[MAXLINELENGTH+32];   // active telegram that is checked for crc
+char telegram_crcIn[MAXLINELENGTH+32] = "";   // active telegram that is checked for crc
 int  telegram_crcIn_len = 0;          // length of this record
 int  telegram_crcOut_cnt = 0;         // number of times masking was positioned
-char telegram_crcOut[MAXLINELENGTH+32];  // processed telegram with changed positions to X
+char telegram_crcOut[MAXLINELENGTH+32] = "";  // processed telegram with changed positions to X
 // const char dummy2b[] = {0x0000};      // prevent save overwrite, v55b remove
 // int  telegram_crcIn_cnt1 = 0;      // number of times CrcIn was called
 int  telegram_crcOut_len = 0;         // length of this record
@@ -1100,9 +1101,9 @@ int  telegram_crcOut_len = 0;         // length of this record
 
 // RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
 #define MAXLINELENGTH2 256
-char telegram2[MAXLINELENGTH2+32];        // RX2 serial databuffer during outside P1 loop Plus overflow
-char telegram2_org[MAXLINELENGTH2+32];    // RX2 serial databuffer during outside P1 loop Plus overflow v54
-char telegram2Record[MAXLINELENGTH2+32];  // telegram extracted data maxsize for P1 RX2  v54 moved below
+char telegram2[MAXLINELENGTH2+32] = "" ;        // RX2 serial databuffer during outside P1 loop Plus overflow
+char telegram2_org[MAXLINELENGTH2+32] = "";    // RX2 serial databuffer during outside P1 loop Plus overflow v54
+char telegram2Record[MAXLINELENGTH2+32] = "";  // telegram extracted data maxsize for P1 RX2  v54 moved below
 // char telegramLast2[3];             // overflow used to catch line termination bracket
 // char telegramLast2o[19];           // overflow-area to prevent memory leak
 bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
@@ -1114,7 +1115,7 @@ long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
 
 
 // Callback mqtt value which is used to received data
-char mqttServer1[64] ;               // v45 used to hold the currrently active mqttserver
+char mqttServer1[64] = "" ;               // v45 used to hold the currrently active mqttserver
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
 int new_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
 void callbackMqtt(char* topic, byte* payload, unsigned int length);   // pubsubscribe
@@ -1170,6 +1171,11 @@ void setup()
   char stack; stack_start = &stack;       // v55c determine stacksize
   program_size = (uint32_t)&stack_start - (uint32_t)&program_end; // v55c
   heap_start   = ESP.getFreeHeap(); // v55c
+
+
+  memset(telegram2,0,sizeof(telegram2));
+  memset(telegram2_org,0,sizeof(telegram2_org));
+  memset(telegram2Record,0,sizeof(telegram2Record));
 
   asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
@@ -2565,7 +2571,7 @@ void readTelegram2() {
           */
           if  ( startChar >= 0  && endChar > startChar && valChar < endChar) {    // we have a start to end, ten do CRC check
 
-                char messageCRC2[5];
+                char messageCRC2[5] = "";
                 strncpy(messageCRC2, telegram2Record+(endChar-startChar)+1, 4);   // copy 4 bytes crc of record and
                 messageCRC2[4] = 0;
                 unsigned int currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2_org)+startChar,(endChar-startChar)+1); // include \header+!trailer '!' into CRC, v48-casting
@@ -3742,7 +3748,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
   }
 
   if (mqttTopic and payLoad) {    // check for not nullpointer
-    char mqttOutput[MAXLINELENGTH];
+    char mqttOutput[MAXLINELENGTH] = "";
     payLoad.toCharArray(mqttOutput, MAXLINELENGTH);
     if (client.connected()) {
       client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
@@ -3859,7 +3865,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     if (endChar >= 0 && telegramP1header) {   // Are we reading the trailer of the Meter with header passed
 
       currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram) + endChar, 1); // include trailer '!' into CRC, v48-casting
-      char messageCRC[5];
+      char messageCRC[5] = "";
       strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
       messageCRC[4] = 0;                                // make it an end of string
 
@@ -4101,7 +4107,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   
   if (strncmp(telegram, "0-0:1.0.0(", strlen("0-0:1.0.0(")) == 0) {       // do we have a Date record ?
     if (telegram[22] == 'S' || telegram[22] == 'W') {  // check for Summer or Wintertime
-      char resDate[16];     // maximum prefix of timestamp message
+      char resDate[16] = "";     // maximum prefix of timestamp message
       memset(resDate, 0, sizeof(resDate));       // Pointer to the block of memory to fill.
       if (strncpy(resDate, telegram + 16, 6)) {  // start buffer+10+1 for 6 bytes
         if (isNumber(resDate, 6)) {            // only copy/use new date if this is full numeric (decimal might give trouble)
@@ -4210,7 +4216,7 @@ void  getValuesFromP1Record(char buf[], int len) {  // 716
   f = FindWordInArrayFwd(buf, "0-0:1.0.0(", len, 9);      // =  "0-0:1.0.0(250106212048W)"
   // Serial.printf(" f=%d ", f ); // mqttcount=3 len=716
   if (( buf[f+22] == 'S' || buf[f+22] == 'W') && buf[f+23] == ')' )  {  // check for Summer or Wintertime
-    char resDate[16];     // maximum prefix of timestamp message
+    char resDate[16] = "";     // maximum prefix of timestamp message
     memset(resDate, 0, sizeof(resDate));       // Pointer to the block of memory to fill.
     if (strncpy(resDate, buf +f+16, 6)) {  // start buffer+10+1 for 6 bytes
       if (isNumber(resDate, 6)) {            // only copy/use new date if this is full numeric (decimal might give trouble)
@@ -4352,7 +4358,7 @@ long getValue(char *buffer, int maxlen)
   if (l < 4)  return 0;    // length from (-* too short
   if (l > 12) return 0;   // length from (-* too long
 
-  char res[16];                 // extract number starting at startbracket+1 for a length of l
+  char res[16] = "";                 // extract number starting at startbracket+1 for a length of l
   memset(res, 0, sizeof(res));
 
   if (strncpy(res, buffer + s + 1, l))  // start buffer+10+1
@@ -4518,7 +4524,7 @@ bool CheckData()        //
 
   if (outputMqttLog) {  // if we LOG status old values not yet set
     // char msgpub[MAXLINELENGTH];
-    char output[MAXLINELENGTH];
+    char output[MAXLINELENGTH] = "";
     memset(output, 0, sizeof(output));      // init v55b
     String msg = "{ checkdata, ";
     msg.concat("\"currentTime\": %lu,");              // %lu is unsigned long
@@ -4603,7 +4609,7 @@ bool CheckData()        //
 
   if (outputMqttPower2)    // output currrent power, flatnumber
   {
-    char output[32];     // use snprintf to format data
+    char output[32] = "";     // use snprintf to format data
     memset(output, 0, sizeof(output));      // init v55b
     String msg = "";      // initialise data
     msg.concat("CurrentPowerConsumption: %lu");       // format data
@@ -4773,7 +4779,7 @@ void processTemperatures() {
   lastTempReadTime = millis();         // Remember the last time measurement
 
   if (outputOnSerial) {
-    char temperatureString[6];
+    char temperatureString[6]="";
     Serial.print( "Sending temperatures: " );
     for (int i = 0; i < numberOfDsb18b20Devices; i++) {
       // The dtostrf() function converts the double value passed in val into an ASCII representationthat will be stored under s.
@@ -5075,13 +5081,13 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
     publishMqtt(mqttErrorTopic, (String) "command_testH2 file " + __FILE__ +  ", line" + __LINE__ ); 
     //         + ", c++ version="  + __cplusplus); // v51 with (String) ok marking version=201103 (C++11)
     String arduinoString = "Temperature: %.1f°C";
-    char buffer[50];
+    char buffer[50] = "";
     float temp = 23.5f;
     // Simple conversion - preferred method
     snprintf(buffer, sizeof(buffer), arduinoString.c_str(), temp);
     publishMqtt(mqttErrorTopic, buffer);      // v51:   CurrentPowerConsumption: %lu
 
-    char output5[128];     // use snprintf to format data
+    char output5[128] = "";     // use snprintf to format data
     String msg5 = "{\"currentTime\":\"%d\", \"CurrentPowerConsumption\":%lu }";   // warning %s iso %d will crash
     snprintf(output5, sizeof(output5), msg5.c_str(), millis(), CurrentPowerConsumption);
     publishMqtt(mqttErrorTopic, output5);      // v51:   CurrentPowerConsumption: %lu
@@ -5096,8 +5102,8 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
     snprintf(output4, sizeof(output4), "secs:%06d %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
     publishMqtt(mqttErrorTopic, output4);      // v51:   CurrentPowerConsumption: %lu
 
-    char msgpub3[128];     // allocate a message buffer
-    char output3[128];     // use snprintf to format data
+    char msgpub3[128] = "";     // allocate a message buffer
+    char output3[128] = "";     // use snprintf to format data
     // std::string msg3 -->  std::string' has no member named 'concat' and so on
     // class String {  --- The string class in /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/WString.h
     //      --> https://cplusplus.com/reference/string/wstring/
