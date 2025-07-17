@@ -5250,24 +5250,24 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 }
 
 void command_testH4(){    // code to maken things stable teststable
-                    // we remoived some unused protection arrays, improved ISR-time,
-                    delay(0);     // v55b , stable1
-                    delay(0);     // v55b , stable0
-                    delay(0);     // v55b , stable4
-                    delay(0);     // v55b , stable2
-                    delay(0);     // v55b , stable1
-                    delay(0);     // v55b , stable1
-                    delay(0);     // v55b , stable0
-                    delay(0);     // v55b , stable2
-                    delay(0);     // v55b , stable1
-  // ------------------------------------------------------------
-                    delay(0);     // v55b , stable8 <-- very very good
-                    // v55b continue to test here if things become better or worse
-                    delay(0);     // v55b , stable6 
-                    delay(0);     // v55b , stable7
-                    delay(0);     // v55b , stable10 <-- even better P1>95% RX2=50%
-                    delay(0);     // v55b , stable9  <-- even better P1>95% RX2=70%
-                    // ------------------------------------------------------------
+  //                   // we remoived some unused protection arrays, improved ISR-time,
+  //                   delay(0);     // v55b , stable1
+  //                   delay(0);     // v55b , stable0
+  //                   delay(0);     // v55b , stable4
+  //                   delay(0);     // v55b , stable2
+  //                   delay(0);     // v55b , stable1
+  //                   delay(0);     // v55b , stable1
+  //                   delay(0);     // v55b , stable0
+  //                   delay(0);     // v55b , stable2
+  //                   delay(0);     // v55b , stable1
+  // // ------------------------------------------------------------
+  //                   delay(0);     // v55b , stable8 <-- very very good
+  //                   // v55b continue to test here if things become better or worse
+  //                   delay(0);     // v55b , stable6 
+  //                   delay(0);     // v55b , stable7
+  //                   delay(0);     // v55b , stable10 <-- even better P1>95% RX2=50%
+  //                   delay(0);     // v55b , stable9  <-- even better P1>95% RX2=70%
+  //                   // ------------------------------------------------------------
 
 
 }
