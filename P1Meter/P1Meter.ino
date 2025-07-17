@@ -41,7 +41,7 @@
 */
 
 /* change history
-  v55b -
+  v556 - reworked to stable
   v55f - restored back to v55b
   v55e - erratic
   v55d - works good, based on v55c but added some serial.debugs, a bit worse than v55b
@@ -248,10 +248,10 @@
   #warning This is the TEST version, be informed
   #ifdef DUP_MODE
     #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-    #define DEF_PROG_VERSION 3155.241 // current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION 3156.241 // current version (displayed in mqtt record)
   #else
     #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-    #define DEF_PROG_VERSION 1155.241 // current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION 1156.241 // current version (displayed in mqtt record)
   #endif
   #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
   #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
@@ -259,10 +259,10 @@
   #warning This is the PRODUCTION version, be warned
   #ifdef DUP_MODE
     #define P1_VERSION_TYPE "d1"      // "p1" production
-    #define DEF_PROG_VERSION 4155.241 //  current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION 4156.241 //  current version (displayed in mqtt record)
   #else
     #define P1_VERSION_TYPE "p1"      // "p1" production
-    #define DEF_PROG_VERSION 2155.241 //  current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION 2156.241 //  current version (displayed in mqtt record)
   #endif
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
@@ -873,7 +873,7 @@ const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+
 // add const if this should never change
 int intervalP1    = 12000;    // mSecs : P1 30 --> 12 seconds response time interval of meter is 10 seconds
 int intervalP1cnt =  360;     // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
-#ifndef MAXTELEGRAM2CNT       // define our receiving buffer  
+#ifndef MAXTELEGRAM2CNT       // define maximum number of RX2 reads during readtelegram2
   #define MAXTELEGRAM2CNT 2
 #endif
 int loopTelegram2cnt = MAXTELEGRAM2CNT;  // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
@@ -2417,7 +2417,7 @@ void readTelegram2() {
       // String telegram2_str(telegram2); // does work but still prints beyond 0x00
       if (loopbackRx2Mode > 0 && len > 0) Serial.print((String) 
                   + " ..len=" + len 
-                  + ":\'" + (loopbackRx2Mode == 3 ? (String) "\r\n" + telegram2 + "\r\n": (String) "---")
+                  + ":\'" + (loopbackRx2Mode == 3 ? (String) "\r\n" + telegram2 + "\r\n": (String) "$")
                   + "\'.. " ); // v54 print incoming
             
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
