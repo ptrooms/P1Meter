@@ -8,6 +8,7 @@
 */
 
 /* tbd 
+  change \n\r to \r\n to 
   sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
       -- strange as wifi proces during setup() before was OK
   change verboselevel == 1 to ==2 that will print lenbgths of P1 records print
@@ -40,7 +41,15 @@
 */
 
 /* change history
+  v55b -
+  v55f - restored back to v55b
+  v55e - erratic
   v55d - works good, based on v55c but added some serial.debugs, a bit worse than v55b
+    - production:  epc1=0x401031f1, epc2=0x00000000, epc3=0x00000000, excvaddr=0x00000000,depc=0x00000000
+    - remove to ...../debug/SoftwareSerial
+    - commented
+    - reduplicated from v55b
+    - time 1 cycled updated from 497 to 500 in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp
   v55c - woes completely on serial
   v55b = perfectly tuned
   v55a - debug to checkout code differences for: teststable
@@ -207,13 +216,6 @@
 // W A R N I N G : Note check port and nodemcu port before uploading using Arduino Framework
 // see/for git: https://github.com/ptrooms/P1Meter
 // Update $ git checkout -b v36 on https://github.com/ptrooms/P1Meter.git to correct watercnt errors 
-
-char *stack_start;            // v55c , mark header to determine stacksize
-uint32_t stack_end    = 0;    // v55c , filled at every end of loop() stack_size()
-uint32_t program_size = 0;    // v55c , (uint32_t)&program_end - (uint32_t)&stack_start;
-uint32_t heap_start   = 0;    // v55c , (uint32_t)&program_end - (uint32_t)&stack_start;
-uint32_t heap_loop    = 0;    // v55c , (uint32_t)&program_end - (uint32_t)&stack_start;
-uint32_t heap_setup   = 0;    // v55c , (uint32_t)&program_end - (uint32_t)&stack_start;
 
 #define P1_Override_Settings    // set in PlatoformIO ; override wifi/server settings
 #define UseP1SoftSerialLIB   //  use the old but faster SoftwareSerial structure based on 2.4.1 and use P1serial verion to listen /header & !finish
@@ -871,7 +873,10 @@ const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+
 // add const if this should never change
 int intervalP1    = 12000;    // mSecs : P1 30 --> 12 seconds response time interval of meter is 10 seconds
 int intervalP1cnt =  360;     // count * : = of maximum 72 minutes (360*12)  will increase at each success until 144minutes
-int loopTelegram2cnt = 6;     // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
+#ifndef MAXTELEGRAM2CNT       // define our receiving buffer  
+  #define MAXTELEGRAM2CNT 2
+#endif
+int loopTelegram2cnt = MAXTELEGRAM2CNT;  // Maximum of readtelegram2 on 2nd RX port before we  flsh and doe force regular p1 again.
 bool forceCheckData = false;  // force check on data in order to output some essential mqtt (Thermostat & Temprature) functions.
 bool firstRun = true;         // do not use forceCheckData (which might be activated during setup-() or first loop-() )
 
@@ -1164,17 +1169,9 @@ PubSubClient client(espClient);   // Use this connection client
 #include <user_interface.h>     // v52: support to display/ger restart reasons
 // rst_info *resetInfo;            // v52: pointer (global)
 
-unsigned long ICACHE_RAM_ATTR command_testH5();
-
-char *program_end;        // v55c mark end_of program
-
 void setup()
 {
-  char stack; stack_start = &stack;       // v55c determine stacksize
-  program_size = (uint32_t)&stack_start - (uint32_t)&program_end; // v55c
-  heap_start   = ESP.getFreeHeap(); // v55c
-
-  asm(".global _printf_float");            // include floating point support
+    asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
 
   // struct rst_info *rtc_info = system_get_rst_info();
@@ -1362,7 +1359,7 @@ void setup()
   Serial.println ("ESP8266-chip-size: "+    String(ESP.getFlashChipRealSize()));
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
   Serial.println ("ESP8266-getChipId: "+    String(ESP.getChipId()));             // sudden crash...
-  Serial.println ("ESP8266-FreeHeap: "+     String(heap_start));
+  Serial.println ("ESP8266-FreeHeap: "+     String(ESP.getFreeHeap()));
 
   WiFi.printDiag(Serial);   // print data  
   strcpy(mqttServer1,mqttServer );         // v45 initialise for reference
@@ -1748,8 +1745,7 @@ void setup()
     loopcnt = 0;              // set loopcount to 0
     Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
   //  WiFi.printDiag(Serial);   // print data
-  heap_setup   = ESP.getFreeHeap(); // v55c
-} // setup
+  } // setup
 
 
 /* 
@@ -1768,8 +1764,7 @@ void setup()
 */
 void loop()
 { 
-  heap_start = ESP.getFreeHeap(); // v55c
-  if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
+    if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
   // note this loop() routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
@@ -1975,7 +1970,7 @@ void loop()
     // old dlocation of  cechking for incoming mqtt  commands
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
-    if (loopTelegram2cnt < 6) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
+    if (loopTelegram2cnt < MAXTELEGRAM2CNT) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if-else allow other activities
   //  ------------------------------------------------------------------------------------------------------------------------- END of allowOtherActivities
 
@@ -2094,9 +2089,7 @@ void loop()
 
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have left the building
-  stack_end = stack_size();   // get stack_size
-  heap_loop = ESP.getFreeHeap(); // v55c
-}
+  }
 
 /* 
   Reconnect lost mqtt connection
@@ -2409,7 +2402,7 @@ void readTelegram2() {
     int telegram2_End   = -1;
     int telegram2_Pos   = 0;
 
-    while (mySerial2.available() && loopTelegram2cnt < 6 && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
+    while (mySerial2.available() && loopTelegram2cnt < MAXTELEGRAM2CNT && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
        // type casting https://www.geeksforgeeks.org/cpp/cpp-program-for-int-to-char-conversion/
       // if (loopbackRx2Mode > 0) Serial.print((String)  + char(mySerial2.peek()) ); // v54 print incoming
       // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
@@ -2421,18 +2414,12 @@ void readTelegram2() {
       #else 
         len = mySerial2.readBytesUntil(13, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       #endif          
-
-      if (loopbackRx2Mode > 0 && len > 0) Serial.println((String) + "..len=" + len + ":\'" + telegram2 + "\'.." ); // v54 print incoming
-      if (loopbackRx2Mode == 4) {   // diagnose header printdata v54
-          Serial.print((String)"\r\n\t  hexlineT4="  );       // v54 print CRC check
-          for (int i = 0; i < len; i++) {                // v54 header hex bytes
-              Serial.printf("%02x ", telegram2[i]); 
-
-          }
-      }
-      
-
-      
+      // String telegram2_str(telegram2); // does work but still prints beyond 0x00
+      if (loopbackRx2Mode > 0 && len > 0) Serial.print((String) 
+                  + " ..len=" + len 
+                  + ":\'" + (loopbackRx2Mode == 3 ? (String) "\r\n" + telegram2 + "\r\n": (String) "---")
+                  + "\'.. " ); // v54 print incoming
+            
       // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
       lenTelegram2 = lenTelegram2 + len;
       if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
@@ -2734,8 +2721,9 @@ void readTelegram2() {
                         + ", endChar="   + (char) telegram2Record[endChar]   + (int) endChar
                         + ", data=\r\n"
                         );
-                    for (int i = 0; i < 100 && i <= endChar; i++) {                // v54 header hex bytes
+                    for (int i = startChar; i <= endChar+5; i++) {                // v54 header hex bytes
                        Serial.printf("%02x ", telegram2_org[i]); 
+
                     }
                     Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
                 }
@@ -3278,37 +3266,10 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'H') {    // testit c-strings and constants
           // command_testH2();    //  v51: Execute test string casting c_str, array, publishmqtt
           if ( (char)payload[1] == '1') command_testH1();    // v52: check mqtt empty strings
-          if ( (char)payload[1] == '2') command_testH2();    // v52: check mqtt empty strings
-          if ( (char)payload[1] == '3') command_testH3();    // v55 
-          if ( (char)payload[1] == '4') command_testH4();    // v55a redudant delay()
-          if ( (char)payload[1] == '5') {
-              int a = 0;
-              int b = 0;
-              unsigned long time1 = command_testH5();  // get iram cycle count
-              unsigned long time2 = command_testH5();  // get iram cycle count
-              for (int c = 1; c < 100; c++){
-                  b++;
-              }
-              unsigned long time3 = command_testH5();  // get iram cycle count
-              for (int c = 1; c < 50; c++){
-                  b++;
-              }
-              unsigned long time4 = command_testH5();  // get iram cycle count
-
-              unsigned long timeD1 = (time2 - time1);
-              unsigned long timeD3 = (time3 - time2);
-              unsigned long timeD4 = (time4 - time3);
-
-              Serial.println((String) " H5a getcyclecount:" 
-                            // + " time1=" + time1
-                            // + " time2=" + time2                            
-                            // + " time3=" + time3
-                            + " timeD1="  +  timeD1
-                            + " loop100=" + (timeD3 - timeD1)
-                            + " loop050=" + (timeD4 - timeD1)
-                            );
-            }
-    } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
+          if ( (char)payload[2] == '2') command_testH2();    // v52: check mqtt empty strings
+          if ( (char)payload[3] == '3') command_testH3();    // v55 
+          if ( (char)payload[4] == '4') command_testH4();    // v55a redudant delay()
+              } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\n\r? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
                                                         + ", compiled " __DATE__ + " " + __TIME__ );
@@ -3377,19 +3338,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                                 + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
                                 + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
                                 + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
-          Serial.println((String) "Sizing stack_end=" + stack_end   // v55c
-                                + ", stack_start="  + (uint32_t) stack_start        
-                                + ", stack_size="   + stack_size()        
-                                + ", program_size=" + program_size
-                                + ", program_end="  + (uint32_t) program_end
-                                );
-          Serial.println((String) "Size  heap now=" + ESP.getFreeHeap()   // v55c
-                                + ", heap_setup="  + (uint32_t) heap_setup
-                                + ", heap_loop="   + (uint32_t) heap_loop
-                                + ", heap_start="  + (uint32_t) heap_start
-                                + ", sketchSize="    + (uint32_t) ESP.getSketchSize()
-                                );                      
-    } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
+              } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
 
      if (outputOnSerial) Serial.println();   // ensure crlf
   }
@@ -3764,7 +3713,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
   if (mqttCnt == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
     char output[128];
     snprintf(output, sizeof(output), 
-          "{\"info\":000, \"mqttCnt=\":%lu ,\"msg\":\"restart reason 0x%08x"
+          "{\"info\":000, \"mqttCnt=\":%d ,\"msg\":\"restart reason 0x%08x"
           ", epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x \"}",
           mqttCnt , save_reason, 
           save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
@@ -5123,7 +5072,7 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
       int secsRemaining = allSeconds % 3600;
       int runMinutes = secsRemaining / 60;
       int runSeconds = secsRemaining % 60;
-    snprintf(output4, sizeof(output4), "secs:%06lu %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
+    snprintf(output4, sizeof(output4), "secs:%06d %02d:%02d:%02d", allSeconds, runHours, runMinutes, runSeconds);
     publishMqtt(mqttErrorTopic, output4);      // v51:   CurrentPowerConsumption: %lu
 
     char msgpub3[128];     // allocate a message buffer
@@ -5146,7 +5095,7 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
     //   const char* output3_data = msg3.data();  // C native returns const char* to the string's internal buffer
     //   const char* output3_str  = msg3.str();  // C native returns const char* to the string's internal buffer
     // snprintf(output3, sizeof(output3), msgpub3, millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
-    snprintf(output3, sizeof(output3), "Millis=%lu Power=%lu", millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
+    snprintf(output3, sizeof(output3), "Millis=%d Power=%d", millis(), CurrentPowerConsumption);  // v51 crashes if msgpub3 null
     publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
 
     // snprint: Write formatted output to sized buffer https://cplusplus.com/reference/cstdio/snprintf/
@@ -5264,106 +5213,29 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 }
 
 void command_testH4(){    // code to maken things stable teststable
-                    // we removed some unused protection arrays, improved ISR-time, 
-    /*
-      //      text    data     bss     dec     hex filename
-      //  334952   10256   31992  377200   5c170    
-      
-      int i = 0;                                // v55
-      Serial.printf(" %02x", telegram2_org[i]); // v55d
-      //      text    data     bss     dec     hex filename
-      //  334984   10256   31992  377232   5c190
+                    // we remoived some unused protection arrays, improved ISR-time,
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable0
+                    delay(0);     // v55b , stable4
+                    delay(0);     // v55b , stable2
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable1
+                    delay(0);     // v55b , stable0
+                    delay(0);     // v55b , stable2
+                    delay(0);     // v55b , stable1
+// ------------------------------------------------------------
+                    delay(0);     // v55b , stable8 <-- very very good
+                    // v55b continue to test here if things become better or worse
+                    delay(0);     // v55b , stable6 
+                    delay(0);     // v55b , stable7
+                    delay(0);     // v55b , stable10 <-- even better P1>95% RX2=50%
+                    delay(0);     // v55b , stable9  <-- even better P1>95% RX2=70%
+                    // ------------------------------------------------------------
 
-      Serial.printf(" %02x", telegram2_org[i+1]); // v55d
-      //    text    data     bss     dec     hex filename
-      //  335016   10256   31992  377264   5c1b0 
 
-      Serial.printf(" %02x", telegram2_org[i+1]); // v55d
-      //      text    data     bss     dec     hex filename
-      //  335032   10256   31992  377280   5c1c0 
-      Serial.println(""); // v55d
-      //    text    data     bss     dec     hex filename
-      //  335032   10256   31992  377280   5c1c0
-      Serial.printf(" %02x, %0d, &s", telegram2_org[i+1], i , (char) telegram2_org[i+1] ); // v55d
-      //      text    data     bss     dec     hex filename
-      //  335048   10268   31992  377308   5c1dc
-      Serial.print("123"); // v55d
-      //    text    data     bss     dec     hex filename
-      //  335064   10268   31992  377324   5c1ec   (print "1")
-      //    text    data     bss     dec     hex filename
-      //  335064   10272   31992  377328   5c1f0   (print "123")
-      char dummy[123];
-      //    text    data     bss     dec     hex filename
-      //  335064   10272   31992  377328   5c1f0
-
-        const char *dummy2 = "abcdefghi1....+....2....+....3....+....4....+....5....+....6....";
-        //      text    data     bss     dec     hex filename
-        //  335064   10272   31992  377328   5c1f0
-        int b = 0;
-        for (int a = 0; a < sizeof(dummy2); a++) {
-          b = dummy2[a];
-        }
-        //    text    data     bss     dec     hex filename
-        //  335064   10272   31992  377328   5c1f0    
-        Serial.print ( (String) "b=" + b);
-    */
-
-    // 16jul25 v55c was OK, we now on v55d re-added the 14 delays from v55b
-    // things go un stable
-                    //    text    data     bss     dec     hex filename
-                    //  334952   10256   31992  377200   5c170                    
-                    delay(0);     // v55d added  0 from v55b , stable1
-                    delay(0);     // v55d added  1 from v55b , stable0
-                    delay(0);     // v55d added  2 from v55b , stable4
-                    delay(0);     // v55d added  3 from v55b , stable2
-                    delay(0);     // v55d added  4 from v55b , stable1
-                    delay(0);     // v55d added  5 from v55b , stable1
-                    delay(0);     // v55d added  6 from v55b , stable0
-                    delay(0);     // v55d added  7 from v55b , stable2
-                    delay(0);     // v55d added  8 from v55b , stable1
-                    //    text    data     bss     dec     hex filename
-                    //  335016   10256   31992  377264   5c1b0                    
-                    // // ------ using above woes during init
-                    //                     // ------------------------------------------------------------
-                    delay(0);     // v55d added  9 from v55b , stable1 <-- very very good on v55b v55d not nice
-                    //   text    data     bss     dec     hex filename
-                    //  335032   10256   31992  377280                     
-                    // // v55b continue to test here if things become better or worse
-                    delay(0);     // v55d added 10 from v55b , stable6 
-                    //   text    data     bss     dec     hex filename
-                    // 335032   10256   31992  377280   5c1c0                    
-                    delay(0);     // v55d added 11 from v55b , stable7 v55d slighly better
-                    //    text    data     bss     dec     hex filename
-                    //  335032   10256   31992  377280   5c1c0                    
-                    delay(0);     // v55d added 12 from v55b , stable10 <-- even better P1>95% RX2=50% on v55b v55d good
-                    //    text    data     bss     dec     hex filename
-                    //  335048   10256   31992  377296   5c1d0                    
-                    delay(0);     // v55d added 13 from v55b , stable9  <-- the best P1>95% RX2=670% on v55b v55 better
-                    //    text    data     bss     dec     hex filename
-                    //  335048   10256   31992  377296   5c1d0                    
-                    // // ------------------------------------------------------------
-                    delay(0);     // v55d added 14 reasonable, rx2=40% not that good
-                    //   text    data     bss     dec     hex filename
-                    //  335048   10256   31992  377296   5c1d0                    
-                    delay(0);     // v55d added 15 somewhat improved to RX2=60%
-                    //   text    data     bss     dec     hex filename
-                    //  335048   10256   31992  377296   5c1d0 
 }
 
-unsigned long command_testH5() {
-      uint32_t ccount;
-    __asm__ __volatile__("esync; rsr %0,ccount":"=a" (ccount));
-    return ccount;
-}
 
-/*
-  display stacksize
-*/
-
-uint32_t stack_size() {
-    char stack;
-    return (uint32_t)stack_start - (uint32_t)&stack;
-}
 
 /* leave this for leaer to investigate why runtime-error is not found ...
 void throwExceptionFunction(void) {
@@ -5372,4 +5244,34 @@ void throwExceptionFunction(void) {
 */
 
 
-// char *program_end;        // v55c mark end_of program
+// useless data to be kept for reference
+/*
+ * // lwip lower memory no features
+        Executable segment sizes:
+        RODATA : 4500  ) / 81920 - constants             (global, static) in RAM/HEAP 
+        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+        IROM   : 289728          - code in flash         (default or ICACHE_FLASH_ATTR) 
+        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+        BSS    : 28184 )         - zeroed variables      (global, static) in RAM/HEAP 
+        Sketch uses 324608 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+        Global variables use 34028 bytes (41%) of dynamic memory, leaving 47892 bytes for local variables. Maximum is 81920 bytes.
+  // lwip lower memory no features
+        Executable segment sizes:
+        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
+        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
+        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.        
+  // removed httpclient
+        Executable segment sizes:
+        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
+        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
+        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
+        
+ */
