@@ -42,6 +42,8 @@
 
 /* change history
   v556 - reworked to stable
+      - 271 activated to check on things
+      - 241 OK 
   v55f - restored back to v55b
   v55e - erratic
   v55d - works good, based on v55c but added some serial.debugs, a bit worse than v55b
