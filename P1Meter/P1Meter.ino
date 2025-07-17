@@ -38,9 +38,13 @@
       we have a Recver if we coull reconstruct CRC
       we have an OK if none of the above and we output things 
 
+
 */
 
 /* change history
+  v56c  investigage  erratic based on v56
+      - cosmetic: nam chanted to  readTelegramP1 readTelegramWL to ease usage
+      - RX_yieldcount = 8  --> RX_yieldcount = 3 when Yield1080 is hit uin a row to ease reads
   v56 - reworked to stable
       - rpelicated to test/production
       - For DUP_MODE (running code on test device with different ID: d1 iso p1 we use normall serial
@@ -1054,7 +1058,7 @@ bool telegramP1header = false;      // used to trigger/signal Header window /KFM
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
 
 unsigned int dataInCRC  = 0;          // CRC routine to calculate CRC of data telegram_crcIn
-int publishP1ToMqttCrc = 0;  // 0=failed, 1=OK, 2=recovered
+int publishP1ToMqttCrc = 0;           // 0=failed, 1=OK, 2=recovered
 bool validCrcInFound = false;         // Set by Decode when Full (recovered) datarecord has valid Crc
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
@@ -1795,20 +1799,24 @@ void loop()
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
     loopcnt++ ;
+    /* 
+        here we display the number of line loops -0-1-2-3-4-5-6-7-8-9    
+    */
     // Serial.print((String)"-" +(loopcnt%10)+" \b");
     Serial.print((String) ((waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopcnt%10)+" \b"); // v47 test water tapping 
     waterReadCounterPrevious = waterReadCounter; 
     test_WdtTime = currentMillis + 1000;  // next interval
   }
 
+
   // Following will trackdown loops on execeeding serial reads using timeouts RX_yieldcount
   if (currentMillis > (previousLoop_Millis + 1080) ) { // exceeding 1.08 second  ?, warn user
     // yield();
     if (RX_yieldcount > 0) RX_yieldcount-- ;     // v52 decrease successive yieldcount  with any or valid P1 read
-    if (RX_yieldcount < 1)  RX_yieldcount = 8;   // v52 when < 1, pause P1 serial reads ubtuk yield is again < 4
+    if (RX_yieldcount < 1)  RX_yieldcount = 3;   // v56c 8 --> 3 when < 1, pause P1 serial reads ubtuk yield is again < 4
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
     if (outputOnSerial) {
-      Serial.printf("\r\nLoop %6.3f exceeded#%d at prev %6.3f !!yield1080\n", 
+          Serial.printf("\r\nLoop %6.3f exceeded#%d at prev %6.3f !!yield1080\n", 
           RX_yieldcount ,     // v52: print yield value
           ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
     } else {
@@ -1833,9 +1841,13 @@ void loop()
 
   mqtt_local_yield();      //   client.loop(); // handle mqtt
 
-  //  ------------------------------------------------------------------------------------------------------------------------- START allowOtherActivities
-  if (!allowOtherActivities) {     // are we outside P1 Telegram processing (which require serial-timed resources)
+  //  --------------------------------------------------------------------------------------------- START allowOtherActivities
+  if (!allowOtherActivities) {     // are we outside P1 Telegram processing (require serial-timeing)
     if (waterTriggerCnt != 0) detachWaterInterrupt();
+    // Serial.print ((String) waterTriggerCnt );    // v56c checking why this is alway activated
+                                                    // likely while decode telgram was not executed 
+                                                    // that reset
+
   } else {                         // else we are allowed to do other acivities
     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
@@ -1978,16 +1990,18 @@ void loop()
     // old dlocation of  cechking for incoming mqtt  commands
 
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
-    if (loopTelegram2cnt < MAXTELEGRAM2CNT) readTelegram2();   // read RX2 GJ gpio4-input (if available), write gpio2 output
+    if (loopTelegram2cnt < MAXTELEGRAM2CNT) readTelegramWL();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if-else allow other activities
-  //  ------------------------------------------------------------------------------------------------------------------------- END of allowOtherActivities
+  //  ---------------------------------------------------------------------------------------------- END of allowOtherActivities
 
   // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
 
   // (p1SerialActive && !p1SerialFinish) , process Telegram data
   
   if (RX_yieldcount < 4) { // assume all if well and we had of have surived any previous yieldcount
-    readTelegram();     // read RX1 P1 gpio14 (if serial data available)
+      readTelegramP1();     // read RX1 P1 gpio14 (if serial data available)
+  } else {
+      Serial.print ((String) " Yc="+ RX_yieldcount + " " );    // v56c
   }
 
   mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
@@ -2004,10 +2018,13 @@ void loop()
     //  if (millis() > 600000) {  // autonomous restart every 5 minutes
     intervalP1cnt--;            // decrease reliability
     if ( intervalP1cnt < 1) {   // if we multiple or frequent misses, restart esp266 to survive
+
       if (outputMqttLog) publishMqtt(mqttLogTopic, (String) "ESP P1 rj11 not connected" );  // report we have survived this interval, v51 String'ed
+
       Serial.print("\n #!!# ESP P1 rj11 not connected, cnt="); // print message line
       Serial.println( intervalP1cnt );
       mqttP1Published = false;
+
     } else {    // reliabilitty intervalP1cnt=360>0
 
       /*
@@ -2039,13 +2056,15 @@ void loop()
       // if (outputOnSerial) {
       if (!serialStopP1 && loopbackRx2Mode == 0) {
          if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
+
          Serial.printf("\n\r# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\n\r",   
                           ((float)  micros() / 1000000), 
                           intervalP1cnt,
                           previousMillis,
                           currentMillis);
+
       } else {
-         Serial.print(".\n\r:") ;        // v54: if no RJ11 message print some indication
+         Serial.print("|\n\r:") ;        // v54: if no RJ11 message print some indication
       }                          
     /*    
       // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
@@ -2127,11 +2146,11 @@ void mqtt_reconnect() {                 // mqtt read usage doc https://pubsubcli
         }
         doCritical();  // do critical process to maintain basic Thermostat & OTA functions
       }
-#ifdef TEST_MODE            
+    #ifdef TEST_MODE            
       if (mqttConnectDelay < 11000) {      // v45 check if we are below backup time (2+5+8=15sec)  testmode
-#else
+    #else
       if (mqttConnectDelay <=27000) {      // v45 check if we are below backup time (2+5+8+11+14+17+20+23+26+29=155sec) production
-#endif      
+    #endif      
         mqttConnectDelay = mqttConnectDelay + 3000; // increase retry
         Serial.print((String) "... try again in " + (mqttConnectDelay / 1000) + " seconds...\r\n");
       } else {
@@ -2178,7 +2197,7 @@ void doCritical() {
 /* 
   Process  P1 serial data buffer and sendout result at P1 trailer
 */
-void readTelegram() {
+void readTelegramP1() {
 
   unsigned long p1Debounce_time = millis() - p1TriggerTime;		// mSec - p1TriggerTime  set by this() and updated while reading P1 data
   // if (p1SerialActive && p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
@@ -2202,7 +2221,7 @@ void readTelegram() {
   }
   startMicros = micros();  // Exact time we started
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n Cycl%d: %12.9f D%d%s%sC%s%s: %5u start: %11.6f \b\b ", 
+  if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s: %5u start: %11.6f \b\b ", 
         RX_yieldcount,    // v52: check countlevel
         ((float)ESP.getCycleCount()/80000000),
           (int) new_ThermostatState, (thermostatReadState ? "d" : "T"),  (thermostatWriteState ? "A" : "i"),
@@ -2233,7 +2252,12 @@ void readTelegram() {
     // note Serial.setTimeout() sets the maximum and defaults to 1000 milliseconds.
     // The function returns the characters up to the last character before the supplied terminator.
 
-    int len = mySerial.readBytesUntil('\n', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+    #ifdef DUP_MODE
+      int len = mySerial.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+    #else
+      int len = mySerial.readBytesUntil(10, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+    #endif
+
     // Serial.print((String) "yb\b"); no need to display RX progess this goes ok
     
 
@@ -2322,6 +2346,7 @@ void readTelegram() {
         ESP.wdtFeed();              // feed the hungry timer
         
         // print validity status of processed for debug reasons.
+        allowOtherActivities = true;      // v56c resume finished processing of this P1 record.
         if (validTelegramCRCFound) {
               Serial.print((String) "_C");      // print checked OK
         } else {
@@ -2334,9 +2359,9 @@ void readTelegram() {
           } 
         }
 
-    #ifdef NoTx2Function
+      #ifdef NoTx2Function
         if (!loopbackRx2Tx2 && blue_led2_Crc) validTelegramCRCFound ? digitalWrite(BLUE_LED2, HIGH) : digitalWrite(BLUE_LED2, LOW) ; // v38 monitoring
-    #endif
+      #endif
 
         p1TriggerTime = millis();   // indicate we have a yield
 
@@ -2364,7 +2389,11 @@ void readTelegram() {
          } // else
       */
 
-    } // if len > 0
+    } else { // if len > 0
+        // resume oher activities if we have not processed any data len < 0
+        Serial.print((String) " P1-len=" + len + " -#r=" + (bool) allowOtherActivities + "-" ); // v56c
+        allowOtherActivities = true;  // v56c
+    }
   } // while serial available
   // Serial.println("startend..");
 } // void readTelegram
@@ -2374,7 +2403,7 @@ void readTelegram() {
 /* 
   process the secondary serial input port, to be used  in future for 1200Baud GJ meter
 */
-void readTelegram2() {
+void readTelegramWL() {
   // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
   #ifdef UseP1SoftSerialLIB
     if (mySerial.P1active()) return ;   // return if P1 is active
@@ -2417,10 +2446,10 @@ void readTelegram2() {
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
       int len = 0;
-      #ifdef PROD_MODE
-        len = mySerial2.readBytesUntil(00, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      #else 
+      #ifdef DUP_MODE
         len = mySerial2.readBytesUntil(13, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      #else 
+        len = mySerial2.readBytesUntil(00, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       #endif          
       // String telegram2_str(telegram2); // does work but still prints beyond 0x00
       if (loopbackRx2Mode > 0 && len > 0) Serial.print((String) 
