@@ -6,6 +6,12 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.56] - reworked to make it stable again
+	- Tx commands to inspect RX2 data: in mode > 0, =2, =3, =4
+## [v21.55] - Unstable
+	- program behaves erratic in general 
+	- serial reading suddenly refuses to read data
+	- on git we reworked things vrom v55a to v55g
 ## [v21.54] - Major release fully stable
 	- lot's of changes since, see source code for details. Highlights:
 	- working version V52 now made to new master
