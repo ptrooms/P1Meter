@@ -41,7 +41,12 @@
 */
 
 /* change history
-  v556 - reworked to stable
+  v56 - reworked to stable
+      - rpelicated to test/production
+      - For DUP_MODE (running code on test device with different ID: d1 iso p1 we use normall serial
+        However, before V56  - for serial - this was slishtly different for the Test-duplicate device.
+        that was using regular PC/USB serial, hence reverse the invert for normal polarity.
+        When we use flag DUP_MODE_NOINVERT this - using regular serial USB - behavior is activated.
       - 271 activated to check on things
       - 241 OK 
   v55f - restored back to v55b
@@ -682,7 +687,8 @@
   bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
   bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
 #else
-  #ifdef DUP_MODE
+  // note: DUP_MODE will invert to allow regular USB/serial, else we'll use the default (inverted polarity of serial-P1)
+  #ifdef DUP_MODE_NOINVERT
     bool bSERIAL_INVERT  = false; // v53a Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
     bool bSERIAL2_INVERT = false; // v53a Simulated GJ meter is USB interface , does not require invert v53
   #else
