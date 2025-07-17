@@ -3266,10 +3266,10 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'H') {    // testit c-strings and constants
           // command_testH2();    //  v51: Execute test string casting c_str, array, publishmqtt
           if ( (char)payload[1] == '1') command_testH1();    // v52: check mqtt empty strings
-          if ( (char)payload[2] == '2') command_testH2();    // v52: check mqtt empty strings
-          if ( (char)payload[3] == '3') command_testH3();    // v55 
-          if ( (char)payload[4] == '4') command_testH4();    // v55a redudant delay()
-              } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
+          if ( (char)payload[1] == '2') command_testH2();    // v52: check mqtt empty strings
+          if ( (char)payload[1] == '3') command_testH3();    // v55 
+          if ( (char)payload[1] == '4') command_testH4();    // v55a redudant delay()
+    } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\n\r? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
                                                         + ", compiled " __DATE__ + " " + __TIME__ );
@@ -5065,7 +5065,7 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
     snprintf(output5, sizeof(output5), msg5.c_str(), millis(), CurrentPowerConsumption);
     publishMqtt(mqttErrorTopic, output5);      // v51:   CurrentPowerConsumption: %lu
 
-  // v51 test this snprint construction , crashes
+   // v51 test this snprint construction , crashes
     char output4[] = "secs:123456 51:51:51";     // use snprintf to format data
     unsigned long allSeconds = currentMillis / 1000;  // take time of mailoop
       int runHours = (allSeconds / 3600) % 24;
@@ -5107,65 +5107,65 @@ void command_testH2(){    // Execute test string casting c_str, array, publishmq
     // Serial.println((String)"\n\rv51 snprint" + output3 + "n\r");
     // publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
 
-  /*
-  // v51 test this snprint construction , crashes
-    char msgpub3[64];     // allocate a message buffer
-    char output3[64];     // use snprintf to format data
-    String msg3 = "{"; // build mqtt frame 
-    msg3.concat("\"currentTime\":\"%s\"");                  // %s is string
-    msg3.concat(",\"CurrentPowerConsumption\":%lu");    // P1
-    msg3.toCharArray(msgpub3, 64);   
-    snprintf(output3, sizeof(output3), msgpub3,         // snprint clearly causes crash !!!!
-            millis(),
-            CurrentPowerConsumption);     
-    publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
-  
-
-  // v51 test thiss construction
-    char msgpub2[32];     // allocate a message buffer
-    char output2[32];     // use snprintf to format data
-    String msg2 = "";      // initialise data
-    msg2.concat("CurrentPowerConsumption: %lu");       // format data
-    msg2.toCharArray(msgpub2, 32);                     // move it to format buffwer
-    sprintf(output2, msgpub2, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
-    client.publish(mqttPower, output2);     // v51:   CurrentPowerConsumption: 436
-    publishMqtt(mqttErrorTopic, msg2);      // v51:   CurrentPowerConsumption: %lu
-    publishMqtt(mqttErrorTopic, output2);   // v51:   CurrentPowerConsumption: 436
-  
-  // test these approaches
-    String mqttMsg999 = "{";  // start of Json
-    mqttMsg999.concat("\"error\":999 ,\"msg\":\"Check mqttMsg999\"}");  // v51 ok
-    publishMqtt(mqttErrorTopic, mqttMsg999);
+    /*
+    // v51 test this snprint construction , crashes
+      char msgpub3[64];     // allocate a message buffer
+      char output3[64];     // use snprintf to format data
+      String msg3 = "{"; // build mqtt frame 
+      msg3.concat("\"currentTime\":\"%s\"");                  // %s is string
+      msg3.concat(",\"CurrentPowerConsumption\":%lu");    // P1
+      msg3.toCharArray(msgpub3, 64);   
+      snprintf(output3, sizeof(output3), msgpub3,         // snprint clearly causes crash !!!!
+              millis(),
+              CurrentPowerConsumption);     
+      publishMqtt(mqttErrorTopic, output3);   // v51:   CurrentPowerConsumption: 436
     
-    publishMqtt(mqttErrorTopic, "constantdata" ); // v51 ok "constantdata", looks as a string
-    publishMqtt(mqttErrorTopic, "constantdata" + __LINE__); // v51 wrongly: "SID set:"
-    publishMqtt(mqttErrorTopic, "constantdata" + (String)__LINE__); // v51 tbd
 
-    publishMqtt(mqttErrorTopic, (String) "String1_" + __LINE__); // v51 with (String) ok
-    publishMqtt(mqttErrorTopic, "string2_" + __LINE__); // v51 wrongly "(null)"
+    // v51 test thiss construction
+      char msgpub2[32];     // allocate a message buffer
+      char output2[32];     // use snprintf to format data
+      String msg2 = "";      // initialise data
+      msg2.concat("CurrentPowerConsumption: %lu");       // format data
+      msg2.toCharArray(msgpub2, 32);                     // move it to format buffwer
+      sprintf(output2, msgpub2, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+      client.publish(mqttPower, output2);     // v51:   CurrentPowerConsumption: 436
+      publishMqtt(mqttErrorTopic, msg2);      // v51:   CurrentPowerConsumption: %lu
+      publishMqtt(mqttErrorTopic, output2);   // v51:   CurrentPowerConsumption: 436
     
-    String mqttMsg2 = "String3_" + (String) __LINE__ ; // v51 ok 
-    publishMqtt(mqttPower, mqttMsg2); // v51 ok
-    String mqttMsg3 = "string4_" + __LINE__ ;
-    publishMqtt(mqttPower, mqttMsg3); // v51 wrong --> "ntication Failed"
-    publishMqtt(mqttPower, (String) mqttMsg3); // wring --> "ntication Failed"
+    // test these approaches
+      String mqttMsg999 = "{";  // start of Json
+      mqttMsg999.concat("\"error\":999 ,\"msg\":\"Check mqttMsg999\"}");  // v51 ok
+      publishMqtt(mqttErrorTopic, mqttMsg999);
+      
+      publishMqtt(mqttErrorTopic, "constantdata" ); // v51 ok "constantdata", looks as a string
+      publishMqtt(mqttErrorTopic, "constantdata" + __LINE__); // v51 wrongly: "SID set:"
+      publishMqtt(mqttErrorTopic, "constantdata" + (String)__LINE__); // v51 tbd
 
-    char outputData1[32];     // use snprintf to format data
-    sprintf(outputData1, "__LINE__=%lu", __LINE__); // Note: if using multiple values use snprint
-    client.publish(mqttPower, outputData1);        // v51 ok as outputData1 = String'ed
-    
-    char outputData3[16]={}; // define array to veriy behavior, initialised to 0x00
-    outputData3[0]= 'A';     // this convert A to a number
-    outputData3[1]= 'B';     // this convert B to a number
-    outputData3[2]= 'C';     // this convert C to a number
-    outputData3[3]= 'D';     // this convert D to a number
-    if (outputData3[4] == 0x00) outputData3[3] = 'E';   // v51 check behavior of array [4]=0x00 (yes) ABCE
-    outputData3[14]= 'Z';    // this convert to a number
-    outputData3[15]= 0x00;   // this convert to a number
-    client.publish(mqttPower, outputData3);        // v51 works as array is terminated 0x00
-    outputData3[2]= 0x00;     // this convert C to a number
-    client.publish(mqttPower, outputData3);        // v51 array early terminated (yes) "AB"
-  */
+      publishMqtt(mqttErrorTopic, (String) "String1_" + __LINE__); // v51 with (String) ok
+      publishMqtt(mqttErrorTopic, "string2_" + __LINE__); // v51 wrongly "(null)"
+      
+      String mqttMsg2 = "String3_" + (String) __LINE__ ; // v51 ok 
+      publishMqtt(mqttPower, mqttMsg2); // v51 ok
+      String mqttMsg3 = "string4_" + __LINE__ ;
+      publishMqtt(mqttPower, mqttMsg3); // v51 wrong --> "ntication Failed"
+      publishMqtt(mqttPower, (String) mqttMsg3); // wring --> "ntication Failed"
+
+      char outputData1[32];     // use snprintf to format data
+      sprintf(outputData1, "__LINE__=%lu", __LINE__); // Note: if using multiple values use snprint
+      client.publish(mqttPower, outputData1);        // v51 ok as outputData1 = String'ed
+      
+      char outputData3[16]={}; // define array to veriy behavior, initialised to 0x00
+      outputData3[0]= 'A';     // this convert A to a number
+      outputData3[1]= 'B';     // this convert B to a number
+      outputData3[2]= 'C';     // this convert C to a number
+      outputData3[3]= 'D';     // this convert D to a number
+      if (outputData3[4] == 0x00) outputData3[3] = 'E';   // v51 check behavior of array [4]=0x00 (yes) ABCE
+      outputData3[14]= 'Z';    // this convert to a number
+      outputData3[15]= 0x00;   // this convert to a number
+      client.publish(mqttPower, outputData3);        // v51 works as array is terminated 0x00
+      outputData3[2]= 0x00;     // this convert C to a number
+      client.publish(mqttPower, outputData3);        // v51 array early terminated (yes) "AB"
+    */
     publishMqtt(mqttErrorTopic, (String) "h-test" + __LINE__); // v51 with (String) ok marking
   #endif        
 }
@@ -5177,39 +5177,39 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
     const char *mqttErrorTopic_h3 = "/error!/"  P1_VERSION_TYPE;
     publishMqtt(mqttErrorTopic_h3, "TestH3c");      // v51:   CurrentPowerConsumption: %lu
   #endif        
-  /* v55 022 - disabl all code below, after activating WiFi.persistent(false);
-              // production unstable, test looks fine (on RX2 noninverted at least)
-  
-      doesnot change things: code goes unstable if below is removed
-*/
-// // make table teststable1 , active with of without 2 or 3 from printf  results in stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     delay(0);     // 008 adding here without printf above , stable
-//                     // ---------------------------- 009 line 2585 added printf (unstable) 
-//                     delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-//                     delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-//                     delay(0);     // 008 adding 009 test remove, add 011 unstable
-//                     delay(0);     // 008 adding 009 test remove, add 011 unstable
-//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
-//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
-//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
-//                     delay(0);     // 008 adding 009 test remove, add 010 unstable
-//                     delay(0);     // add13 + add 014 stable (rx2-70%)
+    /* v55 022 - disabl all code below, after activating WiFi.persistent(false);
+                // production unstable, test looks fine (on RX2 noninverted at least)
+    
+        doesnot change things: code goes unstable if below is removed
+  */
+  // // make table teststable1 , active with of without 2 or 3 from printf  results in stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     delay(0);     // 008 adding here without printf above , stable
+  //                     // ---------------------------- 009 line 2585 added printf (unstable) 
+  //                     delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
+  //                     delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
+  //                     delay(0);     // 008 adding 009 test remove, add 011 unstable
+  //                     delay(0);     // 008 adding 009 test remove, add 011 unstable
+  //                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+  //                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+  //                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+  //                     delay(0);     // 008 adding 009 test remove, add 010 unstable
+  //                     delay(0);     // add13 + add 014 stable (rx2-70%)
 
 
 
-                    // delay(0);     // add14 + add015 stable (rx2=40%), remove 021
-                    // delay(0);     // add15 + add016 less stable (rx2=20%), remove 021
-                    // delay(0);     // add16 + add017 stable (rx2=50%), remove 021
-                    // delay(0);     // add17 + add018 stable  (rx2=10%), remove 021
-                    // delay(0);     // add18 + add019 stable  (rx2=75%), remove 021
-/* */  
+                      // delay(0);     // add14 + add015 stable (rx2=40%), remove 021
+                      // delay(0);     // add15 + add016 less stable (rx2=20%), remove 021
+                      // delay(0);     // add16 + add017 stable (rx2=50%), remove 021
+                      // delay(0);     // add17 + add018 stable  (rx2=10%), remove 021
+                      // delay(0);     // add18 + add019 stable  (rx2=75%), remove 021
+  /* */  
 }
 
 void command_testH4(){    // code to maken things stable teststable
@@ -5223,7 +5223,7 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v55b , stable0
                     delay(0);     // v55b , stable2
                     delay(0);     // v55b , stable1
-// ------------------------------------------------------------
+  // ------------------------------------------------------------
                     delay(0);     // v55b , stable8 <-- very very good
                     // v55b continue to test here if things become better or worse
                     delay(0);     // v55b , stable6 
