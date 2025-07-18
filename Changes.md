@@ -6,9 +6,13 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
-## [v21.56] - reworked to make it stable again
+## [v21.56] - reworked to make it stable again (july2025)
+	- platformio extended with local script that disassembles
+	- improved coding after inspect
+	- v56c pulled and merged to master
+	- deleted v56c
 	- Tx commands to inspect RX2 data: in mode > 0, =2, =3, =4
-## [v21.55] - Unstable
+## [v21.55] - Unstable / abandoned
 	- program behaves erratic in general 
 	- serial reading suddenly refuses to read data
 	- on git we reworked things vrom v55a to v55g
