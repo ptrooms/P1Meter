@@ -3530,7 +3530,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       
     }
 
-    msg.concat(", \"Version\":%u");                    // version to determine message layout
+    msg.concat(", \"Version\":%s");                    // V57 prog_version %u to %s  version 
     msg.concat(" }"); // terminate JSON
     
   // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
