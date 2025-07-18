@@ -1,11 +1,13 @@
 import os
-Import("env")
+Import("env")  # type: ignore : Import is not defined in pylance 
 
 # using: https://forum.pjrc.com/index.php?threads/useful-script-for-generating-objdump-results-from-platformio.73834/
 
 #https://docs.platformio.org/en/latest/projectconf/advanced_scripting.html
 #https://docs.platformio.org/en/latest/projectconf/section_env_build.html#projectconf-dynamic-build-flags
 #https://docs.platformio.org/en/latest/scripting/actions.html
+
+# extensa: https://github.com/jcmvbkbc/gcc-xtensa
 
 def after_build(source, target, env):
     platform = env.PioPlatform()

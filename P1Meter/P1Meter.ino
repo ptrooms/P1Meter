@@ -3733,11 +3733,17 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 */
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
   // note: to check for occurance on "const char* " , use strstr that searches 
-  if (!mqttTopic || strstr(mqttTopic,"!") ) {
-    if (mqttTopic) Serial.println((String) "\n\r\t mqttTopic is empty.");
-    if (strstr(mqttTopic,"!") && outputOnSerial) Serial.println((String) "\n\r\t" + mqttTopic + "prohibits output.");
+  if (!mqttTopic) {
+    Serial.println((String) "!m");
+    if (outputOnSerial) Serial.println((String) "\n\r\t mqttTopic is empty.");
+    return; // check empty of ! in topic
+  }
+  if (strstr(mqttTopic,"!") ) {
+    Serial.println((String) "!m");
+    if (outputOnSerial) Serial.println((String) "\n\r\t mqttTopic=" + mqttTopic + ", prohibits output.");
     return; // check empty of ! in topic
   }    
+
   
   Serial.print("^");     // signal write mqtt entered
   if (outputOnSerial) {  // debug
@@ -3751,7 +3757,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
   if (mqttCnt == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
     char output[128];
     snprintf(output, sizeof(output), 
-          "{\"info\":000, \"mqttCnt=\":%d ,\"msg\":\"restart reason 0x%08x"
+          "{\"info\":000, \"mqttCnt=\":%ld ,\"msg\":\"restart reason 0x%08x"
           ", epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x \"}",
           mqttCnt , save_reason, 
           save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
