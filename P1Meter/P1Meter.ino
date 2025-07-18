@@ -8,6 +8,7 @@
 */
 
 /* tbd 
+  change record/idś to definitions like "/KFM5KAIFA-METER"
   change \n\r to \r\n to 
   sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
       -- strange as wifi proces during setup() before was OK
@@ -103,7 +104,7 @@
         git log                 // check log status
   V52 13jul25 02u35 renamed to master
   V52 13jul25: restart information display
-     protection "suspend @getValuesFromP1Record while mqttCnt < 5" unneeded, now commented
+     protection "suspend @getValues2FromP1Record while mqttCnt < 5" unneeded, now commented
     'e0'  = divide error
     'e1'  = infinite loop fault
     'E'   = Enforce read fault in Reading P1 data
@@ -3813,7 +3814,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   bool endOfMessage = false;    // led on during long message transfer
 
   // if-else-if check if we are on header, trailer of in between those lines
-  if (startChar >= 0) {        // We are at start/first line of Meter reading
+  if (startChar >= 0) {                       // We are at start/first line of Meter reading
     // digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off
     // digitalWrite(BLUE_LED, LOW);       // Turn the ESPLED on to inform user
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
@@ -3836,20 +3837,20 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     // currentCRC=CRC16(currentCRC,(unsigned char *) "\x0d\x0a\x00\x0d\x0a", 5);    // our intersection messages are terminated with \n which is in fact cr-lf
     //DebugCRC   currentCRC=CRC16(0x0000,(unsigned char *) "/KFM5KAIFA-METER\x0d\x0a\x0d\x0a", 21);    // our intersection messages are terminated with \n which is in fact cr-lf
 
-    if (strncmp(telegram, "/KFM5KAIFA-METER", strlen("/KFM5KAIFA-METER")) == 0) telegramP1header = true;   // indicate we are in header mode
+    if (strncmp(telegram+startChar , "/KFM5KAIFA-METER", strlen("/KFM5KAIFA-METER")) == 0) telegramP1header = true;   // indicate we are in header mode
 
     currentCRC = Crc16In(0x0000, reinterpret_cast<unsigned char*>(telegram) + startChar, len - startChar - 1);  // initialise using header, v48-casting
-    if (telegram[startChar+len-2] == '\x0d') { // v48-casting
+    if (telegram[startChar+len-2] == '\x0d') { // v48-casting add crc16 0x0a
       // currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
         unsigned char tempLiteral[] = {0x0A};  // use temporarily literal to "unsigned char* cast of Crc16In, v48-casting
         currentCRC = Crc16In(currentCRC, tempLiteral, 1);
     }
 
     /*
-    if ( len = 1 && telegram[len-1] == '\x0d') {
-      Serial.print("DebugAddCrLf.."); 
-      currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a\x0d\x0a", 3); // add stripped header
-    }
+      if ( len = 1 && telegram[len-1] == '\x0d') {
+        Serial.print("DebugAddCrLf.."); 
+        currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a\x0d\x0a", 3); // add stripped header
+      }
     */
 
     /*
@@ -3871,7 +3872,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     */
 
   } else {  // startChar >= 0
-
+  
     if (endChar >= 0 && telegramP1header) {   // Are we reading the trailer of the Meter with header passed
 
       currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram) + endChar, 1); // include trailer '!' into CRC, v48-casting
@@ -3884,7 +3885,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
       
       if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
       // incoperate CRC reciovery function
-      if (validTelegramCRCFound) {   // temporari test√erify on Debug switch
+      if (validTelegramCRCFound) {   // temporarily test√erify on Debug switch
         p1ReadRxCnt++ ; // Count times we have had a succesfull CRC read
         RX_yieldcount = 3; // assume all if well and we had of have surived any yieldcount
         if (currentCRC == dataInCRC) { // on match build masking array
@@ -3900,7 +3901,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
                     }
                 }
                 if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
-                getValuesFromP1Record(telegram_crcIn, telegram_crcIn_len);
+                getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
           } else {                                            // no or length changed masking array
 
                 if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
@@ -3994,7 +3995,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
            } // else if (endChar >= 0 && telegramP1header)
       */
 
-    } else {                        // We are reading between header and trailer
+    } else {                                  // We are reading between header and trailer
       
       // currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
       //    reinterpret_cast<unsigned char*> to prevent "C-style pointer casting" message
@@ -4043,6 +4044,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
         */
       } // if output serial
     } // else if endChar >= 0 && telegramP1header
+
   } // startChar >= 0
 
   // if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
@@ -4095,26 +4097,37 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // if (telegram[len - 3] != ')' ) client.publish(mqttErrorTopic, telegram ); // log invalid
   // if (telegram[len - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
 
+  // tbd v56c: this check before or after while in recovery ????
+  /*
+    check valid record format 0/1-....)
+  */
+
   if (   telegram[0] != '0' && telegram[0] != '1' && telegram[1] != '-' ) return endOfMessage; // if subrecord not start wih 0- or 1-
 
   // if ( !(telegram[len - 3] == ')' || telegram[len - 4] == ')' )) return endOfMessage; // if not terminated by bracket then return
   if ( !(telegram[len - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
 
-  // Serial.println((String)"DebugDecode6:"+ (int)telegram[len - 3] );   // with testdata, does not arrive here
-  
-  // Serial.println((String)"DebugDecode7 (=" + strncmp(telegram, "(", strlen("(")) + " )="+strncmp(telegram, ")", strlen(")"))) ;
-  // Serial.println((String)"DebugDecode7 substr1-7(=" + telegram[0]+telegram[1]+telegram[2]+telegram[3]+telegram[4]+"<");
-  //  c h e c k   t e s t   P 1   r e c o r d s
-  // long val = 0;
-  // long val2 = 0;
+  /*
+    // Serial.println((String)"DebugDecode6:"+ (int)telegram[len - 3] );   // with testdata, does not arrive here
+    
+    // Serial.println((String)"DebugDecode7 (=" + strncmp(telegram, "(", strlen("(")) + " )="+strncmp(telegram, ")", strlen(")"))) ;
+    // Serial.println((String)"DebugDecode7 substr1-7(=" + telegram[0]+telegram[1]+telegram[2]+telegram[3]+telegram[4]+"<");
+    //  c h e c k   t e s t   P 1   r e c o r d s
+    // long val = 0;
+    // long val2 = 0;
 
-  // client.publish(mqttLogTopic, telegram );    // show what we have got
+    // client.publish(mqttLogTopic, telegram );    // show what we have got
 
-  //  0123456789012345678901234567890
-  //  0-0:1.0.0(180611014816S) added ptro
-  //  0-0:1.0.0(191119182821W)
+    //  0123456789012345678901234567890
+    //  0-0:1.0.0(180611014816S) added ptro
+    //  0-0:1.0.0(191119182821W)
+  */
   
-  
+  /*
+    below assumes segmented record processing between header and trailer
+    Note: at header and/or trailer, the routine was already returned.
+    tbd: v56c: consider full record at formwarding fields.....
+  */
   if (strncmp(telegram, "0-0:1.0.0(", strlen("0-0:1.0.0(")) == 0) {       // do we have a Date record ?
     if (telegram[22] == 'S' || telegram[22] == 'W') {  // check for Summer or Wintertime
       char resDate[16];     // maximum prefix of timestamp message
@@ -4211,11 +4224,12 @@ void RecoverTelegram_crcIn() {
 }
 
 // ---------------------------------------
-/*
-  v45 Get field values from full P1  record 2872
 
+/*
+  v45 Get field values from full CRC validated P1 record 2872
+    currentTimeS2,powerConsumptionLowTariff2...CurrentPowerProduction2
 */
-void  getValuesFromP1Record(char buf[], int len) {  // 716
+void  getValues2FromP1Record(char buf[], int len) {  // 716
   // return;
   // if (mqttCnt == 3) Serial.printf(" mqttcount=%d len=%d ", mqttCnt, len ); // mqttcount=3 len=716
   // if (mqttCnt < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong here, v52 disabled
@@ -4283,12 +4297,16 @@ void  getValuesFromP1Record(char buf[], int len) {  // 716
                 //                           019061.182*kWh)_
                 //                           1234567890 
                 //                         s+1    
-      f = FindWordInArrayFwd(buf, "1-0:1.8.1(", len, 9);       // total use Low getValuesFromP1Record f=74+35; f=109
-      // int s = FindCharInArrayRev(buf+f, '(', 26);  // search buffer fro bracket (s=??)
-      // int l = FindCharInArrayRev(buf+f, '*', 26) - s - 1;  // search buffer fro bracket (l=??)
-      //                                           f=109 s=9 s=20 val=0 c1=1 c20=*_C
+      f = FindWordInArrayFwd(buf, "1-0:1.8.1(", len, 9);       // total use Low getValues2FromP1Record f=74+35; f=109
       powerConsumptionLowTariff2 = getValue(buf+f, 26);
-      // Serial.printf(" getValuesFromP1Record f=%d s=%d l=%d val=%d c1=%c c2=%c", f, s, l, powerConsumptionLowTariff2, buf[f+s+1], buf[f+s+l]  );
+      
+      if (outputOnSerial) {
+        int s = FindCharInArrayRev(buf+f, '(', 26);  // search buffer fro bracket (s=??)
+        int l = FindCharInArrayRev(buf+f, '*', 26) - s - 1;  // search buffer fro bracket (l=??)
+        //                                           f=109 s=9 s=20 val=0 c1=1 c20=*_C
+        Serial.printf("\r\n\t getValues2FromP1Record cpp=%d f=%d s(=%d l*=%d val=%d c1=%c c2=%c \r\n",
+                     __LINE__, f, s, l, powerConsumptionLowTariff2, buf[f+s+1], buf[f+s+l]  );
+      }        
   }
 
   // return;
