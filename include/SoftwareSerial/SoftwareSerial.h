@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifndef SoftwareSerial_h
 #define SoftwareSerial_h
+
 #include <inttypes.h>
 #include <Stream.h>
 
@@ -35,27 +36,25 @@ class SoftwareSerial : public Stream
 {
 public:
    SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
-   ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
+   ~SoftwareSerial();
 
    void begin(long speed);
    long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
 
    bool overflow();
-   int peek() override;
+   int peek();
 
-   virtual size_t write(uint8_t byte) override;
-   virtual int read() override;
-   virtual int available() override;
-   virtual void flush() override;
-   virtual bool P1active();          // defined class used during P1 serilisation
+   virtual size_t write(uint8_t byte);
+   virtual int read();
+   virtual int available();
+   virtual void flush();
    operator bool() {return m_rxValid || m_txValid;}
 
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
 
-   void rxRead();		// witp1active detection beween / and !
-   void rxRead2();		// without p1active detection beween / and !
+   void rxRead();
 
    // AVR compatibility methods
    bool listen() { enableRx(true); return true; }
@@ -63,35 +62,24 @@ public:
    bool isListening() { return m_rxEnabled; }
    bool stopListening() { enableRx(false); return true; }
 
-   inline uint32_t getCycleCountIram();
-
    using Print::write;
 
 private:
    bool isValidGPIOpin(int pin);
+
    // Member variables
    int m_rxPin, m_txPin, m_txEnablePin;
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
    bool m_invert;
-   bool m_P1active;                 // Ptro 28mar21 to support P1 messageing
    bool m_overflow;
    unsigned long m_bitTime;
-   volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
    uint8_t *m_buffer;
 
-
 };
-
-uint32_t ICACHE_RAM_ATTR SoftwareSerial::getCycleCountIram()
-{
-    uint32_t ccount;
-    __asm__ __volatile__("esync; rsr %0,ccount":"=a" (ccount));
-    return ccount;
-}
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
 #define SW_SERIAL_UNUSED_PIN -1
