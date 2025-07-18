@@ -259,7 +259,7 @@
 
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
-  #ifdef DUP_MODE
+  #ifdef DUP_MODE   // test is same as test with different i/o & id settings
     #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
     #define DEF_PROG_VERSION "31" VERSION_NUMBER ".241" // current version (displayed in mqtt record)
   #else
@@ -270,7 +270,7 @@
   #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
   #warning This is the PRODUCTION version, be warned
-  #ifdef DUP_MODE
+  #ifdef DUP_MODE   // prod is same as prod with different i/o & id settings
     #define P1_VERSION_TYPE "d1"      // "p1" production
     #define DEF_PROG_VERSION "41" VERSION_NUMBER ".241" // current version (displayed in mqtt record)    
   #else
@@ -690,11 +690,17 @@
 
 // communication mode settings, is the Startbit RISING edge or (inverted) FALLING edge
 #ifdef TEST_MODE
-  bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
-  bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
+  #ifdef DUP_MODE_NOINVERT    // v57 reverse for TEST_MODE, normally uninverted
+    bool bSERIAL_INVERT  = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
+    bool bSERIAL2_INVERT = true;  // GJ meter is inverted (output RX2 does pulldown Gpio) v53
+  #else
+    bool bSERIAL_INVERT  = false; // Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
+    bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
+  #endif
+
 #else
   // note: DUP_MODE will invert to allow regular USB/serial, else we'll use the default (inverted polarity of serial-P1)
-  #ifdef DUP_MODE_NOINVERT
+  #ifdef DUP_MODE_NOINVERT    // v56 reverse for PROD_MODE normally inverted
     bool bSERIAL_INVERT  = false; // v53a Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
     bool bSERIAL2_INVERT = false; // v53a Simulated GJ meter is USB interface , does not require invert v53
   #else
@@ -2254,7 +2260,7 @@ void readTelegramP1() {
     // note Serial.setTimeout() sets the maximum and defaults to 1000 milliseconds.
     // The function returns the characters up to the last character before the supplied terminator.
 
-    #ifdef DUP_MODE
+    #if(defined DUP_MODE || defined TEST_MODE)
       int len = mySerial.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #else
       int len = mySerial.readBytesUntil(10, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
@@ -2448,7 +2454,7 @@ void readTelegramWL() {
       // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
       int len = 0;
-      #ifdef DUP_MODE
+      #if(defined DUP_MODE || defined TEST_MODE)
         len = mySerial2.readBytesUntil(13, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       #else 
         len = mySerial2.readBytesUntil(00, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
@@ -3762,7 +3768,8 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
           ", epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x \"}",
           mqttCnt , save_reason, 
           save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
-    publishMqtt(mqttErrorTopic, output); // report to /error/P1 topic
+    if (client.connected()) client.publish(mqttErrorTopic, output);
+    // publishMqtt(mqttErrorTopic, output); // report to /error/P1 topic
   }
 
   if (mqttTopic and payLoad) {    // check for not nullpointer
@@ -3770,16 +3777,18 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     payLoad.toCharArray(mqttOutput, MAXLINELENGTH);
     if (client.connected()) {
       // client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
-      Serial.println((String) "\r\nmqtt>" + __LINE__ + ":" 
-          + "mqttCnt=" + mqttCnt
-          + mqttTopic + ", "  + mqttOutput  + "<");  // display error on debug
-      // client.publish(mqttTopic, mqttOutput);
-      if (mqttCnt > 3) {
-          client.publish(mqttTopic, mqttOutput);
-      } else {
-          client.publish(mqttTopic, mqttOutput);
-      }
 
+      // Serial.println((String) "\r\nmqtt>" + __LINE__ + ":" 
+      //     + "mqttCnt=" + mqttCnt
+      //     + mqttTopic + ", "  + mqttOutput  + "<");  // display error on debug
+
+      client.publish(mqttTopic, mqttOutput);          
+      /*  v57: debug called itself loop
+        if (mqttCnt > 3) {
+        } else {
+            client.publish(mqttTopic, mqttOutput);
+        }
+      */
     }   
   } else {
     if (outputOnSerial) {  // debug
