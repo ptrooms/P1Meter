@@ -1,5 +1,6 @@
 #define TEST_MODE       // set for Arduino to prevent default production compilation
 #define DEBUG_ESP_OTA   // v49 wifi restart issues 
+#define VERSION_NUMBER "57"   // number this version
 /*  documentation 
     https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
     api reference: https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf
@@ -260,10 +261,10 @@
   #warning This is the TEST version, be informed
   #ifdef DUP_MODE
     #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-    #define DEF_PROG_VERSION 3156.241 // current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION "31" VERSION_NUMBER ".241" // current version (displayed in mqtt record)
   #else
     #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-    #define DEF_PROG_VERSION 1156.241 // current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION "11" VERSION_NUMBER ".241" // current version (displayed in mqtt record)
   #endif
   #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
   #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
@@ -271,10 +272,10 @@
   #warning This is the PRODUCTION version, be warned
   #ifdef DUP_MODE
     #define P1_VERSION_TYPE "d1"      // "p1" production
-    #define DEF_PROG_VERSION 4156.241 //  current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION "41" VERSION_NUMBER ".241" // current version (displayed in mqtt record)    
   #else
     #define P1_VERSION_TYPE "p1"      // "p1" production
-    #define DEF_PROG_VERSION 2156.241 //  current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION "21" VERSION_NUMBER ".241" // current version (displayed in mqtt record)
   #endif
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
@@ -728,7 +729,7 @@
 // D9   = 2;
 // D10  = 2;
 
-const int  prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version
+const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
 
 #ifndef ARDUINO_ESP8266_RELEASE 
   /*
