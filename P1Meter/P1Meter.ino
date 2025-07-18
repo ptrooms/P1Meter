@@ -4228,6 +4228,7 @@ void RecoverTelegram_crcIn() {
 /*
   v45 Get field values from full CRC validated P1 record 2872
     currentTimeS2,powerConsumptionLowTariff2...CurrentPowerProduction2
+    v56c: every field found is also copied back to its segmented (copyback1) equivilent 
 */
 void  getValues2FromP1Record(char buf[], int len) {  // 716
   // return;
@@ -4245,7 +4246,9 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
     if (strncpy(resDate, buf +f+16, 6)) {  // start buffer+10+1 for 6 bytes
       if (isNumber(resDate, 6)) {            // only copy/use new date if this is full numeric (decimal might give trouble)
         currentTime2  = (1 * atof(resDate)); // Convert string to double http://www.cplusplus.com/reference/cstdlib/atof/
+        currentTime   = currentTime2;           // v56c, copyback1
         strncpy(currentTimeS2, buf +f+16, 6);  // Ptro 27mar21: added as we like to have readible timestamp in message(s)
+        strncpy(currentTimeS , buf +f+16, 6);   // v56c, copyback1
       }
     }
   }
@@ -4299,8 +4302,9 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
                 //                         s+1    
       f = FindWordInArrayFwd(buf, "1-0:1.8.1(", len, 9);       // total use Low getValues2FromP1Record f=74+35; f=109
       powerConsumptionLowTariff2 = getValue(buf+f, 26);
+      powerConsumptionLowTariff  = powerConsumptionLowTariff2;  // v56c copyback1
       
-      if (outputOnSerial) {
+      if (outputOnSerial) { // v56c
         int s = FindCharInArrayRev(buf+f, '(', 26);  // search buffer fro bracket (s=??)
         int l = FindCharInArrayRev(buf+f, '*', 26) - s - 1;  // search buffer fro bracket (l=??)
         //                                           f=109 s=9 s=20 val=0 c1=1 c20=*_C
@@ -4312,28 +4316,42 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
   // return;
  
   if (f >= 0) {
-    f = FindWordInArrayFwd(buf+f, "1-0:1.8.2(", len-f, 9);       // total use High
+    f = FindWordInArrayFwd(buf, "1-0:1.8.2(", len, 9);       // total use High          (v56c: start at begin of buf)
     powerConsumptionHighTariff2  = getValue(buf+f, 26);
+    powerConsumptionHighTariff   = powerConsumptionHighTariff2; // v56c copyback1
+
+    if (outputOnSerial) {   // v56c
+      int s = FindCharInArrayRev(buf+f, '(', 26);  // search buffer fro bracket (s=??)
+      int l = FindCharInArrayRev(buf+f, '*', 26) - s - 1;  // search buffer fro bracket (l=??)
+      //                                           f=109 s=9 s=20 val=0 c1=1 c20=*_C
+      Serial.printf("\r\n\t getValues2FromP1Record cpp=%d f=%d s(=%d l*=%d val=%d c1=%c c2=%c \r\n",
+                    __LINE__, f, s, l, powerConsumptionHighTariff2, buf[f+s+1], buf[f+s+l]  );
+    }        
+    
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf+f, "1-0:2.8.1(", len-f, 9);        // total Production Low
+    f = FindWordInArrayFwd(buf, "1-0:2.8.1(", len, 9);        // total Production Low   (v56c: start at begin of buf)
     powerProductionLowTariff2  = getValue(buf+f, 26);
+    powerProductionLowTariff   = powerProductionLowTariff2;     // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf+f, "1-0:2.8.2(", len-f, 9);        // total Production High    
+    f = FindWordInArrayFwd(buf, "1-0:2.8.2(", len, 9);        // total Production High  (v56c: start at begin of buf)
     powerProductionHighTariff2 = getValue(buf+f, 26);
+    powerProductionHighTariff  = powerProductionHighTariff2;    // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf+f, "1-0:1.7.0(", len-f, 9);        // Watts usage    
+    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", len, 9);        // Watts usage            (v56c: start at begin of buf)
     CurrentPowerConsumption2   = getValue(buf+f, 21);
+    CurrentPowerConsumption    = CurrentPowerConsumption2;      // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf+f, "1-0:1.7.0(", len-f, 9);        // Watts produced    
+    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", len, 9);        // Watts produced          (v56c: start at begin of buf)
     CurrentPowerProduction2   = getValue(buf+f, 21);
+    CurrentPowerProduction    = CurrentPowerProduction2;        // v56c copyback1
   }
 
 }
