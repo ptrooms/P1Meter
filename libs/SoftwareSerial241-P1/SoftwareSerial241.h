@@ -42,12 +42,12 @@ public:
    void setTransmitEnablePin(int transmitEnablePin);
 
    bool overflow();
-   int peek();
+   int peek() override;
 
-   virtual size_t write(uint8_t byte);
-   virtual int read();
-   virtual int available();
-   virtual void flush();
+   virtual size_t write(uint8_t byte) override;
+   virtual int read() override;
+   virtual int available() override;
+   virtual void flush() override;
    virtual bool P1active();          // defined class used during P1 serilisation
    operator bool() {return m_rxValid || m_txValid;}
 
