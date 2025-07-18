@@ -767,7 +767,7 @@ const char *mqttLogTopic2  = "/log/wl"  P1_VERSION_TYPE;            // 'l' on/of
     const char *mqttServer = "192.168.1.8";                    // our mqtt server adress
     const char *mqttServer2 = "192.168.1.88";                  // our backup test mqtt server adress (desk top test)
     #ifdef P1_STATIC_IP
-      IPAddress local_IP(192, 168, 1, 35);
+      IPAddress local_IP(192, 168, 1, 185);
       IPAddress gateway(192, 168, 1, 1);
       IPAddress subnet(255, 255, 255, 0);
       IPAddress primaryDNS(192, 168, 1, 8);   //optional
@@ -2148,7 +2148,7 @@ void mqtt_reconnect() {                 // mqtt read usage doc https://pubsubcli
         }
         doCritical();  // do critical process to maintain basic Thermostat & OTA functions
       }
-    #ifdef TEST_MODE            
+    #ifdef TEST_MODE
       if (mqttConnectDelay < 11000) {      // v45 check if we are below backup time (2+5+8=15sec)  testmode
     #else
       if (mqttConnectDelay <=27000) {      // v45 check if we are below backup time (2+5+8+11+14+17+20+23+26+29=155sec) production
@@ -3754,7 +3754,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
       Serial.print("{");        // print mqtt start operation
     }
   }
-
+  
   if (mqttCnt == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
     char output[128];
     snprintf(output, sizeof(output), 
@@ -3769,7 +3769,17 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     char mqttOutput[MAXLINELENGTH];
     payLoad.toCharArray(mqttOutput, MAXLINELENGTH);
     if (client.connected()) {
-      client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
+      // client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
+      Serial.println((String) "\r\nmqtt>" + __LINE__ + ":" 
+          + "mqttCnt=" + mqttCnt
+          + mqttTopic + ", "  + mqttOutput  + "<");  // display error on debug
+      // client.publish(mqttTopic, mqttOutput);
+      if (mqttCnt > 3) {
+          client.publish(mqttTopic, mqttOutput);
+      } else {
+          client.publish(mqttTopic, mqttOutput);
+      }
+
     }   
   } else {
     if (outputOnSerial) {  // debug
