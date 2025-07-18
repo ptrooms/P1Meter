@@ -5287,10 +5287,10 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 
 void command_testH4(){    // code to maken things stable teststable
   //                   // we remoived some unused protection arrays, improved ISR-time,
-  //                   delay(0);     // v55b , stable1
-  //                   delay(0);     // v55b , stable0
-  //                   delay(0);     // v55b , stable4
-  //                   delay(0);     // v55b , stable2
+                    delay(0);     // v55b , stable1 v56c make stable
+                    delay(0);     // v55b , stable0 v56c make stable
+                    delay(0);     // v55b , stable4 v56c make stable
+                    delay(0);     // v55b , stable2 v56c make stable
   //                   delay(0);     // v55b , stable1
   //                   delay(0);     // v55b , stable1
   //                   delay(0);     // v55b , stable0
