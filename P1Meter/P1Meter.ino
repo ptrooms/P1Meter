@@ -914,6 +914,10 @@ bool allowOtherActivities = true; // allow other activities if not reading seria
 bool p1SerialActive   = false;    // start program with inactive P1 port
 bool p1SerialFinish   = false;    // transaction finished (at end of !xxxx )
 
+bool bSerialP1State = false; // v57 indicate state
+bool bSerialP2State = false; // v57 indicate state
+
+
 long p1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
 long p1Baudrate2 = P1_BAUDRATE2;   //  V35 2022-09-30 22:25:25: set programmatic speed which can be influenced by teh bB command.
 long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields while tapping water, which may bounce
@@ -1857,6 +1861,11 @@ void loop()
                                                     // that reset
 
   } else {                         // else we are allowed to do other acivities
+    // if (loopbackRx2Mode == 3) Serial.print((String) loopbackRx2Mode 
+    //         + (p1SerialFinish  ? "f" : "g")
+    //         + (p1SerialActive  ? "a" : "b")
+    //          ); // v57 print incoming 3fa/3ga/3fa/3gb <-- after serial send this remains 3ga
+
     // we are now outside P1 Telegram processing (which require serial-timed resources) and deactivated interrupts
     if (!p1SerialActive) {      // P1 (was) not yet active, start primary softserial to wait for P1
       /* 
@@ -1869,6 +1878,7 @@ void loop()
       p1SerialFinish = false; // and let transaction finish
       mySerial2.end();          // Stop- if any - GJ communication
       mySerial2.flush();        // Clear GJ buffer
+      bSerialP2State = false; // v57 indicate state
       if (loopbackRx2Mode > 0) Serial.print((String) "_}" ); // v54 print incoming
       
       telegramError = 0;        // start with no errors
@@ -1883,10 +1893,10 @@ void loop()
           mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
           // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
         #endif
+          bSerialP1State = true; // v57 indicate state
       }        
 
     } else {    // if (!p1SerialActive)
-
       if (p1SerialFinish) {     // P1 transaction completed, we can start GJ serial operation at Serial2
         if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial stopped at " + currentMillis);
         // if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + "." ); // v47 superfluous after preceding debug line
@@ -1899,10 +1909,13 @@ void loop()
                 ( (float) micros()    / 1000000UL ), 
                 ( (float) diffMicros / 1000000UL ) ); 
         }                
+
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
         mySerial.end();    // P1 meter port deactivated
         mySerial.flush();  // Clear P1 buffer
+        bSerialP1State = false; // v57 indicate state
+
         loopTelegram2cnt = 0;  // allow readtelegram2  for a maximum of "6 loops" of actual receives
 
         // Only activate myserial2  atdesignated times
@@ -1918,6 +1931,7 @@ void loop()
             // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
             mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
           #endif
+            bSerialP2State = true; // v57 indicate state
             if (loopbackRx2Mode > 0) Serial.print((String) "{_" ); // v54 print incoming
             // Serial.print((String) "{_" ); // v54 print incoming
           }
@@ -2073,6 +2087,9 @@ void loop()
 
       } else {
          Serial.print("|\n\r:") ;        // v54: if no RJ11 message print some indication
+         p1SerialFinish = true;
+         p1SerialActive = true;          // v57
+         allowOtherActivities = true;     // v57
       }                          
     /*    
       // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
@@ -2265,6 +2282,13 @@ void readTelegramP1() {
     #else
       int len = mySerial.readBytesUntil(10, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #endif
+      if (loopbackRx2Mode == 6) {   // diagnose header    // v57
+          Serial.print((String)"\r\n\t P1header1-32=(" );
+          for (int i = 0; i < 33 && i < len; i++) {
+              Serial.printf("%02x ", telegram[i]); 
+          }
+          Serial.println((String)")" );
+      }
 
     // Serial.print((String) "yb\b"); no need to display RX progess this goes ok
     
@@ -2384,6 +2408,7 @@ void readTelegramP1() {
         p1SerialFinish = true; // indicate mainloop we can stop P1 serial for a while
         mySerial.end();      // flush the buffer (if any) v38
         mySerial.flush();      // flush the buffer (if any)
+        bSerialP1State = false; // v57 indicate state
 
       }
       /* //debugCRC
@@ -2459,6 +2484,14 @@ void readTelegramWL() {
       #else 
         len = mySerial2.readBytesUntil(00, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       #endif          
+      if (loopbackRx2Mode == 6) {   // diagnose header    // v57
+          Serial.print((String)"\r\n\t P2header1-32=(" );
+          for (int i = 0; i < 33 && i < len; i++) {
+              Serial.printf("%02x ", telegram2[i]); 
+          }
+          Serial.println((String)")" );
+      }
+
       // String telegram2_str(telegram2); // does work but still prints beyond 0x00
       if (loopbackRx2Mode > 0 && len > 0) Serial.print((String) 
                   + " ..len=" + len 
@@ -2527,6 +2560,7 @@ void readTelegramWL() {
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
                   mySerial2.end();          // v38 Stop- if any - GJ communication
                   mySerial2.flush();        // v38 Clear GJ buffer
+                  bSerialP2State = false; // v57 indicate state
                   if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
                       // debug print positions
                       Serial.print("\nns1=")          ; // debug v38 print processing
@@ -3123,9 +3157,10 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') {
          loopbackRx2Mode = (((int)payload[1] - 48) * 1);  // set number myself
          // T1 enforces debug diagnose to verify serial processing
-         if (loopbackRx2Mode == 1) {
+         if (loopbackRx2Mode == 1 || loopbackRx2Mode == 3) {  // v57
             outputOnSerial = false;   // disable debug details as we focus on serial input display
-            rx2ReadInterval = 1;     // process this for any RX2 loop
+            rx2ReadInterval = 1;      // process this for any RX2 loop
+            verboseLevel = 4;         // v57
          }
         /* 
             Playing here with myserial is useless
@@ -3288,8 +3323,16 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
     } else  if ((char)payload[0] == 'S') {  // v52 serial stop activating P1
-        serialStopP1 = !serialStopP1;
-        if (outputOnSerial) Serial.print((String) " Serial P1=" + (!serialStopP1  ? "Active" : "disabled") + " )" ) ;
+      if  (    (char)payload[1] ==  '0') p1SerialFinish = false;   // set number myself
+      else if ((char)payload[1] ==  '1') p1SerialFinish = true ;   // set number myself
+      else serialStopP1 = !serialStopP1;
+      if (outputOnSerial) {
+        Serial.print((String) 
+          " Serial P1="  + (!serialStopP1  ? "Active" : "disabled") + " )" 
+          " p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") + " )" 
+          " p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
+        ) ;
+      }
     } else  if ((char)payload[0] == 's') {  // v52 serial stop activating RX2
         if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') rx2ReadInterval = (int)payload[1] - 48;   // set number myself
         else serialStopRX2 = !serialStopRX2;
@@ -3358,8 +3401,17 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"M print Masking array "+ "( MaskX="+ telegram_crcOut_cnt + " )" );   // v52 number of X maskings
           Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )" );   // v52 number of Times we validated
           Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
-          Serial.println((String)"S ON/off serial1 P1 \t" + (!serialStopP1  ? "Yes" : "No") );
-          Serial.println((String)"s ON/off/{0-9} serial2 RX2:"+ rx2ReadInterval  +" \t" + (!serialStopRX2  ? "Yes" : "No") );
+          Serial.println((String)"S ON/off \t\tserial1P1-"
+                        + (bSerialP1State  ? "A" : "i")
+                        + "\t" + (!serialStopP1  ? "Yes" : "No") 
+                        + ", p1SerialFinish=" + (p1SerialFinish  ? "1" : "0") 
+                        + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
+                        );
+          Serial.println((String)"s ON/off/{0-9} \t\tserial2P2-"
+                        + (bSerialP2State  ? "A" : "i")
+                        + ":"+ rx2ReadInterval  
+                        +" \t" + (!serialStopRX2  ? "Yes" : "No") );
+          
           Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
           Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
           
