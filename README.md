@@ -65,9 +65,9 @@ Documentation for latest development version: see comments in source.
 Note: we use a special adapted software serial to improve bit-banging reliability to approx 90% 
 In addition we've added a masked recovery routine to reduce read faults towards 98%
 
-Teh program creates every 10 seconds a complex progessing statusline on serial1 that can be viewed.
-- ReadT3: 38.671062469 D2diChc:    60 start:  611.46301 \_C^^        endP1:  611.803833 ( 0.340773)_.6.7.8.9.0.1-2-3-4-5
-This lines breaks up in the following
+The program creates every 10 seconds a complex progessing statusline on serial1 that can be viewed.
+- <small> ReadT3: 38.671062469 D2diChc:    60 start:  611.46301 \_C^^        endP1:  611.803833 ( 0.340773)_.6.7.8.9.0.1-2-3-4-5</small><br>
+This timed state line breaks up in the following:
 - ReadT3  yieldcount --> normal 2 or 3 lower we have no reads Data; disconnected or failing P1
 - 38.671062469: = micros() 0-55.x
 - D2thCwl -->
@@ -81,11 +81,11 @@ This lines breaks up in the following
 - endP1:  611.803833 --> timer() loop timer P1 finished (trailer)
 - \( 0.340773\)_  = total time serial port was read
 - .6 --> progressing within 10 seconds loop
--- multiple diacritics: . = Serial1P1 , - = Serial2 while water counter is unchanged. State table:
-- - \* \' \" \_    water counting
-- - \: \- \; \-    water not counting
-- - \* \\ \: \-    SerialP1 waiting for input
-- - \* \" \: \;    SerialP2 waiting for input
+- multiple diacritics: . = Serial1P1 , - = Serial2 while water counter is unchanged. State table:
+- - \* \' \" \_   = water counting
+- - \: \- \; \-   = water not counting
+- - \* \\ \: \-   = SerialP1 waiting for input
+- - \* \" \: \;   = SerialP2 waiting for input
 
 ### Issues and support ###
 
