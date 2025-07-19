@@ -77,9 +77,9 @@ This timed state line breaks up in the following:
 - : 60 = mqtt published counter output
 - start: 611.46301  --> timer() loop timer P1 started serial (header) read 0-4300secs
 -  \_C = state of P1 record \_C=ok, Z\_= not processable R\_ recovered (preceded by ToD: currentTimeS2=183916 \_R)
-- ^^.. = one or more is numbe rof mqtt publisments reagrdless of \(erro/log/p1/power topic etc.etc.\)
+- ^^.. = one or more is number of mqtt publishess reagrdless of \(/error/log/p1/power topic etc.etc.\)
 - endP1:  611.803833 --> timer() loop timer P1 finished (trailer)
-- \( 0.340773\)_  = total time serial port was read
+- \( 0.340773\)_  = total time serial port P1 was occupied
 - .6 --> progressing within 10 seconds loop
 - multiple diacritics: . = Serial1P1 , - = Serial2 while water counter is unchanged. State table:
 - - \* \' \" \_   = water counting
