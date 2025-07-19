@@ -257,14 +257,16 @@
   #define P1_BAUDRATE2 115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
 #endif
 
+
+// ARDUINO_ESP8266_RELEASE
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #ifdef DUP_MODE   // test is same as test with different i/o & id settings
     #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-    #define DEF_PROG_VERSION "31" VERSION_NUMBER ".241" // current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION "31" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
   #else
     #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
-    #define DEF_PROG_VERSION "11" VERSION_NUMBER ".241" // current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION "11" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
   #endif
   #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
   #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
@@ -272,10 +274,10 @@
   #warning This is the PRODUCTION version, be warned
   #ifdef DUP_MODE   // prod is same as prod with different i/o & id settings
     #define P1_VERSION_TYPE "d1"      // "p1" production
-    #define DEF_PROG_VERSION "41" VERSION_NUMBER ".241" // current version (displayed in mqtt record)    
+    #define DEF_PROG_VERSION "41" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
   #else
     #define P1_VERSION_TYPE "p1"      // "p1" production
-    #define DEF_PROG_VERSION "21" VERSION_NUMBER ".241" // current version (displayed in mqtt record)
+    #define DEF_PROG_VERSION "21" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
   #endif
 #endif
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
@@ -3603,7 +3605,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       
     }
 
-    msg.concat(", \"Version\":%s");                    // V57 prog_version %u to %s  version 
+    msg.concat(", \"Version\":\"%s\"");                    // V57 prog_version %u to %s  version "Version":4157.2_7_1"
     msg.concat(" }"); // terminate JSON
     
   // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
