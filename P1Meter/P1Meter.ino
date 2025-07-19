@@ -1815,7 +1815,22 @@ void loop()
         here we display the number of line loops -0-1-2-3-4-5-6-7-8-9    
     */
     // Serial.print((String)"-" +(loopcnt%10)+" \b");
-    Serial.print((String) ((waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopcnt%10)+" \b"); // v47 test water tapping 
+    
+    // Serial.print((String) (
+    //   (waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopcnt % 10)+" \b"); // v47 test water tapping 
+    
+    Serial.print((String) (                             // display diagnostic second loopcounter
+          (waterReadCounter != waterReadCounterPrevious) ?   // v47 check test water tapping active
+              (bSerialP1State ? 
+                  (bSerialP2State ? "*"  : "\'")         // water &  and P1:  P2 -->  On* Off"
+                 :(bSerialP2State ? "\"" : "_") )       // water &   no P1:  P2 -->  On' Off_
+              :   
+              (bSerialP1State ? 
+                  (bSerialP2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
+                 :(bSerialP2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
+          )
+          +   (loopcnt % 10)+" \b");
+
     waterReadCounterPrevious = waterReadCounter; 
     test_WdtTime = currentMillis + 1000;  // next interval
   }
