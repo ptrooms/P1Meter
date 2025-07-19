@@ -87,6 +87,12 @@ This timed state line breaks up in the following:
 - - \* \\ \: \-   = SerialP1 waiting for input
 - - \* \" \: \;   = SerialP2 waiting for input
 
+### Testing
+To test the functionality, one can use the following script sequence to send data to the attached 
+
+`while sleep 8; do ./sendp1.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done``
+
+
 ### Issues and support ###
 
 [P1 Community Mail] - via GIT
