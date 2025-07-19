@@ -82,10 +82,10 @@ This lines breaks up in the following
 - \( 0.340773\)_  = total time serial port was read
 - .6 --> progressing within 10 seconds loop
 -- multiple diacritics: . = Serial1P1 , - = Serial2 while water counter is unchanged. State table:
-- - - \* \' \" \_    water counting
-- - - \: \- \; \-    water not counting
-- - - \* \\ \: \-    SerialP1 waiting for input
-- - - \* \" \: \;    SerialP2 waiting for input
+- - \* \' \" \_    water counting
+- - \: \- \; \-    water not counting
+- - \* \\ \: \-    SerialP1 waiting for input
+- - \* \" \: \;    SerialP2 waiting for input
 
 ### Issues and support ###
 
