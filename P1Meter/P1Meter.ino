@@ -5,13 +5,13 @@
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
-#error canceled core_version.h not found
+  #error canceled core_version.h not found
   // should have #define ARDUINO_ESP8266_RELEASE "2_4_1" // ~/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_esp8266_main.cpp 
   // should have #define ARDUINO_ESP8266_RELEASE "2_7_1" // ~/.platformio/packages/framework-arduinoespressif8266@3.20701.0/cores/esp8266/core_version.h
 #endif
 
 
-/*  documentation 
+/*  documentation   
     https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
     api reference: https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf
     sdk: https://github.com/espressif/ESP8266_NONOS_SDK/tree/release/v2.2.x
@@ -1345,7 +1345,7 @@ void setup()
     Added 2021-04-26 22:06:55 to test/check wifi issues
     v55: test WiFi.persistent(false); to check if this affects stability of code changes
   */
-  WiFi.persistent(false); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083) since 29jun25 causes bootloop
+  WiFi.persistent(true); // Solve possible wifi init errors (re-add at 6.2.1.16 #4044, #4083) since 29jun25 causes bootloop
   // WiFi.persistent(true); // Do not overwrites the FLASH if the settings are the same https://github.com/esp8266/Arduino/issues/1054#issuecomment-2662968960
   // WiFi.disconnect(true); // Delete SDK wifi config (after is has connected)
   delay(200);
