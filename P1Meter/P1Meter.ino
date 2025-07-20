@@ -65,6 +65,14 @@
 
 /* change history
   v57 improve state line diagnostics, updated Read.me, ensure P1/RX swapping
+      - 2.7.1 not stable on duptest goes after 20-100 mqtt  into wdt_reset @ 401031f1
+            401031e0:	0adc                	bnez.n	a10, 401031f4 <wDev_ProcessFiq+0x28c>
+            401031e2:	fe8e21               	l32r	a2, 40102c1c <rcReachRetryLimit+0x19c>
+            401031e5:	fe8e31               	l32r	a3, 40102c20 <rcReachRetryLimit+0x1a0>
+            401031e8:	8ba442               	movi	a4, 0x48b
+            401031eb:	fa2801               	l32r	a0, 40101a8c <ppTxqUpdateBitmap+0x28>
+            401031ee:	0000c0               	callx0	a0
+            401031f1:	ffff06               	j	401031f1 <wDev_ProcessFiq+0x289>
       - tested using Arduino 2.7.1
       - PlatformIO enhancements
       - introducing P1 records via bash script command
