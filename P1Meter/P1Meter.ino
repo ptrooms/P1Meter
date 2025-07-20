@@ -2254,9 +2254,9 @@ void readTelegramP1() {
     // The function returns the characters up to the last character before the supplied terminator.
 
     #ifdef DUP_MODE
-      int len = mySerial.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      int len = mySerial.readBytesUntil('\x0d', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #else
-      int len = mySerial.readBytesUntil(10, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      int len = mySerial.readBytesUntil('\x0a', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #endif
 
     // Serial.print((String) "yb\b"); no need to display RX progess this goes ok
