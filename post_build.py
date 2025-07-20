@@ -27,17 +27,18 @@ def after_build(source, target, env):
     print("ptro objdump old: " + objdump)
 
     objdump=env.subst("${FRAMEWORK_ARDUINOESP8266_DIR}") + "/../toolchain-xtensa/bin/xtensa-lx106-elf-objdump"
+    objdump="xtensa-lx106-elf-objdump"
     print("ptro objdump new: " + objdump)
     
     src_elf=env.subst("\"${BUILD_DIR}/${PROGNAME}.elf\"")
-    src_lst=env.subst("\"${BUILD_DIR}/${PROGNAME}.lst\"")
+    src_lst=env.subst("\"${BUILD_DIR}/${PROGNAME}.asm\"")
 
     #--disassembler-options=no-aliases,numeric
     # objdump = esptool
     print("ptro src_elf: " + src_elf)
     #         "/home/pafoxp/.platformio/packages/toolchain-xtensa/xtensa-lx106-elf/bin/objdump", "-d", "--file-start-context", "-w",
     cmd=" ".join([
-        objdump, "-d", 
+        objdump, "-d -C", 
         src_elf,">",src_lst]) #
     #--disassembler-options=no-aliases,numeric
     print("cmd=" + cmd)
