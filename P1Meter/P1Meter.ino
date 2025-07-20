@@ -1183,6 +1183,8 @@ int  telegram_crcOut_len = 0;         // length of this record
 
 // RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
 #define MAXLINELENGTH2 256
+char dummyh4[MAXLINELENGTH2+32];        // v57c-3 after this somewhat stable
+
 char telegram2[MAXLINELENGTH2+32];        // RX2 serial databuffer during outside P1 loop Plus overflow
 char telegram2_org[MAXLINELENGTH2+32];    // RX2 serial databuffer during outside P1 loop Plus overflow v54
 char telegram2Record[MAXLINELENGTH2+32];  // telegram extracted data maxsize for P1 RX2  v54 moved below
@@ -1246,6 +1248,21 @@ PubSubClient client(espClient);   // Use this connection client
 #include <user_interface.h>     // v52: support to display/ger restart reasons
 // rst_info *resetInfo;            // v52: pointer (global)
 
+
+void command_testH6(){    // v57c-2
+  //                   // we remoived some unused protection arrays, improved ISR-time,
+    String msg3 = "{"; // build mqtt frame 
+    char msgpub3[64];     // allocate a message buffer
+    // char output3[64];     // use snprintf to format data
+    msg3.concat("\"currentTime\":\"%d\"");                  // %s is string whc will crash
+    msg3.concat(",\"CurrentPowerConsumption\":%lu }");    // P1
+    msg3.toCharArray(msgpub3, 64);   
+    msg3.toCharArray(msgpub3, sizeof(msgpub3)); // v51 convert/move/vast to char[]
+    publishMqtt(mqttErrorTopic, msg3);       // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+    // publishMqtt(mqttErrorTopic, msgpub3);    // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+
+}
+
 void setup()
 {
     asm(".global _printf_float");            // include floating point support
@@ -1294,7 +1311,7 @@ void setup()
   // prepare wdt
   ESP.wdtDisable();
   
-  ESP.wdtEnable(WDTO_8S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S , v55b activated
+  ESP.wdtEnable(WDTO_2S); // 8 seconds 0/15/30/60/120/250/500MS 1/2/4/8S , v55b activated
   // ESP.wdtEnable(33000); // allow three passses missing, v55b disabled
 
   Serial.begin(115200);
@@ -5454,7 +5471,13 @@ void command_testH3(){    // publish mqtt records in TEST_MODE
 }
 
 void command_testH4(){    // code to maken things stable teststable
-  //                   // we remoived some unused protection arrays, improved ISR-time,
+  //                   // we remoived some unused protection arrays, improved ISR-time, 
+                // v57c-0  added multiple combinations, things remain instable
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
@@ -5526,3 +5549,17 @@ void throwExceptionFunction(void) {
         Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
         
  */
+
+void command_testH5(){    // code to maken things stable teststable v57c-1 no-effect
+  //                   // we remoived some unused protection arrays, improved ISR-time,
+    String msg3 = "{"; // build mqtt frame 
+    char msgpub3[64];     // allocate a message buffer
+    // char output3[64];     // use snprintf to format data
+    msg3.concat("\"currentTime\":\"%d\"");                  // %s is string whc will crash
+    msg3.concat(",\"CurrentPowerConsumption\":%lu }");    // P1
+    msg3.toCharArray(msgpub3, 64);   
+    msg3.toCharArray(msgpub3, sizeof(msgpub3)); // v51 convert/move/vast to char[]
+    publishMqtt(mqttErrorTopic, msg3);       // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+    publishMqtt(mqttErrorTopic, msgpub3);    // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
+
+}
