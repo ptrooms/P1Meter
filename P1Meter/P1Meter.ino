@@ -273,7 +273,7 @@
     #define P1_VERSION_TYPE "d1"      // "p1" production
     #define DEF_PROG_VERSION 4156.241 //  current version (displayed in mqtt record)
   #else
-    #define P1_VERSION_TYPE "p1"      // "p1" production
+    #define P1_VERSION_TYPE "x1"      // "p1" production
     #define DEF_PROG_VERSION 2156.241 //  current version (displayed in mqtt record)
   #endif
 #endif
