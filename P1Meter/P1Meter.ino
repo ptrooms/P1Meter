@@ -2,6 +2,15 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 #define VERSION_NUMBER "57" // number this version
 
+
+#include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
+#ifndef ARDUINO_ESP8266_RELEASE
+#error canceled core_version.h not found
+  // should have #define ARDUINO_ESP8266_RELEASE "2_4_1" // ~/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_esp8266_main.cpp 
+  // should have #define ARDUINO_ESP8266_RELEASE "2_7_1" // ~/.platformio/packages/framework-arduinoespressif8266@3.20701.0/cores/esp8266/core_version.h
+#endif
+
+
 /*  documentation 
     https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
     api reference: https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf
@@ -66,6 +75,9 @@
 /* change history
   v57 improve state line diagnostics, updated Read.me, ensure P1/RX swapping
       - 2.7.1 not stable on duptest goes after 20-100 mqtt  into wdt_reset @ 401031f1
+woes in Wifi/Lamx layer
+        read also https://www.esp8266.com/viewtopic.php?f=9&t=3979&start=20
+         "wdev.c 1166" is printed on the UART before the crash. 
             401031e0:	0adc                	bnez.n	a10, 401031f4 <wDev_ProcessFiq+0x28c>
             401031e2:	fe8e21               	l32r	a2, 40102c1c <rcReachRetryLimit+0x19c>
             401031e5:	fe8e31               	l32r	a3, 40102c20 <rcReachRetryLimit+0x1a0>
