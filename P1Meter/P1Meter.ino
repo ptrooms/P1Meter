@@ -2375,7 +2375,7 @@ void readTelegramP1() {
     #if(defined DUP_MODE || defined TEST_MODE)
       int len = mySerial.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #else
-      int len = mySerial.readBytesUntil(10, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      int len = mySerial.readBytesUntil('\x0a', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #endif
       if (loopbackRx2Mode == 6) {   // diagnose header    // v57
           Serial.print((String)"\r\n\t P1header1-32=(" );
