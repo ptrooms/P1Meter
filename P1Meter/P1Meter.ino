@@ -1,6 +1,6 @@
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
-#define VERSION_NUMBER "57" // number this version
+#define VERSION_NUMBER "58" // number this version
 
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
@@ -73,6 +73,49 @@
 */
 
 /* change history
+  v58 based on corrected master
+    - we extended platformio to generate Disassemble after compile, this to interrogate result
+      which could als be doen by executing the Extensa "objdump" that reads the ELF file to disassemble output.
+      This is done via Python post_build.py (for Arduino 2.4.1) and post_build_271.py (2.7.x)
+      Activated is adding & activating the  .ini options per project environment
+          ;extra_scripts = post_build.py
+          ;targets = disasm
+    - during testing we exprience frequent WDT crashes as related to Wifi, why is a mystery
+      Only the Live production  seems more stable. Perhaps this interelates with actual telegram data.
+    - inroduced COP_MODE to differentiate TEST/PROD_MODE only by IP_Address and Mqtt-prefix:x1 & versionid: 61 
+      
+      internally TEST_MODE & PROD_MODE are different code lines to check and test
+        During TESTing we use real usb serial while PRODduction uses negative polaritye
+          DUP_MODE replicates and revert the active serial polarity and character termination
+          COP_MODE does not change any serial behavior and only differentiate on IP address and Mqtt prefix
+      
+      We now have (summarised) the following 6 code paths with platformio (Arduino framework 2.4.1):
+        PROD_MODE   : prefix p1 and versionid 21  - [env:p1meter-production_241]      LGTM 
+          DUP_MODE  : prefix d1 and versionid 41  - [env:p1meter-dup-production_241]  erratic ??
+          COP_MODE  : prefix x1 and versionid 61  - [env:p1meter-production_241_copy] limited
+        TEST_MODE   : prefix t1 and versionid 11  - [env:t1meter-test-OTA_241] 
+          DUP_MODE  : prefix e1 and versionid 31  - n.i.u.
+          COP_MODE  : prefix x1 and versionid 71  - n.i.u.
+    in addition we have (optional) flag:
+        DUP_MODE_NOINVERT which reverses serial polarity but keeps the end-data character
+
+    Note: Platformio is also used to differentiate Arduino on platform or framework:
+    All are using the SDK framework to generate/ompile code via the "toolchain-xtensa"
+      - Arduino 2.4.1 has it platform  espressif8266@1.7.0 as package framework-arduinoespressif8266@1.20401.3
+      - Arduino 2.7.1 has it platform  espressif8266@2.5.3 as package framework-arduinoespressif8266@3.20701.0
+        Note we have also others (2.4.0, 2.6.2, 2.7.4, 2.7.8, 3.1.2) but these are merely to check support issues 
+      
+    - copy PROD contents to testdevice, the thing collaapses as test data is temrinated with CR (\r = 0x0d)
+    - created 3 data options
+      --> sendp1_nl.sh = termnated solely by NewLine  (\n = 0x0A) (works on PROD_MODE)
+      --- sendp1_crlf.sh = termnated solely by Carriage Return & NewLine  (\r = 0x0D & \n = 0x0A)
+      --- sendp1_cr.sh = termnated solely by Carriage Return (\r = 0x0D)
+      Test op PROD_MOPDE 
+  v57 troubles  as master
+    - One way or the other the DUP_MODE of PROD_MODE behaves differently and crashes after approx 10-80 cycles
+      Possible while the routine collapses on unexpexted serialised input terminated by CR (0x0D)
+    - furthermore, we've had quite some problems to gfet the version numbers right.
+      Now on master, we created v58 as new syncrpoint
   v57 improve state line diagnostics, updated Read.me, ensure P1/RX swapping
       - 2.7.1 not stable on duptest goes after 20-100 mqtt  into wdt_reset @ 401031f1
 woes in Wifi/Lamx layer
@@ -314,6 +357,9 @@ woes in Wifi/Lamx layer
   #ifdef DUP_MODE   // test is same as test with different i/o & id settings
     #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
     #define DEF_PROG_VERSION "31" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
+  #elif defined(COP_MODE)
+    #define P1_VERSION_TYPE "y1"      // "y1" test
+    #define DEF_PROG_VERSION "71" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
   #else
     #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
     #define DEF_PROG_VERSION "11" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
@@ -325,6 +371,9 @@ woes in Wifi/Lamx layer
   #ifdef DUP_MODE   // prod is same as prod with different i/o & id settings
     #define P1_VERSION_TYPE "d1"      // "p1" production
     #define DEF_PROG_VERSION "41" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
+  #elif defined(COP_MODE)
+    #define P1_VERSION_TYPE "x1"      // "x1" production
+    #define DEF_PROG_VERSION "61" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
   #else
     #define P1_VERSION_TYPE "p1"      // "p1" production
     #define DEF_PROG_VERSION "21" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
