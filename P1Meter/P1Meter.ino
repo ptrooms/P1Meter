@@ -12,6 +12,8 @@
 
 
 /*  documentation   
+  feeding data test_mode: while sleep 8; do ./sendp1_cr.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
+  feeding data  cop_mode: while sleep 8; do ./sendp1_crlf.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
 
   21jul25: debug serial2.4.1. library debug : 
   1. search SoftwareSerial241.cpp.o in /home/pafoxp/code-P1Meter/.pio/build
@@ -359,8 +361,9 @@ woes in Wifi/Lamx layer
 #endif
 
 #ifdef TEST_MODE
-  #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
-  #define P1_BAUDRATE2 115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+  // note 115100 with physical ionverted device is not reliable.
+  #define P1_BAUDRATE  115200       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+  #define P1_BAUDRATE2 115200       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
 #else
   // note: 115250 < baudrate < 115150 will increase errors and misreads
   #define P1_BAUDRATE  115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
@@ -5744,6 +5747,7 @@ void command_testH4(){    // code to maken things stable teststable
                 // v57c-0  added multiple combinations, things remain instable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
+#ifndef TEST_MODE                    
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
@@ -5775,7 +5779,7 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
-
+#endif
 
 }
 
