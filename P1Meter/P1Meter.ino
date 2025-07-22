@@ -85,6 +85,9 @@
 */
 
 /* change history
+  - v58 refactor myserial1/2 names, enhanced bittime, stop and baudrate control
+    - we added serial read mode 0/1/2: 0-physical port, 1-P1 record, 2=WL-record
+  - v58a  --> moved to production
     - likely cause that serial processing stays tool long in ISR, with wifi debug , we see dev:1153
           https://github.com/espressif/ESP8266_NONOS_SDK/issues/90
   v58 based on corrected master
@@ -218,7 +221,7 @@ woes in Wifi/Lamx layer
     'E'   = Enforce read fault in Reading P1 data
     testing serial processing on stable 2.4.1 and less stable 2.7.1
   V52 06jul25: restart information display
-    command 'S'/'s' serialStopP1 serialStopRX2 (prohibit serial data)
+    command 'S'/'s' serial1Stop serial2Stop (prohibit serial data)
     RX_yieldcount ignore serial if too many failures
     print & save restart reason information en report this at first mqttCnt into mqtt Errortopic
     format localIp() address to string for display 'D', can also IPAddress just as an array of 4 ints.
@@ -417,7 +420,7 @@ woes in Wifi/Lamx layer
 //    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
 // 03okt22 23u11: v35 serial2 inverted slightly better
-// 30sep22 22u26: v35 p1Baudrate2 115k2 for "warmtelink" 
+// 30sep22 22u26: v35 serial2Baudrate 115k2 for "warmtelink" 
 // 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
 // 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
 //  Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
@@ -1030,12 +1033,12 @@ bool allowOtherActivities = true; // allow other activities if not reading seria
 bool p1SerialActive   = false;    // start program with inactive P1 port
 bool p1SerialFinish   = false;    // transaction finished (at end of !xxxx )
 
-bool bSerialP1State = false; // v57 indicate state
-bool bSerialP2State = false; // v57 indicate state
+bool bSerial1State = false; // v57 indicate state
+bool bSerial2State = false; // v57 indicate state
 
 
-long p1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
-long p1Baudrate2 = P1_BAUDRATE2;   //  V35 2022-09-30 22:25:25: set programmatic speed which can be influenced by teh bB command.
+long serial1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
+long serial2Baudrate = P1_BAUDRATE2;   //  V35 2022-09-30 22:25:25: set programmatic speed which can be influenced by teh bB command.
 long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields while tapping water, which may bounce
 long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active with serial communication
 
@@ -1071,11 +1074,13 @@ bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
 bool rx2_function     = true;    // "F" true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
 bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogRX2 /log/wl2
-bool serialStopP1     = false;   // 'S' stop read/inputting serial1 P1 data  (v52)
-bool serialStopRX2    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
+bool serial1Stop     = false;   // 'S' stop read/inputting serial1 P1 data  (v52)
+bool serial2Stop    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
 long rx2ReadInterval  = 7;       // 's' decreases also de readinterval
 bool doReadAnalog     = true;    // 'a' yes/no read analog port for value
 bool doForceFaultP1   = false;   // 'E' yes/no force fault in Read telegram
+int serial1PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 1 - use internal for test
+int serial2PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 2 - use internal for test
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
@@ -1273,7 +1278,7 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
 #ifdef UseNewSoftSerialLIB
   //  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-  SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
+  SoftwareSerial mySerial1;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
   SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
 #else
   /// @param baud the TX/RX bitrate
@@ -1283,8 +1288,8 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
   /// @param invert true: uses invert line level logic
   /// @param bufCapacity the capacity for the received bytes buffer
   /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
-  // 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-  SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  // 274 rubbish // SoftwareSerial mySerial1(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial1( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
   SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
@@ -1502,13 +1507,13 @@ void setup()
   /*
     #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-      mySerial.begin  (115200,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+      mySerial1.begin  (115200,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
       mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-      // newserial: mySerial.begin(115200, SWSERIAL_8N1, SERIAL_RX, -1, true , MAXLINELENGTH,0);  // define softserial  GPIO14
+      // newserial: mySerial1.begin(115200, SWSERIAL_8N1, SERIAL_RX, -1, true , MAXLINELENGTH,0);  // define softserial  GPIO14
       // Serial.swap();       // use the alternative serial pins
       // Serial.begin(115200);   // use use UART0 (TX = GPIO1, RX = GPIO3) hardware
     #else
-      mySerial.begin(115200);    // P1 meter port 115200 baud
+      mySerial1.begin(115200);    // P1 meter port 115200 baud
       mySerial2.begin( 1200);   // GJ meter port   1200 baud
     #endif
   */
@@ -1988,9 +1993,9 @@ void loop()
   /*
     time how long the P1 record took
   */
-  if (mySerial.P1active()  && startMicrosP1 == 0UL) {
+  if (mySerial1.P1active()  && startMicrosP1 == 0UL) {
     startMicrosP1 = micros();
-  } else if (!mySerial.P1active() && startMicrosP1 > 0UL)  {
+  } else if (!mySerial1.P1active() && startMicrosP1 > 0UL)  {
     if (outputOnSerial) Serial.print ((String) "\tP1time=" + (micros() - startMicrosP1) + " " );
     startMicrosP1 = 0;
   }    
@@ -2018,13 +2023,13 @@ void loop()
     //   (waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopcnt % 10)+" \b"); // v47 test water tapping 
     Serial.print((String) (                             // display diagnostic second loopcounter
           (waterReadCounter != waterReadCounterPrevious) ?   // v47 check test water tapping active
-              (bSerialP1State ? 
-                  (bSerialP2State ? "*"  : "\'")         // water &  and P1:  P2 -->  On* Off"
-                 :(bSerialP2State ? "\"" : "_") )       // water &   no P1:  P2 -->  On' Off_
+              (bSerial1State ? 
+                  (bSerial2State ? "*"  : "\'")         // water &  and P1:  P2 -->  On* Off"
+                 :(bSerial2State ? "\"" : "_") )       // water &   no P1:  P2 -->  On' Off_
               :   
-              (bSerialP1State ? 
-                  (bSerialP2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
-                 :(bSerialP2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
+              (bSerial1State ? 
+                  (bSerial2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
+                 :(bSerial2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
           )
           +   (loopcnt % 10)+" \b");
 
@@ -2096,26 +2101,22 @@ void loop()
       p1SerialFinish = false; // and let transaction finish
       mySerial2.end();          // Stop- if any - GJ communication
       mySerial2.flush();        // Clear GJ buffer
-      bSerialP2State = false; // v57 indicate state
+      bSerial2State = false; // v57 indicate state
       if (loopbackRx2Mode > 0) Serial.print((String) "_}" ); // v54 print incoming
       
       telegramError = 0;        // start with no errors
       // Start secondary serial connection if not yet active
-      if (!serialStopP1) {
+      if (!serial1Stop) {
         #ifdef UseNewSoftSerialLIB
           // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-          mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          mySerial1.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
           // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
         #else
-          // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          #ifdef DUP_MODE
-            mySerial.begin(p1Baudrate, 1);    // V58a Use simulated data P1
-          #else 
-            mySerial.begin(p1Baudrate, 0);    // P1 meter port 115200 baud, v52 stop/start (0/port,data for 1=P1,2=WL )
-          #endif
-          // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
+          // mySerial1.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+          mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
+          // mySerial1.begin(serial1Baudrate);  // < v58a ss241 P1 meter port   115k2    // required during test without P1
         #endif
-          bSerialP1State = true; // v57 indicate state
+          bSerial1State = true; // v57 indicate state
       }        
 
     } else {    // if (!p1SerialActive)
@@ -2137,9 +2138,9 @@ void loop()
 
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
-        mySerial.end();    // P1 meter port deactivated
-        mySerial.flush();  // Clear P1 buffer
-        bSerialP1State = false; // v57 indicate state
+        mySerial1.end();    // P1 meter port deactivated
+        mySerial1.flush();  // Clear P1 buffer
+        bSerial1State = false; // v57 indicate state
 
         loopTelegram2cnt = 0;  // allow readtelegram2  for a maximum of "6 loops" of actual receives
 
@@ -2149,21 +2150,19 @@ void loop()
                 (mqttCnt == 2  || 
                 (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
-          if (!serialStopRX2) {
+          if (!serial2Stop) {
               #ifdef UseNewSoftSerialLIB
                 // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-                // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-                mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+                // mySerial1.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+                mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
               #else
-                // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-                // mySerial2.begin(p1Baudrate2,2);    // GJ meter port   1200 baud
-                #ifdef DUP_MODE
-                  mySerial2.begin(p1Baudrate2,2);    // simulate 1=P1; 2=RX/WL data.
-                #else 
-                  mySerial2.begin(p1Baudrate2,0);    // Using physical 0-port
-                #endif
+                // mySerial2.begin(serial2Baudrate);    // P1 meter port 115200 baud
+                mySerial2.begin(serial2Baudrate,serial2PortMode);    // v58a, v58b ss241 =0 or simulate 1=P1; 2=RX/WL data.
+                // #else 
+                //   mySerial2.begin(serial2Baudrate,0);    // Using physical 0-port
+                // #endif
               #endif
-              bSerialP2State = true; // v57 indicate state
+              bSerial2State = true; // v57 indicate state
               if (loopbackRx2Mode > 0) Serial.print((String) "{_" ); // v54 print incoming
               // Serial.print((String) "{_" ); // v54 print incoming
           }
@@ -2288,8 +2287,8 @@ void loop()
       p1SerialFinish = true;  // v53: enforce to accomodate faults normal set at  processing P1 record
       p1SerialActive = true; // v53: enforce to accomodate faults normal set at  processing P1 record
 
-      // mySerial.end();         // v53: enforce finish , done at line 1775
-      // mySerial.flush();       // v53: enforce flush the buffer (if any) line 1775
+      // mySerial1.end();         // v53: enforce finish , done at line 1775
+      // mySerial1.flush();       // v53: enforce flush the buffer (if any) line 1775
 
       // report to error mqtt, // V20 candidate for a callable error routine
       // tbd: consider to NOT send values
@@ -2307,7 +2306,7 @@ void loop()
             
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
-      if (!serialStopP1 && loopbackRx2Mode == 0) {
+      if (!serial1Stop && loopbackRx2Mode == 0) {
          if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
 
          Serial.printf("\r\n# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\r\n",   
@@ -2470,13 +2469,13 @@ void readTelegramP1() {
     /*
       Using our 241 adapted library, we wait between / and ! 
     */
-    if ( mySerial.P1active())  {    // does not seem to activate
+    if ( mySerial1.P1active())  {    // does not seem to activate
         if (!bP1Active_signalled) Serial.print((String) "\\" ); // length processed previous line
         bP1Active_signalled = true;
         return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
     }
   #endif  
-  if (!mySerial.available() || serialStopP1 ) return ;  // quick return if no data, v52
+  if (!mySerial1.available() || serial1Stop ) return ;  // quick return if no data, v52
 
   if (outputOnSerial)    {
     if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + " s=s123..\b\b\b\b\b") ; // print message line
@@ -2503,7 +2502,7 @@ void readTelegramP1() {
 
   // Serial.println("Debug: startbuf..");
 
-  while (mySerial.available())     {      // If serial data in buffer
+  while (mySerial1.available())     {      // If serial data in buffer
     // Serial.print((String) "xa\b"); no need to display serial available this goes ok
     
     /*
@@ -2516,9 +2515,9 @@ void readTelegramP1() {
     // The function returns the characters up to the last character before the supplied terminator.
 
     #if(defined DUP_MODE || defined TEST_MODE)
-      int len = mySerial.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      int len = mySerial1.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #else
-      int len = mySerial.readBytesUntil('\x0a', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      int len = mySerial1.readBytesUntil('\x0a', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
     #endif
       yield();                    // v58 do background processing required for wifi etc.
       ESP.wdtFeed();              // v58 feed the hungry timer
@@ -2647,9 +2646,9 @@ void readTelegramP1() {
         if (intervalP1cnt < 1140) intervalP1cnt++ ; // increase survived read count
 
         p1SerialFinish = true; // indicate mainloop we can stop P1 serial for a while
-        mySerial.end();      // flush the buffer (if any) v38
-        mySerial.flush();      // flush the buffer (if any)
-        bSerialP1State = false; // v57 indicate state
+        mySerial1.end();      // flush the buffer (if any) v38
+        mySerial1.flush();      // flush the buffer (if any)
+        bSerial1State = false; // v57 indicate state
 
       }
       /* //debugCRC
@@ -2685,15 +2684,15 @@ void readTelegramWL() {
     /*
       Using our 241 adapted library, we wait between / and ! 
     */
-    if (mySerial.P1active()) {    // return if P1 is active
+    if (mySerial1.P1active()) {    // return if P1 is active
       if (!bP1Active_signalled) Serial.print((String) "\\" ); // length processed previous line
           bP1Active_signalled = true;
           return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
     }
   #endif  
 
-  if (serialStopRX2) return;    // v52 return if we have stopped this serial
-  if (!bSerialP2State) return;  // v58 useless to continue without active serial
+  if (serial2Stop) return;    // v52 return if we have stopped this serial
+  if (!bSerial2State) return;  // v58 useless to continue without active serial
 
 
   bGot_Telegram2Record  = false;      // v38 check RX2 seen
@@ -2815,7 +2814,7 @@ void readTelegramWL() {
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
                   mySerial2.end();          // v38 Stop- if any - GJ communication
                   mySerial2.flush();        // v38 Clear GJ buffer
-                  bSerialP2State = false; // v57 indicate state
+                  bSerial2State = false; // v57 indicate state
                   if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
                       // debug print positions
                       Serial.print("\nns1=")          ; // debug v38 print processing
@@ -3373,46 +3372,40 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       Serial.print("\t doForceFaultP1=");
       if (!doForceFaultP1)  Serial.println("OFF\t");
       if (doForceFaultP1)   Serial.println("ON\t");
-    } else  if ((char)payload[0] == 'b') {    // here
-      if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') {
-          p1Baudrate = p1Baudrate - (((int)payload[1] - 47) * 100);  // set number 1-10
-      } else {
-        p1Baudrate = p1Baudrate - 50 ;
-      }
-      Serial.print((String)"Decreasing Baudrate to " + p1Baudrate);
-    } else  if ((char)payload[0] == 'B') {    // here
-      if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') {
-          p1Baudrate = p1Baudrate + (((int)payload[1] - 47) * 100);  // set number 1-10
-      } else {
-        p1Baudrate = p1Baudrate + 50 ;
-      }
-      Serial.print((String)"Increasing Baudrate to " + p1Baudrate);
-    } else  if ((char)payload[0] == 'B') {    // here
-      if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') {
-          p1Baudrate = p1Baudrate + (((int)payload[1] - 47) * 100);  // set number 1-10
-      } else {
-        p1Baudrate = p1Baudrate + 50 ;
-      }
-      Serial.print((String)"Increasing Baudrate to " + p1Baudrate);
+
+    } else  if ((char)payload[0] == 'B') {    // v58b: changed to control Baudrate of port 1/2 with +/- 0-9
+      if (((char)payload[1] >= '1' && (char)payload[1] <= '3') &&
+          ((char)payload[2] == '+' || (char)payload[2] == '-') && 
+          ((char)payload[3] >= '1' && (char)payload[3] <= '9') ) {
+          int temp = (((int)payload[3] - 48) * 50);   // set number 0-9  add or minus
+          if ( (char)payload[3] == '9')  temp = 100;   // increase by 100 if 9
+          if ( (char)payload[2] == '-')  temp = temp * -1;
+          if ( (char)payload[1] == '1' || (char)payload[1] == '3')  serial1Baudrate = serial1Baudrate + temp; // set number 1-10  
+          if ( (char)payload[1] == '2' || (char)payload[1] == '3')  serial2Baudrate = serial2Baudrate + temp; // set number 1-10  
+          Serial.print((String)"Changing" + (char)payload[1] + ":"   // v58b display result
+                + " Baudrate1="  + serial1Baudrate
+                + ", Baudrate2=" + serial1Baudrate );
+        } 
     } else  if (  ( (char)payload[0] == 'J' || (char)payload[0] == 'j' )  &&              // v58 change m_bitwait
-                  ( (char)payload[1] == '+' || (char)payload[1] == '-') &&
+                  ( (char)payload[1] == '+' || (char)payload[1] == '-')   &&
                   ( (char)payload[2] >= '0' && (char)payload[2] <= '9') ) {
         
         int temp = (((int)payload[2] - 48));
+        if ( (char)payload[2] == '9')  temp = 10;   // increase by 10 if 9
         // Serial.print((String)"\r\n Changing m_bitwait with " + temp ) ;
         if ((char)payload[1] == '-') temp = temp * -1;
         // Serial.print((String)"\r\n to " + temp ) ;
 
         if ( (char)payload[0] == 'J' ) 
-              temp =  mySerial.m_bitWait + temp;
+              temp = mySerial1.m_bitWait + temp;
         else  temp = mySerial2.m_bitWait + temp;
 
         Serial.print((String)"\r\n Changing Serial"
               + ( (char)payload[0] == 'J' ? "P1" : "WL" )
-              + " m_bitwait to " + temp ) ;
+              + " m_bitwait=" + temp ) ;
 
         if ( (char)payload[0] == 'J' ) 
-              mySerial.m_bitWait   = temp;
+              mySerial1.m_bitWait   = temp;
         else  mySerial2.m_bitWait  = temp;
 
   /* DNO , leave it to investigate how to force an exception
@@ -3475,25 +3468,25 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 
          if        (loopbackRx2Mode == 1 ) { // redefine myserial2
             SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, !bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
-            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 - 10);
+            if (!serial2Stop) mySerial2.begin(serial2Baudrate - 10);
             Serial.print((String) " RX2 baudrateB1 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
                     + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
-                    + ", p1Baudrate2=" + p1Baudrate2  
+                    + ", serial2Baudrate=" + serial2Baudrate  
             );
           } else if (loopbackRx2Mode == 2 ) {
             SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2,  bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
-            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 + 10);
+            if (!serial2Stop) mySerial2.begin(serial2Baudrate + 10);
             Serial.print((String) " RX2 baudrateB2 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
                     + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
-                    + ", p1Baudrate2=" + p1Baudrate2  
+                    + ", serial2Baudrate=" + serial2Baudrate  
             );
           }
           // print loopTelegram2cnt ???
         */
       } else {
          loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
-         Serial.print((String) " RX1 baudrateA1=" + mySerial.baudRate() // v53: print diagse status if resetted myserial2
-                             + " RX2 baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+         Serial.print((String) " P1 baudrateA1=" + mySerial1.baudRate() // v53: print diagse status if resetted myserial2
+                             + " WL baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
                              + " loopbackRx2Tx2=" + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")
                              + " " );
       }
@@ -3606,7 +3599,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
             Serial.print("\n");
         } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
             Serial.print("|");
-            break;
+            // break;
         } else  {
             Serial.print("?");                    // unprintable
         }
@@ -3623,29 +3616,38 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
             Serial.print("\n");
         } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
             Serial.print("|");
-            break;
+            // break;
         } else  {
             Serial.print("?");                    // unprintable
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
-    } else  if ((char)payload[0] == 'S') {  // v52 serial stop activating P1
-      if  (    (char)payload[1] ==  '0') p1SerialFinish = false;   // set number myself
-      else if ((char)payload[1] ==  '1') p1SerialFinish = true ;   // set number myself
-      else serialStopP1 = !serialStopP1;
-      if (outputOnSerial) {
-        Serial.print((String) 
-          " Serial P1="  + (!serialStopP1  ? "Active" : "disabled") + " )" 
-          " p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") + " )" 
-          " p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
-        ) ;
-      }
-    } else  if ((char)payload[0] == 's') {  // v52 serial stop activating RX2
-        if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') rx2ReadInterval = (int)payload[1] - 48;   // set number myself
-        else serialStopRX2 = !serialStopRX2;
-        // if (rx2ReadInterval < 1) rx2ReadInterval = 7;   // reset back to 7 (actual 6*12=72secs)
-        if (outputOnSerial) Serial.print((String) " Serial RX2=" + rx2ReadInterval  
-                            + " (" + (!serialStopRX2  ? "Active" : "disabled") + " )" ) ;
+    
+    } else  if ( (char)payload[0] == 'S') {  // v52 serial stop activating P1
+        if  (    (char)payload[1] == '0') p1SerialFinish = false;   // set number myself
+        else if ((char)payload[1] == '1') p1SerialFinish = true ;   // set number myself
+        else if ((char)payload[1] == 'p') serial1PortMode = 0;    // v58b use physical port data SS241
+        else if ((char)payload[1] == 'T') serial1PortMode = 1;    // v58b use internal simulation  SS241
+        else serial1Stop = !serial1Stop;
+
+        if (outputOnSerial) Serial.print((String) 
+              " Serial1 P1="  + (!serial1Stop  ? "Active" : "disabled") + " )" 
+            + " mode="        + serial1PortMode    // v58b
+            + " Finish="  + (p1SerialFinish  ? "1" : "0") + " )" 
+            + " Active="  + (p1SerialActive  ? "1" : "0") + " )" ) ;
+    
+    } else  if ( (char)payload[0] == 's') {  // v52 serial stop activating RX2
+        if (     (char)payload[1] >= '1' && (char)payload[1] <= '9') 
+             rx2ReadInterval = (int)payload[1] - 48;   // set number myself
+        else if ((char)payload[1] == 'p') serial2PortMode = 0;    // v58b use physical port data SS241
+        else if ((char)payload[1] == 'T') serial2PortMode = 2;    // v58b use internal simulation  SS241
+        else serial2Stop = !serial2Stop;
+        
+        if (outputOnSerial) Serial.print((String) 
+              " Serial2 WL="" (" + (!serial2Stop  ? "Active" : "disabled") + " )"
+            + " mode="        + serial2PortMode    // v58b   
+            + " interval=" + rx2ReadInterval ) ;   //  % mqttCnt
+
     } else  if ((char)payload[0] == 'a') {  // v52 manipulate analog read value
         // nowValueAdc = 0;
         if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') nowValueAdc = (((int)payload[1] - 48) * 100);   // set number myself
@@ -3677,11 +3679,11 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                                                     + (new_ThermostatState == 3 ? " <--" : "" ) );
           Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
           Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
-          Serial.println((String)"L log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
+          Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
           Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-          Serial.println((String)"b Baud decrease gpio14:"        + "\t" +  p1Baudrate);
-          Serial.println((String)"B Baud increase gpio14"         + "\t" +  p1Baudrate);
+          Serial.println((String)"B 12/+-/0-8|9 Baudrate25 serial1=" + "\t" +  serial1Baudrate
+                                                   + " serial2=" +      +  serial2Baudrate);
           Serial.println((String)"l Stoplog "+ mqttLogTopic);
           Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
           Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
@@ -3708,23 +3710,33 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"M print Masking array "+ "( MaskX="+ telegram_crcOut_cnt + " )" );   // v52 number of X maskings
           Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )" );   // v52 number of Times we validated
           Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
-          int temp1 = mySerial.m_bitWait * 1;
-          Serial.println((String)"S ON/off \t\tserial1P1-"
-                        + (bSerialP1State  ? "A" : "i")
-                        + " bittime=" + temp1                        
-                        + "\t" + (!serialStopP1  ? "Yes" : "No") 
-                        + ", p1SerialFinish=" + (p1SerialFinish  ? "1" : "0") 
+          int temp1 = mySerial1.m_bitWait * 1;
+            // S P/T|0-1 serial1 on/off finish
+            // s P/T|0-9 serial2 interval
+          Serial.println((String)"S (p|Test|0-1) ON/off "
+                        + "\t" + (!serial1Stop  ? "Yes" : "No") 
+                        + "\tserial1P1-"
+                        + (bSerial1State  ? "A" : "i")
+                        + " , bittime=" + temp1
+                        + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
+                        + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
                         + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
                         );
           
           int temp2 = mySerial2.m_bitWait * 1;
-          Serial.println((String)"s ON/off/{0-9} \t\tserial2P2-"
-                        + (bSerialP2State  ? "A" : "i")
-                        + " bittime=" + temp2
-                        + " interval:"+ rx2ReadInterval  
-                        +" \t" + (!serialStopRX2  ? "Yes" : "No") );
+          Serial.println((String)"s (p|Test|0-9) ON/off" 
+                        + " \t" + (!serial2Stop  ? "Yes" : "No")          
+                        + "\tserial2P2-"
+                        + (bSerial2State  ? "A" : "i")
+                        + " , bittime=" + temp2
+                        + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
+                        + ", interval:"+ rx2ReadInterval  
+                        );
           
           Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
+          Serial.println((String)"J/j 12/+-/0-8|9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+                                                    + ", jserial2=" + mySerial2.m_bitWait);
+          
           Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
           
           Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
