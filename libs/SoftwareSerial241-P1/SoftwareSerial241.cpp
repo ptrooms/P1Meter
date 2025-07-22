@@ -122,6 +122,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long speed) {
    // Use getCycleCount() loop to get as exact timing as possible
+   Serial.print((String) ":B@"+ m_rxPin);      /// v58b diagnose
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
    // m_wait = m_bitTime + m_bitTime/3 - 500;      // calculate timer waits midship done in ISR
                                                    // 497-501-505 // 425 115k2@80MHz 
@@ -139,18 +140,20 @@ void SoftwareSerial::begin(long speed) {
 */
 void SoftwareSerial::begin(long speed, int recordtype) {
    if (recordtype == 0) {
-         begin(speed);   // do normal serial
+         // Serial.print((String) "\tset@"+ m_rxPin + "=>"); // v58b diagnose
+         // note: plain use will calll somethign else and produeces
+         this->begin(speed);   // do normal serial
    } else {
          // char *  str = warning: deprecated conversion from string constant to 'char*'
          // corrected to const char * str
          const char * str1 = "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n\xFF";
          const char * str2 = "_/VALID-VI\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
-
+         Serial.print((String) "\tuse@"+ m_rxPin + ":"  + recordtype  + "\t"); // v58b diagnose
          // Serial.print((String) "\r\n using serial " + __FILE__ +  "\r\n" + str);
          m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
          m_highSpeed = speed > 9600;   
          m_P1active = false;
-         enableRx(false);     // will set m_rxEnabled = false;
+         this->enableRx(false);     // will set m_rxEnabled = false;
          m_outPos = 0;        // position to start of buffer
          // msg3.concat("
          // int str_len = str.length() + 1; 

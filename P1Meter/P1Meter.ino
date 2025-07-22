@@ -1432,6 +1432,37 @@ void setup()
     dev 1153    (?? .../tools/sdk/lib/libpp.a)
     --> wdtreset
 
+  22jul25 17u30 we saw wifi tery to reconnect
+      bcn_timout,ap_probe_send_start
+   
+  22jul25 17u35
+        bcn_timout,ap_probe_send_start
+    -8-9
+
+    ap_probe_send over, rest wifi status to disassoc
+    state: 5 -> 0 (1)
+    rm 0
+    pm close 7
+      Attempt MQTT connection to nodemcu-x1 ...failed to 192.168.1.8^scandone
+
+    state: 0 -> 2 (b0)
+    st
+    ate: 2 -> 3 (0)
+    state: 3 -> 5 (10)
+    add 0
+    aid 6
+    cnt
+      connected with Pafo SSID4, channel 1
+
+      ip:192.168.1.185,mask:255.255.255.0,gw:192.168.1.1
+      ip:192.168.1.185,mask:255.255.255.0,gw:192.168.1.1
+
+      ^... try again in 5 seconds...
+    , connect-rc=-1
+
+    Attempt MQTT connection to nodemcu-x1 ...(re)connected to 192.168.1.8, connect-rc=0
+    ; subscribed to >nodemcu-x1/switch/port1< .
+
    At OTA termination, we migt see:
     state: 5 -> 0 (0)
     rm 0
@@ -1500,6 +1531,7 @@ void setup()
     ESP.restart();
     // delay(1000);             // ToTest 2021-04-26 22:30:51 (read https://github.com/espressif/arduino-esp32/issues/400)
   }
+  WiFi.setSleepMode(WIFI_NONE_SLEEP); // 22jul25 perhaps redo after WiFi.waitForConnectResult()
   // print your WiFi shield's IP address:
   Serial.print((String)"Connected and booted " + hostName + ", using IP Address:") ;    // v45 fyi
   Serial.println(WiFi.localIP());
@@ -1564,9 +1596,10 @@ void setup()
   save_excvaddr = resetInfo->excvaddr;
   save_depc     = resetInfo->depc;
 
-  Serial.println("Firmware version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
-  Serial.println ("ESP getFullVersion:" + ESP.getFullVersion());   
-  Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
+  Serial.println("Firmware version: "+ (String)P1_VERSION_TYPE + "-" 
+                  + "(" + __DATE__ + " " + __TIME__ + ")." );
+  Serial.println   ("ESP getFullVersion:" + ESP.getFullVersion());
+  Serial.println ((String)"Arduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
   Serial.println ("IP address: " + String(WiFi.localIP().toString().c_str()) );  // v52: convert,  WiFi.localIP() is a reverse value
   Serial.println ("ESP8266-ResetReason: "+  String(ESP.getResetReason()));
@@ -2113,6 +2146,8 @@ void loop()
           // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
         #else
           // mySerial1.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+          mySerial1.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial1.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
           mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
           // mySerial1.begin(serial1Baudrate);  // < v58a ss241 P1 meter port   115k2    // required during test without P1
         #endif
@@ -2157,6 +2192,8 @@ void loop()
                 mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
               #else
                 // mySerial2.begin(serial2Baudrate);    // P1 meter port 115200 baud
+                mySerial2.end();          // v58b: not sure  but to acertain,  finish any active
+                mySerial2.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
                 mySerial2.begin(serial2Baudrate,serial2PortMode);    // v58a, v58b ss241 =0 or simulate 1=P1; 2=RX/WL data.
                 // #else 
                 //   mySerial2.begin(serial2Baudrate,0);    // Using physical 0-port
@@ -3300,10 +3337,11 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 
 
   */
-  if ((char)payload[0] != '\x00' && 
+  if (  (char)payload[0] != '\x00' && 
       ( (char)payload[1] == '\x00' ||
         (char)payload[2] == '\x00' ||
-        (char)payload[3] == '\x00') )  {   // only single/double command supported for now
+        (char)payload[3] == '\x00' ||
+        (char)payload[4] == '\x00') )  {   // v58b up to 5 commmands
       
     if         ((char)payload[0] == '0') {
       new_ThermostatState = 0;                   // Heating on
@@ -3376,16 +3414,20 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     } else  if ((char)payload[0] == 'B') {    // v58b: changed to control Baudrate of port 1/2 with +/- 0-9
       if (((char)payload[1] >= '1' && (char)payload[1] <= '3') &&
           ((char)payload[2] == '+' || (char)payload[2] == '-') && 
-          ((char)payload[3] >= '1' && (char)payload[3] <= '9') ) {
-          int temp = (((int)payload[3] - 48) * 50);   // set number 0-9  add or minus
-          if ( (char)payload[3] == '9')  temp = 100;   // increase by 100 if 9
+          ((char)payload[3] >= '1' && (char)payload[3]) ) {
+          int temp = (((int)payload[3] - 48) * 25);   // set number 0-9  add or minus
+          if ( (char)payload[3] == '6')  temp =   100;   // increase by 100 if 9
+          if ( (char)payload[3] == '7')  temp =   500;   // increase by 100 if 9
+          if ( (char)payload[3] == '8')  temp =  1000;   // increase by 100 if 9
+          if ( (char)payload[3] == '9')  temp =  5000;   // increase by 100 if 9
           if ( (char)payload[2] == '-')  temp = temp * -1;
-          if ( (char)payload[1] == '1' || (char)payload[1] == '3')  serial1Baudrate = serial1Baudrate + temp; // set number 1-10  
-          if ( (char)payload[1] == '2' || (char)payload[1] == '3')  serial2Baudrate = serial2Baudrate + temp; // set number 1-10  
-          Serial.print((String)"Changing" + (char)payload[1] + ":"   // v58b display result
-                + " Baudrate1="  + serial1Baudrate
-                + ", Baudrate2=" + serial1Baudrate );
-        } 
+          if ( (char)payload[1] == '1' || (char)payload[1] == '3') serial1Baudrate = serial1Baudrate + temp; // set number 1-10  
+          if ( (char)payload[1] == '2' || (char)payload[1] == '3') serial2Baudrate = serial2Baudrate + temp; // set number 1-10  
+          
+          Serial.print((String)"\tBaud" + (char)payload[1] + "="   // v58b display result
+                 + ( (char)payload[1] == '1' ?  serial1Baudrate : serial2Baudrate )
+                 + "\t" );
+        }
     } else  if (  ( (char)payload[0] == 'J' || (char)payload[0] == 'j' )  &&              // v58 change m_bitwait
                   ( (char)payload[1] == '+' || (char)payload[1] == '-')   &&
                   ( (char)payload[2] >= '0' && (char)payload[2] <= '9') ) {
@@ -3400,9 +3442,9 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
               temp = mySerial1.m_bitWait + temp;
         else  temp = mySerial2.m_bitWait + temp;
 
-        Serial.print((String)"\r\n Changing Serial"
+        Serial.print((String)"\tBitait"
               + ( (char)payload[0] == 'J' ? "P1" : "WL" )
-              + " m_bitwait=" + temp ) ;
+              + "=" + temp + "\t" ) ;
 
         if ( (char)payload[0] == 'J' ) 
               mySerial1.m_bitWait   = temp;
@@ -3624,29 +3666,38 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
     
     } else  if ( (char)payload[0] == 'S') {  // v52 serial stop activating P1
-        if  (    (char)payload[1] == '0') p1SerialFinish = false;   // set number myself
-        else if ((char)payload[1] == '1') p1SerialFinish = true ;   // set number myself
+        if  (    (char)payload[1] == '0') p1SerialActive = !p1SerialActive;   // set number myself
+        else if ((char)payload[1] == '1') p1SerialFinish = !p1SerialFinish ;   // set number myself
         else if ((char)payload[1] == 'p') serial1PortMode = 0;    // v58b use physical port data SS241
         else if ((char)payload[1] == 'T') serial1PortMode = 1;    // v58b use internal simulation  SS241
-        else serial1Stop = !serial1Stop;
+        else if ((char)payload[1] == '\x00') serial1Stop = !serial1Stop;
 
         if (outputOnSerial) Serial.print((String) 
-              " Serial1 P1="  + (!serial1Stop  ? "Active" : "disabled") + " )" 
+              " Serial1 P1="  + (!serial1Stop  ? "Active" : "disabled") +
             + " mode="        + serial1PortMode    // v58b
             + " Finish="  + (p1SerialFinish  ? "1" : "0") + " )" 
             + " Active="  + (p1SerialActive  ? "1" : "0") + " )" ) ;
-    
+
+        else Serial.print((String) "\tSerial1=" 
+              + (!serial1Stop  ? "E" : "D") 
+              + serial1PortMode
+              + (p1SerialActive  ? "A" : "a")
+              + (p1SerialFinish  ? "F" : "f")              
+              + "\t" );
     } else  if ( (char)payload[0] == 's') {  // v52 serial stop activating RX2
         if (     (char)payload[1] >= '1' && (char)payload[1] <= '9') 
              rx2ReadInterval = (int)payload[1] - 48;   // set number myself
         else if ((char)payload[1] == 'p') serial2PortMode = 0;    // v58b use physical port data SS241
         else if ((char)payload[1] == 'T') serial2PortMode = 2;    // v58b use internal simulation  SS241
-        else serial2Stop = !serial2Stop;
+        else if ((char)payload[1] == '\x00') serial2Stop = !serial2Stop;
         
         if (outputOnSerial) Serial.print((String) 
-              " Serial2 WL="" (" + (!serial2Stop  ? "Active" : "disabled") + " )"
-            + " mode="        + serial2PortMode    // v58b   
-            + " interval=" + rx2ReadInterval ) ;   //  % mqttCnt
+              " Serial2 WL="" (" + (!serial2Stop  ? "Active" : "disabled") 
+            + " mode="           + serial2PortMode    // v58b   
+            + " interval="       + rx2ReadInterval ) ;   //  % mqttCnt
+        else Serial.print((String) "\tserial2=" 
+              + (!serial2Stop  ? "e" : "d") 
+              + serial2PortMode + "\t"  );
 
     } else  if ((char)payload[0] == 'a') {  // v52 manipulate analog read value
         // nowValueAdc = 0;
@@ -3682,8 +3733,9 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
           Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-          Serial.println((String)"B 12/+-/0-8|9 Baudrate25 serial1=" + "\t" +  serial1Baudrate
-                                                   + " serial2=" +      +  serial2Baudrate);
+          Serial.println((String)"B 12/+-/0-8|9 Baudrate25\t"
+                                    + " serial1=" +  serial1Baudrate
+                                    + " serial2=" +  serial2Baudrate);
           Serial.println((String)"l Stoplog "+ mqttLogTopic);
           Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
           Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
