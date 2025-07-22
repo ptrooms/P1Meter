@@ -38,7 +38,7 @@ public:
    ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
 
    void begin(long speed);
-   void begin(long speed, bool buffermode);
+   void begin(long speed, int);
    long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
 

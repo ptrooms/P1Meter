@@ -50,12 +50,12 @@ void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_2() { ObjList[2]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_3() { ObjList[3]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead2(); };		// gpio4 is used for read secondary p1
+void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead2(); };	// gpio4/D2 is used to bitbang secondary RX/WL
 void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 // Pin 6 to 11 can not be used
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14 is used for read primary p1
+void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
 
 static void (*ISRList[MAX_PIN+1])() = {
@@ -133,29 +133,53 @@ void SoftwareSerial::begin(long speed) {
 }
 
 /*
-   Simulate input
+   Simulate input: 
+   1 = produce P1/power telegram
+   2 = produce WL/heat telegram
 */
-void SoftwareSerial::begin(long speed, bool buffermode) {
-   m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
-   m_highSpeed = speed > 9600;   
-   m_P1active = false;
-   enableRx(false);     // will set m_rxEnabled = false;
-   m_outPos = 0;        // position to start of buffer
-   // msg3.concat("
-   char *  str = "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n";
-   // int str_len = str.length() + 1; 
-   // // Prepare the character array (the buffer) 
-   // char char_array[str_len];
-   // Copy it over 
-   // m_inPos = str.length() % m_buffSize;
-   // str.toCharArray(m_buffer, m_inPos );
-   
-   // no match for call to '(String) (unsigned int&)'  
-      for (m_inPos = 0; m_inPos < sizeof(str) && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
-         m_buffer[m_inPos] = str[m_inPos];  // move data
-      }
+void SoftwareSerial::begin(long speed, int recordtype) {
+   if (recordtype == 0) {
+         begin(speed);   // do normal serial
+   } else {
+         // char *  str = warning: deprecated conversion from string constant to 'char*'
+         // corrected to const char * str
+         const char * str1 = "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n\xFF";
+         const char * str2 = "_/VALID-VI\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
 
-   m_inPos++;  // position after  last one
+         // Serial.print((String) "\r\n using serial " + __FILE__ +  "\r\n" + str);
+         m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
+         m_highSpeed = speed > 9600;   
+         m_P1active = false;
+         enableRx(false);     // will set m_rxEnabled = false;
+         m_outPos = 0;        // position to start of buffer
+         // msg3.concat("
+         // int str_len = str.length() + 1; 
+         // // Prepare the character array (the buffer) 
+         // char char_array[str_len];
+         // Copy it over 
+         // m_inPos = str.length() % m_buffSize;
+         // str.toCharArray(m_buffer, m_inPos );
+         
+         // no match for call to '(String) (unsigned int&)'  
+         // Serial.print((String) "\r\n using serial " + __FILE__  + ">") ;
+         if (recordtype == 2) {
+               for (m_inPos = 0;  str2[m_inPos] != 0xff && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
+               m_buffer[m_inPos] = str2[m_inPos];  // move data
+               // Serial.print((String) m_buffer[m_inPos]);
+               }
+         } else {
+            for (m_inPos = 0;  str1[m_inPos] != 0xff && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
+               m_buffer[m_inPos] = str1[m_inPos];  // move data
+               // Serial.print((String) m_buffer[m_inPos]);
+            }
+         }
+
+         m_inPos++;  // position after  last one
+         // Serial.print((String) "<\r\n Serialsize=" + m_inPos + " + \r\n");
+         Serial.print((String) "$");
+
+
+   }
 }
 
 long SoftwareSerial::baudRate() {
