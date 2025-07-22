@@ -2108,7 +2108,11 @@ void loop()
           // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
         #else
           // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          mySerial.begin(p1Baudrate, 1);    // P1 meter port 115200 baud, v52 stop/start (0/port,data for 1=P1,2=WL )
+          #ifdef DUP_MODE
+            mySerial.begin(p1Baudrate, 1);    // V58a Use simulated data P1
+          #else 
+            mySerial.begin(p1Baudrate, 0);    // P1 meter port 115200 baud, v52 stop/start (0/port,data for 1=P1,2=WL )
+          #endif
           // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
         #endif
           bSerialP1State = true; // v57 indicate state
@@ -2153,7 +2157,11 @@ void loop()
               #else
                 // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
                 // mySerial2.begin(p1Baudrate2,2);    // GJ meter port   1200 baud
-                mySerial2.begin(p1Baudrate2,2);    // Using 0-port, or simulate 1=P1; 2=RX/WL data.
+                #ifdef DUP_MODE
+                  mySerial2.begin(p1Baudrate2,2);    // simulate 1=P1; 2=RX/WL data.
+                #else 
+                  mySerial2.begin(p1Baudrate2,0);    // Using physical 0-port
+                #endif
               #endif
               bSerialP2State = true; // v57 indicate state
               if (loopbackRx2Mode > 0) Serial.print((String) "{_" ); // v54 print incoming
