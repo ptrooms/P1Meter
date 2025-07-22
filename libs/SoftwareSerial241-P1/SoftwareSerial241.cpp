@@ -84,7 +84,8 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    m_overflow = false;
    m_rxEnabled = false;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
-   m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
+   // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
+   m_bitWait = 509;                       // v58: production & copy , 498 is bottom
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
@@ -122,10 +123,39 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 void SoftwareSerial::begin(long speed) {
    // Use getCycleCount() loop to get as exact timing as possible
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
+   // m_wait = m_bitTime + m_bitTime/3 - 500;      // calculate timer waits midship done in ISR
+                                                   // 497-501-505 // 425 115k2@80MHz 
    m_highSpeed = speed > 9600;
+   
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
    if (!m_rxEnabled)
      enableRx(true);
+}
+
+/*
+   Simulate input
+*/
+void SoftwareSerial::begin(long speed, bool buffermode) {
+   m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
+   m_highSpeed = speed > 9600;   
+   m_P1active = false;
+   enableRx(false);     // will set m_rxEnabled = false;
+   m_outPos = 0;        // position to start of buffer
+   // msg3.concat("
+   char *  str = "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n";
+   // int str_len = str.length() + 1; 
+   // // Prepare the character array (the buffer) 
+   // char char_array[str_len];
+   // Copy it over 
+   // m_inPos = str.length() % m_buffSize;
+   // str.toCharArray(m_buffer, m_inPos );
+   
+   // no match for call to '(String) (unsigned int&)'  
+      for (m_inPos = 0; m_inPos < sizeof(str) && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
+         m_buffer[m_inPos] = str[m_inPos];  // move data
+      }
+
+   m_inPos++;  // position after  last one
 }
 
 long SoftwareSerial::baudRate() {
@@ -150,6 +180,17 @@ void SoftwareSerial::enableRx(bool on) {
       else
          detachInterrupt(m_rxPin);
       m_rxEnabled = on;
+      /*
+      if (on)  // diagnose v58
+        Serial.print((String) "\r\n Serial " + m_rxPin +  " On  " + (m_invert ? "RISING" : "FALLING") + " " );
+      else        
+        Serial.print((String) " Serial " + m_rxPin +  " OFF " + (m_invert ? "RISING" : "FALLING") + "\r\n" );
+      
+         Serial.print((String) " Serial " + m_rxPin 
+                     + ", enableRx=" + (m_rxEnabled ? "ON" : "OFF")
+                     + ", m_bitWait=" + m_bitWait 
+                     + ", flank=" + (m_invert ? "RISING" : "FALLING") + "\r\n" );
+      */
    }
 }
 
@@ -228,6 +269,7 @@ int SoftwareSerial::peek() {
 // note: wait starts at approx 500
 // getCycleCountIram = cycle counter, which increments with each clock cycle  (doc: v55d)
 #define WAITIram4 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+#define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 #define WAITIram5 { while (wait<7000 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
 // at 115k2 --> m_bittime = 694 cycles
 
@@ -237,7 +279,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // Advance the starting point for the samples but compensate for the
    // initial delay which occurs before the interrupt is delivered
    // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
-   unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz
+
+      // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz /
+      unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505 // 425 115k2@80MHz /
+      // stored as m_wait
+
    // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
 
    // failed // unsigned long wait = 427UL;		// 501 // 425 115k2@80MHz   
@@ -246,12 +292,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4w; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
-     else                     // v52 balance isr rxread always doing or operation
-       rec |= 0x00;
+   //   else                     // v52 balance isr rxread always doing or operation
+   //     rec |= 0x00;
    }
    if (m_invert) rec = ~rec;
    // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
@@ -259,15 +305,15 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
    // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
    //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
-#ifdef TEST_MODE
-   if (next != m_outPos && wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
-#else
-   if (next != m_outPos) {  // this works best in production
-#endif
+   #ifdef TEST_MODE
+      if (next != m_outPos && m_wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+   #else
+      if (next != m_outPos) {  // this works best in production
+   #endif
       if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
       if (rec == '!') m_P1active = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
       m_buffer[m_inPos] = rec;
@@ -289,18 +335,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // initial delay which occurs before the interrupt is delivered
    // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
    // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
-   unsigned long wait = m_bitTime + m_bitTime/3 -    m_bitWait;		// 501 // 425 115k2@80MHz
+   unsigned long wait = m_bitTime + m_bitTime/3 -  m_bitWait;	// v58 m_bitwait = 498 goes ok // 501 // 425 115k2@80MHz
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
    unsigned long start = getCycleCountIram();
-   uint8_t rec = 0;
-   for (int i = 0; i < 8; i++) {
+   uint8_t rec = 0;     /// 236:	01a0d2               	movi	a13, 1  
+   for (int i = 0; i < 8; i++) {    /// 233:	08a0f2               	movi	a15, 8  
      WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
-     rec >>= 1;
+     rec >>= 1;         ///  2bd:	41d1d0               	srli	a13, a13, 1   
      if (digitalRead(m_rxPin))
-       rec |= 0x80;
+       rec |= 0x80;     /// 239:	81af52               	movi	a5, -127   
      else                     // v52 balance isr rxread2 always doing or operation
-       rec |= 0x00;
+       rec |= 0x00;     /// 237:	250c                	   movi.n	a5, 0      , note: x01 will optimize
    }
    if (m_invert) rec = ~rec;
    // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
@@ -313,12 +359,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
    // rec = 'z'; // nty sure why we define this as
-#ifdef TEST_MODE
-   if (next != m_outPos && wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
-#else
-   if (next != m_outPos) {  // this works best in production
-#endif
+   #ifdef TEST_MODE
+      if (next != m_outPos && wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+   #else
+      if (next != m_outPos) {  // this works best in production
+   #endif
       if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
+                           ///  optimized compilation rubles things up
       if (rec == '!') m_P1active = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
       m_buffer[m_inPos] = rec;
       m_inPos = next;

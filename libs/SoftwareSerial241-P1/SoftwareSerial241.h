@@ -38,6 +38,7 @@ public:
    ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
 
    void begin(long speed);
+   void begin(long speed, bool buffermode);
    long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
 
@@ -62,7 +63,8 @@ public:
    void end() { stopListening(); }
    bool isListening() { return m_rxEnabled; }
    bool stopListening() { enableRx(false); return true; }
-
+   volatile unsigned long m_bitWait;         // introduced to control bittiming
+   volatile int preset_bitWait;              // v58 to set m_bitwait up/down
    inline uint32_t getCycleCountIram();
 
    using Print::write;
@@ -77,11 +79,15 @@ private:
    bool m_P1active;                 // Ptro 28mar21 to support P1 messageing
    bool m_overflow;
    unsigned long m_bitTime;
-   volatile unsigned long m_bitWait;         // introduced to control bittiming
+   // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
    uint8_t *m_buffer;
+   
+   // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;
+   // 497-501-505 // 425 115k2@80MHz 
+   unsigned long m_wait; 
 
 
 };
