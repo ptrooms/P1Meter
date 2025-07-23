@@ -30,7 +30,7 @@ def after_build(source, target, env):
     print("ptro objdump new: " + objdump)
     
     src_elf=env.subst("\"${BUILD_DIR}/${PROGNAME}.elf\"")
-    src_lst=env.subst("\"${BUILD_DIR}/${PROGNAME}.lst\"")
+    src_lst=env.subst("\"${BUILD_DIR}/${PROGNAME}.asm\"")
 
     #--disassembler-options=no-aliases,numeric
     # objdump = esptool

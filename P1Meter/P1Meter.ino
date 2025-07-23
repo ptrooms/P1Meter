@@ -1,5 +1,7 @@
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
+//Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
+
 #define VERSION_NUMBER "58" // number this version
 
 
@@ -10,6 +12,19 @@
   // should have #define ARDUINO_ESP8266_RELEASE "2_7_1" // ~/.platformio/packages/framework-arduinoespressif8266@3.20701.0/cores/esp8266/core_version.h
 #endif
 
+/* dev 1153 epc1=0x401022c5 PROD_MODE v58c P1Meter.ino version 2158.2_4_1, compiled Jul 23 2025 18:12:52
+
+   dev 1153 epc1=0x401025dd, COP_MODE V58c P1Meter.ino version 6158.2_4_1, compiled Jul 23 2025 18:13:16 wdt1153
+    assemble file: file://home/pafoxp/code-P1Meter/.pio/build/p1meter-production_241_copy/firmware.asm
+        401025ce:	fe6421               	l32r	a2, 40101f60 <trc_NeedRTS+0x238>
+        401025d1:	fe6431               	l32r	a3, 40101f64 <trc_NeedRTS+0x23c>
+        401025d4:	81a442               	movi	a4, 0x481
+        401025d7:	f99a01               	l32r	a0, 40100c40 <ppTxqUpdateBitmap+0x28>
+        401025da:	0000c0               	callx0	a0
+        401025dd:	ffff06               	j	401025dd <wDev_ProcessFiq+0x341>
+        401025e0:	000000               	ill
+        401025e3:	c0                      	.byte 0xc0
+*/
 
 /*  documentation   
   feeding data test_mode: while sleep 8; do ./sendp1_cr.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
@@ -39,7 +54,7 @@
     P1 processing: void readTelegramP1()
     P2 processing: void readTelegramWL()
 
-  Summarised loop() sequence (approx 5000/sec): 
+  Summarised loop( ) sequence (approx 5000/sec): 
       set timings & check P1 not active
       else swap start Serial P1 <--> P2
       Check if/do water trigger
@@ -55,7 +70,7 @@
   change record/idś to definitions like "/KFM5KAIFA-METER"
   change \r\n to \r\n to 
   sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
-      -- strange as wifi proces during setup() before was OK
+      -- strange as wifi proces during setup( ) before was OK
   change verboselevel == 1 to ==2 that will print myLenbgths of P1 records print
   documentation for mqtt commands
   cleanout no longer needed code
@@ -87,7 +102,10 @@
 */
 
 /* change history
-  - v58 refactor myserial1/2 names, enhanced bittime, stop and baudrate control
+  - v58c refactor len to myLen, debugging options
+    - testing for (int i = 14; i < 11; i--) {asm NOP}
+    - adding 4 delay()s to check if this stabilizes the COP_MODE version
+  - v58b refactor myserial1/2 names, enhanced bittime, stop and baudrate control
     - we added serial read mode 0/1/2: 0-physical port, 1-P1 record, 2=WL-record
   - v58a  --> moved to production
     - likely cause that serial processing stays tool long in ISR, with wifi debug , we see dev:1153
@@ -314,15 +332,15 @@ woes in Wifi/Lamx layer
 
 /* Water sensor logic: (doc v51)
   ------------------------------------------------------------------------------------------------------------------------------
-    WaterTrigger0/1_ISR() attach/detachWaterInterrupt is activated in loop() during peiodes not reading serial1/2 data.
+    WaterTrigger0/1_ISR() attach/detachWaterInterrupt is activated in loop( ) during peiodes not reading serial1/2 data.
       With command 'W' we can test/switch between WaterTrigger0/1_ISR (used for development reasons)
       (tbd: With command 'w' we could change/force next pullup behavior, now active/low/high automatically)
 
     Using a wheel that senses mirrored Infrared: 1 pulse (going in --> going out) = 1 Liter
         We use active GPIO5 Interrupt Service Routine for the cycle below, where a segmented turn = liter
         An UP or Down is only valid if this continues to be the case for at least 50mS (v51, waterReadDebounce=50)
-           (debounce measuremnt starts/resets in ISR and is monitored in in loop())
-    then: in loop() If -->
+           (debounce measuremnt starts/resets in ISR and is monitored in in loop( ))
+    then: in loop( ) If -->
       A) GPIO5=activeHigh to low, wheel sensor has as entered blink zone and shorts ActiveHigh to GND
             GPIO5 now goes goes L and we disable the pull resistor waiting for active-low  (mode Input)
       B) GPIO5=atciveLow to high, waited until wheelsensor left by pulling activeLow to VCC
@@ -387,7 +405,7 @@ woes in Wifi/Lamx layer
   #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
   #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
-  #warning This is the PRODUCTION version, be warned
+  #warning "This is the PRODUCTION version be warned !!!!!."
   #ifdef DUP_MODE   // prod is same as prod with different i/o & id settings
     #define P1_VERSION_TYPE "d1"      // "p1" production
     #define DEF_PROG_VERSION "41" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
@@ -449,7 +467,7 @@ woes in Wifi/Lamx layer
 // - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
 // - 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
 // 	--- (+9sec after last mqtt)
-// - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop() during speific yields,
+// - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop( ) during speific yields,
 // 	-- normal yield does support Wifi but NOT the (disconnected) Pubsubclient
 // 	-- Beautified
 // ## [V21.20]
@@ -862,7 +880,7 @@ const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 
   /*
    2.4.1: file /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_version.h
      main file:   [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_esp8266_main.cpp]
-        static void loop_wrapper() --> setup() else loop(); run_scheduled_functions(); esp_schedule()
+        static void loop_wrapper() --> setup( ) else loop( ); run_scheduled_functions(); esp_schedule()
         post_mortem at crash: [/home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_esp8266_postmortem.c]
 
 
@@ -1390,6 +1408,28 @@ void setup()
 
   Serial.begin(115200);
   Serial.println("Booting debug");              // message to serial log
+
+  #ifdef DISABLE_MDNS_OTA_PTRO_INACTIVE           // check if we have disabled MDNS in ArduinoOTA.cpp
+    Serial.println("MDNS is disabled. ");         // to snsure MDNS will not cause wdt bu excessive data
+  #elif(defined DISABLE_MDNS_OTA_PTRO)         // Do we want by option to disable MDNS ?
+    Serial.println("Please check DISABLE_MDNS_OTA_PTRO option in ArduinoOTA.cpp ");              // message to serial log
+  #endif
+
+  // v58c check if ArduinoOTA.cpp is answering this......
+  #ifdef DISABLE_MDNS_OTA_PTRO_INACTIVE
+    #warning "DISABLE_MDNS_OTA_PTRO_INACTIVE ArduinoOTA.cpp"
+  #endif
+  #ifdef DISABLE_MDNS_OTA_PTRO_ACTIVE
+    #warning "DISABLE_MDNS_OTA_PTRO_ACTIVE ArduinoOTA.cpp"
+  #endif
+  #if(defined DISABLE_MDNS_OTA_PTRO)
+    #ifndef DISABLE_MDNS_OTA_PTRO_INACTIVE
+      #warning "DISABLE_MDNS_OTA_PTRO requested but not replied back by ArduinoOTA.cpp."
+    #else 
+      #warning "DISABLE_MDNS_OTA_PTRO requested and honoured by ArduinoOTA.cpp."
+    #endif
+  #endif
+    
   Serial.setDebugOutput(true); 
   // dev1153
 
@@ -1436,6 +1476,11 @@ void setup()
     ....
     dev 1153    (?? .../tools/sdk/lib/libpp.a)
     --> wdtreset
+
+    MDNS:
+      Reading answers RX: REQ, ID:0, Q:0, A:1, NS:0, ADD:0
+      Not expecting any answers right now, returning
+
 
   22jul25 17u30 we saw wifi tery to reconnect
       bcn_timout,ap_probe_send_start
@@ -1587,7 +1632,8 @@ void setup()
   
   //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   // #define DEF_PROG_VERSION 1123.240
-  ArduinoOTA.begin();
+  ;                       // https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html
+  ArduinoOTA.begin();     // ArduinoOTA.begin(false) = disable mdns
 
   Serial.printf("Reset reason code: %x\n", resetInfo->reason);     // v52: print restart reason
   Serial.println((String) "\r\nRestart time " + micros() + " for " + __FILE__ + " cause:" +  resetInfo->reason); // same but nicer
@@ -2020,7 +2066,7 @@ void setup()
 void loop()
 { 
   if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
-  // note this loop() routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
+  // note this loop( ) routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
   // millis() and micros() return the number of milliseconds and microseconds elapsed after reset, respectively.
@@ -2028,6 +2074,23 @@ void loop()
   currentMillis = millis(); // Get snapshot of runtime
   previousMicros = currentMicros; // get V47 previous loop time
   currentMicros = micros(); // get current cycle time
+
+    // v58c: check if this stabilizes
+    for (int i = 14; i < 11; i--) {
+      asm(
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+      );
+    }
+
   /*
     time how long the P1 record took
   */
@@ -2112,7 +2175,7 @@ void loop()
     // WiFi.printDiag(Serial);   // print data ESP8266WiFiClass::printDiag(Print& p)
   }
 
-  mqtt_local_yield();      //   client.loop(); // handle mqtt
+  mqtt_local_yield();      //   client.loop( ); // handle mqtt
 
   //  --------------------------------------------------------------------------------------------- START allowOtherActivities
   if (!allowOtherActivities) {     // are we outside P1 Telegram processing (require serial-timeing)
@@ -5760,17 +5823,21 @@ void command_testH4(){    // code to maken things stable teststable
                 // v57c-0  added multiple combinations, things remain instable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
-#ifndef TEST_MODE                    
+
+                    delay(0);     // v58 add to check for stability
+                    delay(0);     // v58 add to check for stability
+                    delay(0);     // v58 add to check for stability
+                    delay(0);     // v58 add to check for stability   // v58c 267 + asm 10
+
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability  // v58c 10
+
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability   // v58c 3
+
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
+#ifdef TEST_MODE                    
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
