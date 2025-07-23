@@ -34,7 +34,7 @@
     def RX2TX2LOOPBACK false -->  def NoTx2Function  <> loopbackRx2Tx2 will light led
 
   Locations:
-    commands: void ProcessMqttCommand(char* payload, unsigned int length)
+    commands: void ProcessMqttCommand(char* payload, unsigned int myLength)
     Setup ()
     P1 processing: void readTelegramP1()
     P2 processing: void readTelegramWL()
@@ -56,7 +56,7 @@
   change \r\n to \r\n to 
   sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
       -- strange as wifi proces during setup() before was OK
-  change verboselevel == 1 to ==2 that will print lenbgths of P1 records print
+  change verboselevel == 1 to ==2 that will print myLenbgths of P1 records print
   documentation for mqtt commands
   cleanout no longer needed code
     error: 06jul25 13u00 (using faulty esp, port0 > 3.6volts) 
@@ -192,7 +192,7 @@ woes in Wifi/Lamx layer
           loopbackRx2Mode  0-9 , no data: swap/switch
           loopbackRx2Mode == 1 --> switch off debug (outputOnSerial), activate RX2 read evey second (rx2ReadInterval = 1)
           If set > 0: we produce diagnostic data when RX2 is read  {_   _}
-            length/telegram2 record
+            myLength/telegram2 record
           If set > 5: when CRC is valid, we output the hexbytes and reset back to 0
           If set = 3: we print crc and record
           If set = 2: we print crc and first 20 bytes of header in hex
@@ -793,7 +793,7 @@ woes in Wifi/Lamx layer
     DEBUG_PRINTLN("ESPConn - Looks not connected.");
     DEBUG_PRINT("Sending: ");
     str = esp.readStringUntil(':'); DEBUG_PRINT(str);
-    DEBUG_WRITE_BYTES(data, length); DEBUG_PRINTLN();
+    DEBUG_WRITE_BYTES(data, myLength); DEBUG_PRINTLN();
 */
 #define DEBUG
 #ifdef DEBUG
@@ -1084,6 +1084,8 @@ bool doReadAnalog     = true;    // 'a' yes/no read analog port for value
 bool doForceFaultP1   = false;   // 'E' yes/no force fault in Read telegram
 int serial1PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 1 - use internal for test
 int serial2PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 2 - use internal for test
+char serial1terminator = '\x0a';  // v58c termination telegrams serial1 (test/dup = \x0d)
+char serial2terminator = '\x00';  // v58c termination telegrams serial1 (test/dup = \x0d)
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
@@ -1200,12 +1202,12 @@ bool validCrcInFound = false;         // Set by Decode when Full (recovered) dat
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
 char telegram_crcIn[MAXLINELENGTH+32];   // active telegram that is checked for crc
-int  telegram_crcIn_len = 0;          // length of this record
+int  telegram_crcIn_len = 0;          // myLength of this record
 int  telegram_crcOut_cnt = 0;         // number of times masking was positioned
 char telegram_crcOut[MAXLINELENGTH+32];  // processed telegram with changed positions to X
 // const char dummy2b[] = {0x0000};      // prevent save overwrite, v55b remove
 // int  telegram_crcIn_cnt1 = 0;      // number of times CrcIn was called
-int  telegram_crcOut_len = 0;         // length of this record
+int  telegram_crcOut_len = 0;         // myLength of this record
 // int  telegram_crcIn_cnt2 = 0;      // number of times CrcIn was called
 
 /* At header: initialise telegram_crcin
@@ -1214,7 +1216,7 @@ int  telegram_crcOut_len = 0;         // length of this record
     if telegram_crcIn_len = telegram_crcOut_len and crcValidCounter > 0
       if CRC=OK
         // Mark telegram_crcOut with X changes comparing same telegram_crcin
-        for i=0 to len
+        for i=0 to myLen
           if telegram_crcOut(i) != X and telegram_crcOut(i) != telegram_crcIn(i)
           then telegram_crcOut(i) = X
                crcMaskCounter++      // count masked positions
@@ -1223,7 +1225,7 @@ int  telegram_crcOut_len = 0;         // length of this record
       
       else:   // CRC failure on input, try to recover
         // try recover characters position: 
-        for i=0 to len
+        for i=0 to myLen
           if telegram_crcOut(i) != X and telegram_crcOut(i) != telegram_crcIn(i)
           then  telegram_crcIn(i) = telegram_crcOut(i)
                 crcRecoverCounter++
@@ -1240,7 +1242,7 @@ int  telegram_crcOut_len = 0;         // length of this record
       if CRC=OK
         Copy telegram_crcin to telegram_crcout
         telegram_crcOut_len = telegram_crcIn_len
-        for i=0 to len
+        for i=0 to myLen
           telegram_crcOut(i) = telegram_crcIn(i)
         loop
         crcValidCounter = 1   // start validity all over
@@ -1274,7 +1276,7 @@ long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
 char mqttServer1[64] ;               // v45 used to hold the currrently active mqttserver
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
 int new_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
-void callbackMqtt(char* topic, byte* payload, unsigned int length);   // pubsubscribe
+void callbackMqtt(char* topic, byte* payload, unsigned int myLength);   // pubsubscribe
 char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format time, will be overriden by Telegrams
 
 // Note Software serial uses "attachinterrupt" FALLING on pin to calculate BAUD timing
@@ -1394,7 +1396,7 @@ void setup()
   /*  /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ESP8266WiFi/src/
 
       wdt reset
-      load 0x4010f000, len 1384, room 16
+      load 0x4010f000, myLen 1384, room 16
       tail 8
       chksum 0x2d
       csum 0x2d
@@ -2500,7 +2502,7 @@ void readTelegramP1() {
     // yield();                // allow time to others
     mqtt_local_yield();
     if (outputOnSerial) {   // indicate on console
-      Serial.print((String) " !!>" + millis() + " yield due " + p1TriggerTime + "< exceeded !!" ); // length processed previous line
+      Serial.print((String) " !!>" + millis() + " yield due " + p1TriggerTime + "< exceeded !!" ); // myLength processed previous line
     }
     p1TriggerTime = millis();
   }
@@ -2510,7 +2512,7 @@ void readTelegramP1() {
       Using our 241 adapted library, we wait between / and ! 
     */
     if ( mySerial1.P1active())  {    // does not seem to activate
-        if (!bP1Active_signalled) Serial.print((String) "\\" ); // length processed previous line
+        if (!bP1Active_signalled) Serial.print((String) "\\" ); // myLength processed previous line
         bP1Active_signalled = true;
         return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
     }
@@ -2534,7 +2536,7 @@ void readTelegramP1() {
 
   if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );
 
-  int lenTelegram = 0;
+  int myLenTelegram = 0;
   memset(telegram, 0, sizeof(telegram));   // initialitelegram buffer-array to 0
   memset(telegramLast, 0, sizeof(telegramLast));     // initialise 3 byte array to 0
 
@@ -2554,17 +2556,23 @@ void readTelegramP1() {
     // note Serial.setTimeout() sets the maximum and defaults to 1000 milliseconds.
     // The function returns the characters up to the last character before the supplied terminator.
 
-    #if(defined DUP_MODE || defined TEST_MODE)
-      int len = mySerial1.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
-    #else
-      int len = mySerial1.readBytesUntil('\x0a', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
-    #endif
+    /* v58c removed and relaced by 
+      #if(defined DUP_MODE || defined TEST_MODE)  
+        // serial1terminator = '\x0d';
+        int myLen = mySerial1.readBytesUntil(serial1terminator, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      #else
+        // serial1terminator = '\x0a';
+        int myLen = mySerial1.readBytesUntil(serial1terminator, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      #endif
+    */
+    int myLen = mySerial1.readBytesUntil(serial1terminator, telegram, MAXLINELENGTH - 2); // v58c read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+
       yield();                    // v58 do background processing required for wifi etc.
       ESP.wdtFeed();              // v58 feed the hungry timer
     
       if (loopbackRx2Mode == 6) {   // diagnose header    // v57
           Serial.print((String)"\r\n\t P1header1-32=(" );
-          for (int i = 0; i < 33 && i < len; i++) {
+          for (int i = 0; i < 33 && i < myLen; i++) {
               Serial.printf("%02x ", telegram[i]); 
           }
           Serial.println((String)")" );
@@ -2573,20 +2581,20 @@ void readTelegramP1() {
     // Serial.print((String) "yb\b"); no need to display RX progess this goes ok
     
 
-    if (len > 1) {      // correct dual Carrigage returns, Windows formatted testdata on Linux
-      // decrease len as the dual 0x0d 0x0d is from streamed testdata
-      if (telegram[len-2] == '\x0d' && telegram[len-1] == '\x0d' ) len-- ;  // double carriage return ?
+    if (myLen > 1) {      // correct dual Carrigage returns, Windows formatted testdata on Linux
+      // decrease myLen as the dual 0x0d 0x0d is from streamed testdata
+      if (telegram[myLen-2] == '\x0d' && telegram[myLen-1] == '\x0d' ) myLen-- ;  // double carriage return ?
     }
     // debug this
-    // if (len > 1)  Serial.print((String)" La="+ (int)telegram[len-2]);
-    // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
-    // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
+    // if (myLen > 1)  Serial.print((String)" La="+ (int)telegram[myLen-2]);
+    // if (myLen > 0)  Serial.print((String)" Lb="+ (int)telegram[myLen-1]);
+    // if (myLen == 0) Serial.print((String)" Lc="+ (int)telegram [myLen]);
     
-    if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (len-1) + ']' );   // v52/test replaced \n into \r
+    if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (myLen-1) + ']' );   // v52/test replaced \n into \r
 
     if (outputOnSerial && verboseLevel >= VERBOSE_P1) {     // do we want/need to print the Telegram for Debug
-      Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
-      for (int cnt = 0; cnt < len; cnt++) {
+      Serial.print((String)"\rlT=" + (myLen-1) + " \t[");   // v33 replaced \n into \r
+      for (int cnt = 0; cnt < myLen; cnt++) {
           
         if (isprint(telegram[cnt])) {             // v45 revise to improve print debug 
             Serial.print(telegram[cnt]);
@@ -2604,51 +2612,51 @@ void readTelegramP1() {
     /* //debugCRC
             yield();        // ptro added 31mar21 tr/to prevent wdt reset
             // print hexadecimal of this read.
-             Serial.printf("readbytesuntil=%u :", len);
-             for (int cnt = 0; cnt < len; cnt++) {
+             Serial.printf("readbytesuntil=%u :", myLen);
+             for (int cnt = 0; cnt < myLen; cnt++) {
                  Serial.printf("%02x",telegram[cnt-1]);
              }
              Serial.println(". ");
     */
-    // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate an error report
+    // myLen == 0 ? myLenTelegram = -1 : myLenTelegram += myLen;   // if myLen = 0 indicate an error report
 
-    //debugCRC if ( len == 0 && outputOnSerial) Serial.print(" <0> "); // debug print processing serial data
-    //debugCRC if (outputOnSerial) Serial.printf("{%02X %02X %02X}",telegram[len-2],telegram[len-1],telegram[len]);
+    //debugCRC if ( myLen == 0 && outputOnSerial) Serial.print(" <0> "); // debug print processing serial data
+    //debugCRC if (outputOnSerial) Serial.printf("{%02X %02X %02X}",telegram[myLen-2],telegram[myLen-1],telegram [myLen]);
 
-    lenTelegram = lenTelegram + (len - 1); // accumulate actual number of characters (excluding cr/lf)
-    if ( len == 0) lenTelegram = -1; // if len = 0 indicate for report
+    myLenTelegram = myLenTelegram + (myLen - 1); // accumulate actual number of characters (excluding cr/lf)
+    if ( myLen == 0) myLenTelegram = -1; // if myLen = 0 indicate for report
 
 
-    //DebugCRC int lenSave = len;                     // the the original value
+    //DebugCRC int myLenSave = myLen;                     // the the original value
     /* // debugCRC
        if (outputOnSerial) Serial.print(" <"); // debug print processing serial data
-       if (outputOnSerial) Serial.print(len) ; // debug print processing serial data
+       if (outputOnSerial) Serial.print(myLen) ; // debug print processing serial data
        if (outputOnSerial) Serial.print(">"); // debug print processing serial data
     */
 
-    if (len > 0 )  {  // len=0 indicates serial error, a length of 1 means the zerobyte (0x00-0d-0a) string.
+    if (myLen > 0 )  {  // myLen=0 indicates serial error, a myLength of 1 means the zerobyte (0x00-0d-0a) string.
 
       /* //debugCRC
                // Extract last character into a printable string to  //debugCRC
-               telegramLast[0] = telegram[len - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
+               telegramLast[0] = telegram[myLen - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
                telegramLast[1] = '\n';               // 3byte telegram lastbyte termination string
                telegramLast[2] = 0;                  // 3vyte-telegram lastbyte terminaion variable
 
                // Make Telegram printable , Note this may could overwrite the running buffer
-               telegram[len + 1] = '\n';    // string set lastcharacter to \n
-               telegram[len + 2] = 0;       // variable next character before null
+               telegram[myLen + 1] = '\n';    // string set lastcharacter to \n
+               telegram[myLen + 2] = 0;       // variable next character before null
 
                // sprintf("%02X", theNumber); // take alot of memory
                if (outputOnSerial) Serial.print((String)"\r\n1:"+String(telegramLast[0],HEX)+"="+telegramLast[0]+"  >"); // Hex debug print line last character
       */
 
-      if (decodeTelegram(len + 1)) {        // process data did we have a 'true' end of message condition including terminating CR
+      if (decodeTelegram(myLen + 1)) {        // process data did we have a 'true' end of message condition including terminating CR
 
         /*  //debugCRC
-            // print/display readed length
+            // print/display readed myLength
             if (outputOnSerial) {           // this line is alway printed.
-                Serial.print(" [");         // debug print transaction length
-                Serial.print(lenTelegram);  // length processed previous line
+                Serial.print(" [");         // debug print transaction myLength
+                Serial.print(myLenTelegram);  // myLength processed previous line
                 Serial.print("] #OK# ");    // display we have a successful end of data
                 // Serial.println("\r\n");
             }
@@ -2694,18 +2702,18 @@ void readTelegramP1() {
       /* //debugCRC
            else {                              // data not yet finished or in transit
                if (outputOnSerial) {           // this line is alway printed.
-                   Serial.print(" [");         // debug print transaction length
-                   Serial.print((String) lenTelegram + "," + lenSave);  // length processed previous line
+                   Serial.print(" [");         // debug print transaction myLength
+                   Serial.print((String) myLenTelegram + "," + myLenSave);  // myLength processed previous line
                    Serial.print("] ");         // single of with println: double lines spacing
                    // Serial.println("\r\n");
                }
          } // else
       */
 
-    } else { // if len > 0
-        // resume oher activities if we have not processed any data len < 0
+    } else { // if myLen > 0
+        // resume oher activities if we have not processed any data myLen < 0
         // this activates when we feed the input pins with programmatic data (0A0D) seperation.
-        Serial.print((String) " P1-len=" + len + " -#r=" + (bool) allowOtherActivities + "-" ); // v56c
+        Serial.print((String) " P1-len=" + myLen + " -#r=" + (bool) allowOtherActivities + "-" ); // v56c
         allowOtherActivities = true;  // v56c
     }
   } // while serial available
@@ -2725,7 +2733,7 @@ void readTelegramWL() {
       Using our 241 adapted library, we wait between / and ! 
     */
     if (mySerial1.P1active()) {    // return if P1 is active
-      if (!bP1Active_signalled) Serial.print((String) "\\" ); // length processed previous line
+      if (!bP1Active_signalled) Serial.print((String) "\\" ); // myLength processed previous line
           bP1Active_signalled = true;
           return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
     }
@@ -2737,7 +2745,7 @@ void readTelegramWL() {
 
   bGot_Telegram2Record  = false;      // v38 check RX2 seen
   
-  int lenTelegram2 = 0;
+  int myLenTelegram2 = 0;
   /*
     if (mySerial2.P1active())   {               // P2 blocked
       // if (loopbackRx2Tx2) Serial.print("RxA "); // print message line
@@ -2766,46 +2774,51 @@ void readTelegramWL() {
     while (mySerial2.available() && loopTelegram2cnt < MAXTELEGRAM2CNT && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
        // type casting https://www.geeksforgeeks.org/cpp/cpp-program-for-int-to-char-conversion/
       // if (loopbackRx2Mode > 0) Serial.print((String)  + char(mySerial2.peek()) ); // v54 print incoming
-      // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      // int myLen = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      // int myLen = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
-      int len = 0;
-      #if(defined DUP_MODE || defined TEST_MODE)
-        len = mySerial2.readBytesUntil(13, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      #else 
-        len = mySerial2.readBytesUntil(00, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      #endif  
+
+      /* v58c test dup/test readBytesUntil removed and relaced by 
+        #if(defined DUP_MODE || defined TEST_MODE)
+          // serial2terminator = '\x0d';
+          myLen = mySerial2.readBytesUntil(serial2terminator, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+        #else 
+          // serial2terminator = '\x00';
+          myLen = mySerial2.readBytesUntil(serial2terminator, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+        #endif  
+      */
+      int myLen = mySerial2.readBytesUntil(serial2terminator, telegram2, MAXLINELENGTH2 - 2); // v58c, read a max of  64bytes-2 per line, termination is not supplied
       yield();                    // v58 do background processing required for wifi etc.
       ESP.wdtFeed();              // v58 feed the hungry timer
        
       if (loopbackRx2Mode == 6) {   // diagnose header    // v57
           Serial.print((String)"\r\n\t P2header1-32=(" );
-          for (int i = 0; i < 33 && i < len; i++) {
+          for (int i = 0; i < 33 && i < myLen; i++) {
               Serial.printf("%02x ", telegram2[i]); 
           }
           Serial.println((String)")" );
       }
 
       // String telegram2_str(telegram2); // does work but still prints beyond 0x00
-      if (loopbackRx2Mode > 0 && len > 0) Serial.print((String) 
-                  + " ..len=" + len 
+      if (loopbackRx2Mode > 0 && myLen > 0) Serial.print((String) 
+                  + " ..len=" + myLen 
                   + ":\'" + (loopbackRx2Mode == 3 ? (String) "\r\n" + telegram2 + "\r\n": (String) "$")
                   + "\'.. " ); // v54 print incoming
             
-      // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
-      lenTelegram2 = lenTelegram2 + len;
-      if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
+      // myLen == 0 ? myLenTelegram = -1 : myLenTelegram += myLen;   // if myLen = 0 indicate for report
+      myLenTelegram2 = myLenTelegram2 + myLen;
+      if ( myLen == 0) myLenTelegram2 = -1; // if myLen = 0 indicate for report
 
-      if (len > 0)  {   // do we have bytes in buffer
+      if (myLen > 0)  {   // do we have bytes in buffer
         // remember  last character
-        // telegramLast2[0] = telegram2[len - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
+        // telegramLast2[0] = telegram2[myLen - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
         // telegramLast2[1] = '\n';                // 3byte telegram lastbyte termination string
         // telegramLast2[2] = 0;                   // 3byte-telegram lastbyte terminaion variable
-        if ( len > (MAXLINELENGTH2 - 2) ) {            // we have clearly an overflow
-           len =  (MAXLINELENGTH2 - 2) ;
+        if ( myLen > (MAXLINELENGTH2 - 2) ) {            // we have clearly an overflow
+           myLen =  (MAXLINELENGTH2 - 2) ;
         }
-        telegram2[len + 1] = '\n';    // string set lastcharacter to \n
-        telegram2[len + 2] = 0;       // variable next character before null
+        telegram2[myLen + 1] = '\n';    // string set lastcharacter to \n
+        telegram2[myLen + 2] = 0;       // variable next character before null
         /*
          * Check ascii output
          */
@@ -2816,7 +2829,7 @@ void readTelegramWL() {
           telegram2_Pos   = 0;
         }
         
-        for (int i = 0; (i <= len && !bGot_Telegram2Record); i++) {  // forward
+        for (int i = 0; (i <= myLen && !bGot_Telegram2Record); i++) {  // forward
 
             // if (rx2_function && !bGot_Telegram2Record ) { // v38 rx2_function
             if (rx2_function && !bGot_Telegram2Record ) { // v38 rx2_function
@@ -2836,7 +2849,7 @@ void readTelegramWL() {
 
                 }
                 if (telegram2[i] == '!')  {
-                    if (telegram2_End   < 0 && (i < (len - 6)) ) telegram2_End = i + 6;  // anticiptae after checksum position !1234.6
+                    if (telegram2_End   < 0 && (i < (myLen - 6)) ) telegram2_End = i + 6;  // anticiptae after checksum position !1234.6
                     if (telegram2_Start < 0 ) telegram2_End = -1;  // reset if not yet started
                 } 
                 
@@ -2848,7 +2861,7 @@ void readTelegramWL() {
                   telegram2_org[telegram2_Pos]   = 0;     // initialize next position v54
                 } // if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) 
               } // if ( telegram2_Pos < MAXLINELENGTH2 && (telegram2_Start == 0 || telegram2_Pos > 0 || i < telegram2_End ) )
-              if (telegram2_Pos > 4) {      // check for length start2finish before Checksum
+              if (telegram2_Pos > 4) {      // check for myLength start2finish before Checksum
                 if (telegram2Record[0] == '/' && telegram2Record[telegram2_Pos - 5] == '!')  {
                   bGot_Telegram2Record = true;
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
@@ -2880,9 +2893,9 @@ void readTelegramWL() {
                         + ", \"length\":"  + telegram2_Pos
                         + ", \"rx2=\":\""  + (String) telegram2
                      + "\"}" );
-            // Serial.println((String) "\r\n\t.s2>[len=" + len + " Pos=" + telegram2_Pos + "]" + telegram2) ;
+            // Serial.println((String) "\r\n\t.s2>[myLen=" + myLen + " Pos=" + telegram2_Pos + "]" + telegram2) ;
             /*                     
-            for (int i = 200; i <= len; i++) {  // forward
+            for (int i = 200; i <= myLen; i++) {  // forward
                 Serial.print(" ") ;         // debug print processing serial data
                 Serial.print((int8) telegram2[i] ) ;         // debug print processing serial data
                 Serial.print((String) + "=" + telegram2[i] ) ;         // debug print processing serial data
@@ -2890,7 +2903,7 @@ void readTelegramWL() {
             */
         }
         if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
-          Serial.println((String) "\n.s2>[len=" + len + " Pos=" + telegram2_Pos + "]" + telegram2) ;
+          Serial.println((String) "\n.s2>[myLen=" + myLen + " Pos=" + telegram2_Pos + "]" + telegram2) ;
         }
 
         // if (rx2_function) { // do we want to execute v38 rx2_function (superfluous , as routine her eis v38)
@@ -3072,11 +3085,11 @@ void readTelegramWL() {
                     Serial.printf(" %02x", telegram2_org[i]);      // 000-005, 008 causing unstablity
                   }
                   
-                  Serial.println((String) "\r\n\t start=" + startChar + ", len=" + ((endChar-startChar)+1) );
+                  Serial.println((String) "\r\n\t start=" + startChar + ", myLen=" + ((endChar-startChar)+1) );
                   loopbackRx2Mode = 0;   // stop debug
                 }
 
-                if (outputOnSerial || loopbackRx2Mode == 3) {   // print serial record count, total receivwed length, calculated CRC
+                if (outputOnSerial || loopbackRx2Mode == 3) {   // print serial record count, total receivwed myLength, calculated CRC
                   Serial.printf(" s=%c, e=%c, crt=%s, cr1=%x, ;", telegram2Record[startChar],telegram2Record[endChar], messageCRC2, currentCRC2) ;    // debug print calculated CRC
                   /* below are incorrect
                   currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2_org)+startChar,(endChar-startChar));   // ignore header, v48-casting
@@ -3127,7 +3140,7 @@ void readTelegramWL() {
             Serial.print("-");            // print minus
             Serial.print(telegram2_Start); 
             Serial.print("=");            // debug print processing
-            Serial.print((telegram2_End - telegram2_Start)); // debug print processing serial data length
+            Serial.print((telegram2_End - telegram2_Start)); // debug print processing serial data myLength
             Serial.print(":");            // debug print processing
             Serial.print(telegram2_Pos);  // debug print processing last record positition
             Serial.print(",s=");          // debug print processing
@@ -3155,7 +3168,7 @@ void readTelegramWL() {
               // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) {
               // total HeatFlow
               // HeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), (endChar - 40) );   // -37:xxx.xxx*m3, -38:xx.xxx GJ
-              long tHeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), 38) ;   // pointer & record length = 30-38 to get intger long
+              long tHeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), 38) ;   // pointer & record myLength = 30-38 to get intger long
               
               Serial.print(" WL-");               //  v46 print value/type unconditionally on new 
               Serial.print(telegram2[valChar+1]);   
@@ -3194,12 +3207,12 @@ void readTelegramWL() {
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
-      } // if (len > 0)  {   // do we have bytes in buffer
+      } // if (myLen > 0)  {   // do we have bytes in buffer
       loopTelegram2cnt++;   /// account this readloop to prevent overrunning on RX2
     } // while data
 
     if (outputOnSerial) {
-      Serial.print((String) " [lenTelegram2="     + lenTelegram2 );  // debug print transaction length
+      Serial.print((String) " [myLenTelegram2="     + myLenTelegram2 );  // debug print transaction myLength
       Serial.print((String) ", loopTelegram2cnt=" + loopTelegram2cnt );
       Serial.print((String) ", Got_Telegram2Record_cnt="+ Got_Telegram2Record_cnt + "].");
       Serial.println("");
@@ -3262,7 +3275,7 @@ void processGpio() {    // Do regular functions of the system
 /* 
     Mqtt input received, callled whenever a MQTT subscription message arrives
 */
-void callbackMqtt(char* topic, byte* payload, unsigned int length) {
+void callbackMqtt(char* topic, byte* payload, unsigned int myLength) {
   previousBlinkMillis = millis() + intervalBlinkMillis ; // end the shortblink (if any)
 
   // struggling with C++ forbids comparison between pointer and integer
@@ -3274,7 +3287,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
 
   String mqttCommand = ""; // initialise as string
   int i = 0;
-  for (i = 0; (i < length && i < sizeof(mqttReceivedCommand)); i++) { // read mqtt payload
+  for (i = 0; (i < myLength && i < sizeof(mqttReceivedCommand)); i++) { // read mqtt payload
       char receivedChar = (char)payload[i];
       mqttCommand += receivedChar;
       mqttReceivedCommand[i] = (char)payload[i];
@@ -3286,7 +3299,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
     Serial.print(topic);
     Serial.print("]: ");
     // char w1 = (char)payload[0];
-    Serial.println((String)(mqttCommand) + ", len=" + i );
+    Serial.println((String)(mqttCommand) + ", myLen=" + i );
     // Serial.println((String)mqttReceivedCommand[0] + (int)mqttReceivedCommand[1]); 
     // yield();  // do background processing required for wifi etc.
   }
@@ -3296,7 +3309,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
 /* 
   Processing queued mqttCommand, received by callbackMqtt 
 */
-void ProcessMqttCommand(char* payload, unsigned int length) { 
+void ProcessMqttCommand(char* payload, unsigned int myLength) { 
   /* Commands: (single byte)
 
     ? Print brief helptexst on serial output
@@ -3634,7 +3647,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         if (!outputMqttPower2 ) Serial.print("Inactive.");
       }
     } else  if ((char)payload[0] == 'm') {       // v48 10jun25 print m-asked Input array
-      Serial.println((String)"\r\n dataIn telegram_crcIn len=" + telegram_crcIn_len + " som>>");
+      Serial.println((String)"\r\n dataIn telegram_crcIn myLen=" + telegram_crcIn_len + " som>>");
       for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
         if (isprint(telegram_crcIn[cnt])) {             // if printable
             Serial.print(telegram_crcIn[cnt]);
@@ -3651,7 +3664,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
     } else  if ((char)payload[0] == 'M') {       // v48 10jun25 print M-asking array
-      Serial.println((String)"\r\n Recovery telegram_crcOut len=" + telegram_crcOut_len + " som>>");
+      Serial.println((String)"\r\n Recovery telegram_crcOut myLen=" + telegram_crcOut_len + " som>>");
       for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
         if (isprint(telegram_crcOut[cnt])) {             // if printable
             Serial.print(telegram_crcOut[cnt]);
@@ -4258,7 +4271,7 @@ bool processLightRead(bool myOperation)
   process P1 data start / to ! Let us decode to see what the /KFM5KAIFA-METER meter is reading
   called each time we have a telegram record
 */
-bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends in Linefeed \n
+bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that ends in Linefeed \n
 {
   // there are 24 telegram lines (electricity() totalling  676bytes + 24 returns = 700 bytes
 
@@ -4266,8 +4279,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   validTelegramCRCFound = false;  // init telegram record
   validCrcInFound       = false;  // init Crcin record
 
-  int startChar = FindCharInArrayRev(telegram, '/', len);  // 0-offset "/KFM5KAIFA-METER" , -1 not found
-  int endChar   = FindCharInArrayRev(telegram, '!', len);  // 0-offset "!769A" , -1 not found
+  int startChar = FindCharInArrayRev(telegram, '/', myLen);  // 0-offset "/KFM5KAIFA-METER" , -1 not found
+  int endChar   = FindCharInArrayRev(telegram, '!', myLen);  // 0-offset "!769A" , -1 not found
   bool endOfMessage = false;    // led on during long message transfer
 
   // if-else-if check if we are on header, trailer of in between those lines
@@ -4281,9 +4294,9 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     // DebugCRC testTelegramPos = 0;     // initialise array
 
     // initialise CRC
-    // currentCRC=CRC16(0x0000,(unsigned char *) telegram+startChar, len-startChar);
+    // currentCRC=CRC16(0x0000,(unsigned char *) telegram+startChar, myLen-startChar);
 
-    //DebugCRC if (outputOnSerial) Serial.printf("{.%02X%02X%02X%02X}",telegram[len-startChar-2],telegram[len-startChar-1],telegram[len-startChar],telegram[len-startChar+1]);
+    //DebugCRC if (outputOnSerial) Serial.printf("{.%02X%02X%02X%02X}",telegram[myLen-startChar-2],telegram[myLen-startChar-1],telegram[myLen-startChar],telegram[myLen-startChar+1]);
 
     //   xN= {52 0D 00}
     //     {.0D000A00} /KFM5KAIFA-METER [16,17] {00 0D 4B}{29 0D 45}
@@ -4296,15 +4309,15 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
     if (strncmp(telegram+startChar , "/KFM5KAIFA-METER", strlen("/KFM5KAIFA-METER")) == 0) telegramP1header = true;   // indicate we are in header mode
 
-    currentCRC = Crc16In(0x0000, reinterpret_cast<unsigned char*>(telegram) + startChar, len - startChar - 1);  // initialise using header, v48-casting
-    if (telegram[startChar+len-2] == '\x0d') { // v48-casting add crc16 0x0a
+    currentCRC = Crc16In(0x0000, reinterpret_cast<unsigned char*>(telegram) + startChar, myLen - startChar - 1);  // initialise using header, v48-casting
+    if (telegram[startChar+myLen-2] == '\x0d') { // v48-casting add crc16 0x0a
       // currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
         unsigned char tempLiteral[] = {0x0A};  // use temporarily literal to "unsigned char* cast of Crc16In, v48-casting
         currentCRC = Crc16In(currentCRC, tempLiteral, 1);
     }
 
     /*
-      if ( len = 1 && telegram[len-1] == '\x0d') {
+      if ( myLen = 1 && telegram[myLen-1] == '\x0d') {
         Serial.print("DebugAddCrLf.."); 
         currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a\x0d\x0a", 3); // add stripped header
       }
@@ -4313,8 +4326,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     /*
          if (outputOnSerial)  {     // Printing /KFM5KAIFA-METER
              // Serial.println("soh>\r\n");
-             if (len > 4) {
-                 for (int cnt = startChar; cnt < len - (startChar + 2); cnt++) { // print P1 characters
+             if (myLen > 4) {
+                 for (int cnt = startChar; cnt < myLen - (startChar + 2); cnt++) { // print P1 characters
                    // copy over the processed data
                    testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
                    if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
@@ -4359,7 +4372,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
                 }
                 if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
                 getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
-          } else {                                            // no or length changed masking array
+          } else {                                            // no or myLength changed masking array
 
                 if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
                 for (int i=0; i < telegram_crcIn_len; i++) {
@@ -4373,7 +4386,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
         } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
 
             Serial.printf(", crE:%x!=%x",currentCRC,messageCRC);
-            telegram_crcOut[0] = 0x00;     // reset mask length and counters
+            telegram_crcOut[0] = 0x00;     // reset mask myLength and counters
             telegram_crcOut_len = 0;
             telegram_crcOut_cnt = 0;
             if (outputOnSerial) Serial.printf(", msk0=%d ",telegram_crcOut_cnt);
@@ -4382,7 +4395,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
         // ----------------------------------------------------------------------------------------------
       } else {    // we have a CRC error on running CRC, try to recover using using created mask
         
-        if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if length of error is equal , try to unmask differences  ?
+        if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if myLength of error is equal , try to unmask differences  ?
             for (int i=0; i < telegram_crcIn_len; i++) {
                 if (telegram_crcOut[i] != 'X' && telegram_crcIn[i] != telegram_crcOut[i] ) {   // Unmask the error ??
                   if (outputOnSerial) {
@@ -4424,7 +4437,7 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
         //DebugCRC
               if (outputOnSerial)     {
                 // Serial.println("a\n<eof0\nb");
-                for (int cnt = 0; cnt < len-2; cnt++) {
+                for (int cnt = 0; cnt < myLen-2; cnt++) {
 
                  // copy over the processed data
                  testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
@@ -4454,15 +4467,15 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
     } else {                                  // We are reading between header and trailer
       
-      // currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
+      // currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, myLen - 1); // calculatate CRC upto/including 0x0D
       //    reinterpret_cast<unsigned char*> to prevent "C-style pointer casting" message
-      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram), len - 1); // calculatate CRC upto/including 0x0D, v48-casting
+      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram), myLen - 1); // calculatate CRC upto/including 0x0D, v48-casting
       
       // prevent "C-style pointer casting" message
-      //  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
-      // dnw:  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>("\x0a"), 1); // add excluded \n
-      // dnw:  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, "\x0a", 1); // add excluded \n
-      if (telegram[len - 2] == '\x0d') {    // correctly use a literal to addin to Crc16in, v48-casting
+      //  if (telegram[myLen - 2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
+      // dnw:  if (telegram[myLen - 2] == '\x0d') currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>("\x0a"), 1); // add excluded \n
+      // dnw:  if (telegram[myLen - 2] == '\x0d') currentCRC = Crc16In(currentCRC, "\x0a", 1); // add excluded \n
+      if (telegram[myLen - 2] == '\x0d') {    // correctly use a literal to addin to Crc16in, v48-casting
         // use temporarily literal to add
         unsigned char tempLiteral[] = {0x0A};
         currentCRC = Crc16In(currentCRC, tempLiteral, 1);
@@ -4470,8 +4483,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
       if (outputOnSerial) {
         // Serial.print("<");
-        if (len > 2) {  // (was > 2)
-          for (int cnt = 0; cnt < len - 2; cnt++) {  // read max 64 bytes (was len-2)
+        if (myLen > 2) {  // (was > 2)
+          for (int cnt = 0; cnt < myLen - 2; cnt++) {  // read max 64 bytes (was myLen-2)
             /*// DebugCRC
               //DebugCRC copy over the processed data
               testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
@@ -4490,11 +4503,11 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
               }
             */
           } // for loop
-          //DebugCRC if (outputOnSerial) Serial.printf("{%02X}",telegram[len-2]);
+          //DebugCRC if (outputOnSerial) Serial.printf("{%02X}",telegram[myLen-2]);
         }
         /* //DebugCRC
-          if (len <= 2) {
-          Serial.print(charArray[len]);
+          if (myLen <= 2) {
+          Serial.print(charArray [myLen]);
           }
           // Serial.print(">\r\n");
           // Serial.print(">");
@@ -4510,23 +4523,23 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
 
   /*
-    if (!(telegram[len - 2] == ')') ) { // ignore if not ending on )
-      telegram[0] = telegram[len - 2];
-      telegram[1] = telegram[len - 2];
-      telegram[2] = telegram[len - 2];
+    if (!(telegram[myLen - 2] == ')') ) { // ignore if not ending on )
+      telegram[0] = telegram[myLen - 2];
+      telegram[1] = telegram[myLen - 2];
+      telegram[2] = telegram[myLen - 2];
       client.publish(mqttLogTopic, telegram );   // log
       return endOfMessage;
     }
   */
 
   /*
-     if (telegram[len - 3] == ')' ) client.publish(mqttLogTopic, "tele-3" );   // log
-     if (telegram[len - 2] == ')' ) client.publish(mqttLogTopic, "tele-2" );   // log valid
-     if (telegram[len - 1] == ')' ) client.publish(mqttLogTopic, "tele-1" );   // log
-     if (telegram[len]     == ')' ) client.publish(mqttLogTopic, "tele=0" );   // log
-     if (telegram[len + 1] == ')' ) client.publish(mqttLogTopic, "tele+1" );   // log
-     if (telegram[len + 2] == ')' ) client.publish(mqttLogTopic, "tele+2" );   // log
-     if (telegram[len + 3] == ')' ) client.publish(mqttLogTopic, "tele+3" );   // log
+     if (telegram[myLen - 3] == ')' ) client.publish(mqttLogTopic, "tele-3" );   // log
+     if (telegram[myLen - 2] == ')' ) client.publish(mqttLogTopic, "tele-2" );   // log valid
+     if (telegram[myLen - 1] == ')' ) client.publish(mqttLogTopic, "tele-1" );   // log
+     if (telegram [myLen]     == ')' ) client.publish(mqttLogTopic, "tele=0" );   // log
+     if (telegram[myLen + 1] == ')' ) client.publish(mqttLogTopic, "tele+1" );   // log
+     if (telegram[myLen + 2] == ')' ) client.publish(mqttLogTopic, "tele+2" );   // log
+     if (telegram[myLen + 3] == ')' ) client.publish(mqttLogTopic, "tele+3" );   // log
 
      if (telegram[22] == 'S'     ) client.publish(mqttLogTopic, "tele+S" );   // log
      if (telegram[22] == 'S'     ) client.publish(mqttLogTopic, telegram );   // log DateTime
@@ -4551,8 +4564,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
 
   // used to catch P1meter line termination bracket
-  // if (telegram[len - 3] != ')' ) client.publish(mqttErrorTopic, telegram ); // log invalid
-  // if (telegram[len - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
+  // if (telegram[myLen - 3] != ')' ) client.publish(mqttErrorTopic, telegram ); // log invalid
+  // if (telegram[myLen - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
 
   // tbd v56c: this check before or after while in recovery ????
   /*
@@ -4561,11 +4574,11 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
   if (   telegram[0] != '0' && telegram[0] != '1' && telegram[1] != '-' ) return endOfMessage; // if subrecord not start wih 0- or 1-
 
-  // if ( !(telegram[len - 3] == ')' || telegram[len - 4] == ')' )) return endOfMessage; // if not terminated by bracket then return
-  if ( !(telegram[len - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
+  // if ( !(telegram[myLen - 3] == ')' || telegram[myLen - 4] == ')' )) return endOfMessage; // if not terminated by bracket then return
+  if ( !(telegram[myLen - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
 
   /*
-    // Serial.println((String)"DebugDecode6:"+ (int)telegram[len - 3] );   // with testdata, does not arrive here
+    // Serial.println((String)"DebugDecode6:"+ (int)telegram[myLen - 3] );   // with testdata, does not arrive here
     
     // Serial.println((String)"DebugDecode7 (=" + strncmp(telegram, "(", strlen("(")) + " )="+strncmp(telegram, ")", strlen(")"))) ;
     // Serial.println((String)"DebugDecode7 substr1-7(=" + telegram[0]+telegram[1]+telegram[2]+telegram[3]+telegram[4]+"<");
@@ -4616,40 +4629,40 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // 1-0:1.8.1(000992.992*kWh)
   // 1-0:1.8.1 = Elektra verbruik laag tarief (DSMR v4.0)  
   if (strncmp(telegram, "1-0:1.8.1(", strlen("1-0:1.8.1(")) == 0) {        // total Watts Low
-    powerConsumptionLowTariff = getValue(telegram, len);
+    powerConsumptionLowTariff = getValue(telegram, myLen);
     }
 
   // 1-0:1.8.2(000560.157*kWh)
   // 1-0:1.8.2 = Elektra verbruik hoog tarief (DSMR v4.0)
   if (strncmp(telegram, "1-0:1.8.2(", strlen("1-0:1.8.2(")) == 0)         // total Watts High
-    powerConsumptionHighTariff = getValue(telegram, len);
+    powerConsumptionHighTariff = getValue(telegram, myLen);
 
   // 1-0:2.8.1(000348.890*kWh)
   // 1-0:2.8.1 = Elektra opbrengst laag tarief (DSMR v4.0)
   if (strncmp(telegram, "1-0:2.8.1(", strlen("1-0:2.8.1(")) == 0)         // total Production Low
-    powerProductionLowTariff = getValue(telegram, len);
+    powerProductionLowTariff = getValue(telegram, myLen);
 
   // 1-0:2.8.2(000859.885*kWh)
   // 1-0:2.8.2 = Elektra opbrengst hoog tarief (DSMR v4.0)
   if (strncmp(telegram, "1-0:2.8.2(", strlen("1-0:2.8.2(")) == 0)         // total Production High
-    powerProductionHighTariff = getValue(telegram, len);
+    powerProductionHighTariff = getValue(telegram, myLen);
 
   // 1-0:1.7.0(00.424*kW) Actueel verbruik
   // 1-0:2.7.0(00.000*kW) Actuele teruglevering
   // 1-0:1.7.x = Electricity consumption actual usage (DSMR v4.0)
   if (strncmp(telegram, "1-0:1.7.0(", strlen("1-0:1.7.0(")) == 0)        // Watts usage
     // client.publish(mqttLogTopic, telegram );
-    CurrentPowerConsumption = getValue(telegram, len);
+    CurrentPowerConsumption = getValue(telegram, myLen);
 
 
   if (strncmp(telegram, "1-0:2.7.0(", strlen("1-0:2.7.0(")) == 0)        // Watts produced
-    CurrentPowerProduction = getValue(telegram, len);
+    CurrentPowerProduction = getValue(telegram, myLen);
 
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
   // 0-1:24.2.1(250222224600W)(65.478*GJ)  -new
   // 0-1:24.2.1 = Gas (DSMR v4.0) on Kaifa MA105 meter
   if (strncmp(telegram, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0)      // Gaz
-    GasConsumption = getValue(telegram, len);
+    GasConsumption = getValue(telegram, myLen);
 
   return endOfMessage;
 }
@@ -4687,16 +4700,16 @@ void RecoverTelegram_crcIn() {
     currentTimeS2,powerConsumptionLowTariff2...CurrentPowerProduction2
     v56c: every field found is also copied back to its segmented (copyback1) equivilent 
 */
-void  getValues2FromP1Record(char buf[], int len) {  // 716
+void  getValues2FromP1Record(char buf[], int myLen) {  // 716
   // return;
-  // if (mqttCnt == 3) Serial.printf(" mqttcount=%d len=%d ", mqttCnt, len ); // mqttcount=3 len=716
+  // if (mqttCnt == 3) Serial.printf(" mqttcount=%d myLen=%d ", mqttCnt, myLen ); // mqttcount=3 myLen=716
   // if (mqttCnt < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong here, v52 disabled
 
   int f = 0;
   // InitialiseValues();         // Data record, ensure we start fresh with newly values in coming records
                                                           //     01234567890123456789012
-  f = FindWordInArrayFwd(buf, "0-0:1.0.0(", len, 9);      // =  "0-0:1.0.0(250106212048W)"
-  // Serial.printf(" f=%d ", f ); // mqttcount=3 len=716
+  f = FindWordInArrayFwd(buf, "0-0:1.0.0(", myLen, 9);      // =  "0-0:1.0.0(250106212048W)"
+  // Serial.printf(" f=%d ", f ); // mqttcount=3 myLen=716
   if (( buf[f+22] == 'S' || buf[f+22] == 'W') && buf[f+23] == ')' )  {  // check for Summer or Wintertime
     char resDate[16];     // maximum prefix of timestamp message
     memset(resDate, 0, sizeof(resDate));       // Pointer to the block of memory to fill.
@@ -4757,7 +4770,7 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
                 //                           019061.182*kWh)_
                 //                           1234567890 
                 //                         s+1    
-      f = FindWordInArrayFwd(buf, "1-0:1.8.1(", len, 9);       // total use Low getValues2FromP1Record f=74+35; f=109
+      f = FindWordInArrayFwd(buf, "1-0:1.8.1(", myLen, 9);       // total use Low getValues2FromP1Record f=74+35; f=109
       powerConsumptionLowTariff2 = getValue(buf+f, 26);
       powerConsumptionLowTariff  = powerConsumptionLowTariff2;  // v56c copyback1
       
@@ -4773,7 +4786,7 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
   // return;
  
   if (f >= 0) {
-    f = FindWordInArrayFwd(buf, "1-0:1.8.2(", len, 9);       // total use High          (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:1.8.2(", myLen, 9);       // total use High          (v56c: start at begin of buf)
     powerConsumptionHighTariff2  = getValue(buf+f, 26);
     powerConsumptionHighTariff   = powerConsumptionHighTariff2; // v56c copyback1
 
@@ -4788,25 +4801,25 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:2.8.1(", len, 9);        // total Production Low   (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:2.8.1(", myLen, 9);        // total Production Low   (v56c: start at begin of buf)
     powerProductionLowTariff2  = getValue(buf+f, 26);
     powerProductionLowTariff   = powerProductionLowTariff2;     // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:2.8.2(", len, 9);        // total Production High  (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:2.8.2(", myLen, 9);        // total Production High  (v56c: start at begin of buf)
     powerProductionHighTariff2 = getValue(buf+f, 26);
     powerProductionHighTariff  = powerProductionHighTariff2;    // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", len, 9);        // Watts usage            (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", myLen, 9);        // Watts usage            (v56c: start at begin of buf)
     CurrentPowerConsumption2   = getValue(buf+f, 21);
     CurrentPowerConsumption    = CurrentPowerConsumption2;      // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", len, 9);        // Watts produced          (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", myLen, 9);        // Watts produced          (v56c: start at begin of buf)
     CurrentPowerProduction2   = getValue(buf+f, 21);
     CurrentPowerProduction    = CurrentPowerProduction2;        // v56c copyback1
   }
@@ -4823,10 +4836,10 @@ long getValue(char *buffer, int maxlen)
   // 1234567890123456789012345678901234567890   = 40    18061   000   // countlist 1
   // 01234567890123456789012345678901234567890  = 40                  // countlist 0
   //           123456789012                                           // countlist after first bracket
-  // 0-0:1.0.0(180611014816S)                   = data record len=25, string length datalen 12
+  // 0-0:1.0.0(180611014816S)                   = data record myLen=25, string myLength datalen 12
   // 0-1:24.2.1(150531200000S)(00811.923*m3)    = gaz date record which we do not have at our P1
   // 0-1:24.2.1(250222224600W)(65.478*GJ)       = new GJ
-  // 1-0:1.8.2(010707.720*kWh)                  = power consumption record len=26 datalen 10
+  // 1-0:1.8.2(010707.720*kWh)                  = power consumption record myLen=26 datalen 10
   // /ISk5\2MT382-1000...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record 0-162bytes
   //  .........1.........2.........3.........4.........5
 
@@ -4854,14 +4867,14 @@ long getValue(char *buffer, int maxlen)
     if (l < 0) {   // no asterisk in message, check for Summer or Winter Time date record
       // 11jun20 yield();  // do background processing else things will not work
       // l = FindCharInArrayRev(buffer, 'S', maxlen - 0) - s - 1;  // search S , s=start of (
-      if (buffer[22] == 'S') l = 6; // length 7-digits does not work vaue too large
-      if (buffer[22] == 'W') l = 6; // length 7-digits does not work vaue too large
+      if (buffer[22] == 'S') l = 6; // myLength 7-digits does not work vaue too large
+      if (buffer[22] == 'W') l = 6; // myLength 7-digits does not work vaue too large
   */
 
-  if (l < 4)  return 0;    // length from (-* too short
-  if (l > 12) return 0;   // length from (-* too long
+  if (l < 4)  return 0;    // myLength from (-* too short
+  if (l > 12) return 0;   // myLength from (-* too long
 
-  char res[16];                 // extract number starting at startbracket+1 for a length of l
+  char res[16];                 // extract number starting at startbracket+1 for a myLength of l
   memset(res, 0, sizeof(res));
 
   if (strncpy(res, buffer + s + 1, l))  // start buffer+10+1
@@ -4889,15 +4902,15 @@ char TranslateForPrint(char c)
 /* 
   generic subroutine to find a character in reverse , return position as offset to 0
 */
-int FindCharInArrayRev(const char array[], char c, int len) {              // Find character >=0 found, -1 failed
+int FindCharInArrayRev(const char array[], char c, int myLen) {              // Find character >=0 found, -1 failed
   //           123456789012
   // 1234567890123456789012345678901234567890  = 40
-  // 0-0:1.0.0(180611014816S)                  = sublen12 len=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
+  // 0-0:1.0.0(180611014816S)                  = sublen12 myLen=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
   // 0-1:24.2.1(250222224600W)(65.478*GJ)  - GJ 
   // ...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record
-  for (int i = len - 1; i >= 0; i--)   // backward
-  // for (int i = len - 1; i < 1; i--)   // backward
+  for (int i = myLen - 1; i >= 0; i--)   // backward
+  // for (int i = myLen - 1; i < 1; i--)   // backward
   {
     if (array[i] == c)
     {
@@ -4908,10 +4921,10 @@ int FindCharInArrayRev(const char array[], char c, int len) {              // Fi
 }
 
 /*
-  find character forwarding for len bytes
+  find character forwarding for myLen bytes
 */
-int FindCharInArrayFwd(const char array[], char c, int len) {              // Find character >=0 found, -1 failed
-  for (int i = 0; i < len+1 ; i++)   // forward
+int FindCharInArrayFwd(const char array[], char c, int myLen) {              // Find character >=0 found, -1 failed
+  for (int i = 0; i < myLen+1 ; i++)   // forward
   {
     if (array[i] == c)
     {
@@ -4943,20 +4956,20 @@ int FindWordInArrayFwd(const char array[], const char word[], int alen, int wlen
     input:
      crc unsigned integer (2 bytes 0x0000-0xFFFF)
      buf pointer=address of unsigned char to reference characters as int 0-255 values
-     len length of buf 0-768
+     myLen myLength of buf 0-768
      
-     currentCRC = CRC16(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
+     currentCRC = CRC16(currentCRC, (unsigned char*)telegram, myLen - 1); // calculatate CRC upto/including 0x0D
 */
 unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
   /*
 
         char telegram_crcIn[MAXLINELENGTH];   // active telegram that is checked for crc
-        int  telegram_crcIn_len = 0;          // length of this record
+        int  telegram_crcIn_len = 0;          // myLength of this record
         char telegram_crcOut[MAXLINELENGTH];  // processed telegram with changed positions to X
         int  telegram_crcOut_len = 0;  
 
-        for (int i = len - 1; i >= 0; i--)   // backward
-        // for (int i = len - 1; i < 1; i--)   // backward
+        for (int i = myLen - 1; i >= 0; i--)   // backward
+        // for (int i = myLen - 1; i < 1; i--)   // backward
         {
           if (array[i] == c)
           {
@@ -5002,7 +5015,7 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
         telegram_crcIn_cnt > 1 &&
         telegram_crcIn[telegram_crcIn_len - 1] == '!' ) {  // (single quoted) are we on end of record ??
       dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len);  // get CRC of whole copied record, v48-casting
-      if (outputOnSerial) {   // print serial record count, total receivwed length, calculated CRC
+      if (outputOnSerial) {   // print serial record count, total receivwed myLength, calculated CRC
         // Serial.println((String)" ct=" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
         Serial.printf("\tcr0=%x,crc=%d,crl=%d\t", dataInCRC,  telegram_crcIn_cnt, telegram_crcIn_len) ; 
       }
@@ -5160,9 +5173,9 @@ void SetOldValues()     // executed at end succesful  telegrams
 }
 
 // check if data/field is numeric 0-9 & decimal-point
-bool isNumber(const char *res, int len)       // False/true if numeriv
+bool isNumber(const char *res, int myLen)       // False/true if numeriv
 {
-  for (int i = 0; i < len; i++)
+  for (int i = 0; i < myLen; i++)
   {
     if (((res[i] < '0') || (res[i] > '9')) && (res[i] != '.' && res[i] != 0))
     {
