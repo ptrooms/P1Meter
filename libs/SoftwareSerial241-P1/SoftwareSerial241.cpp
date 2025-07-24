@@ -44,7 +44,7 @@ extern "C" {
 
 // As the Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible GPIO pins have to be defined
-SoftwareSerial *ObjList[MAX_PIN+1];
+SoftwareSerial *ObjList[MAX_PIN+3];
 
 void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };
@@ -57,8 +57,12 @@ void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming
+void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxTriggerBit(); };  // use gpio14 for bittiming
 
-static void (*ISRList[MAX_PIN+1])() = {
+// void ICACHE_RAM_ATTR rxTriggerBit_ISR(void); // store the ISR test routine in cache
+
+static void (*ISRList[MAX_PIN+3])() = {
       sws_isr_0,
       sws_isr_1,
       sws_isr_2,
@@ -74,10 +78,28 @@ static void (*ISRList[MAX_PIN+1])() = {
       sws_isr_12,
       sws_isr_13,
       sws_isr_14,
-      sws_isr_15
+      sws_isr_15,
+      sws_isr_16,
+      sws_isr_17
 };
 
+SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logic, unsigned int buffSize) {
+   m_rxValid = m_txValid = m_txEnableValid = false;
+   Serial.println((String) "\n\r >>>>>> Allocated overloaded inverse_logic=" +  inverse_logic);
+   // SoftwareSerial(receivePin,transmitPin, true, buffSize);  // will cause crash
+   m_rxValid = m_txValid = m_txEnableValid = false;
+   m_buffer = NULL;
+   m_invert = inverse_logic;
+   m_overflow = false;
+   m_rxEnabled = false;
+   m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
+   // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
+   m_bitWait = 509;
+   
+}
+
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {
+   Serial.println((String) "\n\r >>>>>> Allocated non overloaded inverse_logic=" +  inverse_logic);
    m_rxValid = m_txValid = m_txEnableValid = false;
    m_buffer = NULL;
    m_invert = inverse_logic;
@@ -174,7 +196,7 @@ void SoftwareSerial::begin(long speed, int recordtype) {
          m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
          m_highSpeed = speed > 9600;   
          m_P1active = false;
-         this->enableRx(false);     // will set m_rxEnabled = false;
+         this->enableRx(false, recordtype);     // will set m_rxEnabled = false;
          m_outPos = 0;        // position to start of buffer
          // msg3.concat("
          // int str_len = str.length() + 1; 
@@ -358,6 +380,22 @@ unsigned long SoftwareSerial::peek(int buffer_time_Pos ) {
 #define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 #define WAITIram5 { while (wait<7000 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
 // at 115k2 --> m_bittime = 694 cycles
+
+/*
+  Register cycle count in m_buffer_bits[m_buffer_bits_inPos]
+*/
+void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {          
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+   int next = (m_inPos+1) % m_buffSize;
+   if (next != m_outPos) {  // this works best in production
+      m_buffer_bits[m_inPos] = M_BIT_CYCLE_VALUE;
+      m_inPos = next;
+   }
+}
+
+/*
+  Do BitBang, store Byte in m_buffer[m_inPos] and check for P1 and
+*/
 
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status

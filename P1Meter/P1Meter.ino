@@ -1312,8 +1312,16 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
   /// @param bufCapacity the capacity for the received bytes buffer
   /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
   // 274 rubbish // SoftwareSerial mySerial1(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-  SoftwareSerial mySerial1( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  SoftwareSerial mySerial1(SERIAL_RX, -1          , bSERIAL_INVERT  , MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2 , bSERIAL2_INVERT , MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 3, 100);   // (RX, TX. bittiming)
+  // SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 3, 100);   // (RX, TX, bittiming)
+  // next causes a problem
+  // SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 10, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  // SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 10, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+
+  
+  // SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, (int) 10, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
 // Wifi https://docs.arduino.cc/language-reference/en/functions/wifi/client/
@@ -2257,7 +2265,8 @@ void loop()
               #ifdef UseNewSoftSerialLIB
                 // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
                 // mySerial1.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-                mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+                // mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
+                 mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2);
               #else
                 // mySerial2.begin(serial2Baudrate);    // P1 meter port 115200 baud
                 mySerial2.end();          // v58b: not sure  but to acertain,  finish any active

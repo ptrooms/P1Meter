@@ -50,7 +50,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 class SoftwareSerial : public Stream
 {
 public:
-   SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
+      SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
+      SoftwareSerial(int receivePin, int transmitPin, int  inverse_logic = 10   , unsigned int buffSize = 64);
    ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
 
    void begin(long speed);
@@ -61,6 +62,7 @@ public:
    bool overflow();
    int peek();
    unsigned long peek(int);
+   unsigned long peekbit(int);
 
    virtual size_t write(uint8_t byte) override;
    virtual int read() override;
@@ -73,8 +75,9 @@ public:
    void enableRx(bool on);
    void enableRx(bool on, int recorrtype);      // to use/do bittiming
 
-   void rxRead();		// witp1active detection beween / and !
-   void rxRead2();		// without p1active detection beween / and !
+   void rxRead();		   // BitBang with    p1active detection beween / and !
+   void rxRead2();		// BitBang without p1active detection beween / and !
+   void rxTriggerBit(); // use bittiming every flank change allocates a time
 
    // AVR compatibility methods
    bool listen() { enableRx(true); return true; }
@@ -101,12 +104,13 @@ private:
    bool m_highSpeed;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
-   uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes)
+   uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
-   unsigned long *m_buffer_bits;         // time-array
-   unsigned int m_buffer_bits_inPos;        // position in buffer
-   unsigned int m_buffer_bits_outPos;        // position in buffer
-   int          m_buffer_bitValue;       // Last time detected
+   unsigned long *m_buffer_bits;         // 4096-value time-array  index m_inPos, m_outPos;
+   // unsigned int m_buffer_bits_inPos;        // position in buffer
+   // unsigned int m_buffer_bits_outPos;        // position in buffer
+   int          m_buffer_bitValue;       // Last time detected index by 
+   
    unsigned long *m_buffer_time;         // time-array
    unsigned int m_buffer_timePos;        // position in buffer
    
