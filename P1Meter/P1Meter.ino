@@ -1312,8 +1312,13 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
   /// @param bufCapacity the capacity for the received bytes buffer
   /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
   // 274 rubbish // SoftwareSerial mySerial1(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-  SoftwareSerial mySerial1( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  SoftwareSerial mySerial1(SERIAL_RX, -1          , bSERIAL_INVERT  , MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2 , bSERIAL2_INVERT , MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 10, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 10, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+
+  
+  // SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, (int) 10, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
 // Wifi https://docs.arduino.cc/language-reference/en/functions/wifi/client/
@@ -2759,28 +2764,28 @@ void readTelegramP1() {
         p1SerialFinish = true; // indicate mainloop we can stop P1 serial for a while
         if (outputOnSerial)
             Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 time "
-                + " " + mySerial1.peek(0)
-                + " " + mySerial1.peek(1)
+                + " "  +  mySerial1.peek(M_TIME_START)
+                + " "  +  mySerial1.peek(M_TIME_RX_START)
                 + ". "
-                + " " + mySerial1.peek(2) 
-                + " +" + (mySerial1.peek(3) - mySerial1.peek(2))
-                + "= "+ mySerial1.peek(3) 
-                + " +" + (mySerial1.peek(4) - mySerial1.peek(3)) 
-                + "="+ mySerial1.peek(4) 
-                + " +"+ (mySerial1.peek(5) - mySerial1.peek(4))
-                + "=" + mySerial1.peek(5)
-                + " +"+ (mySerial1.peek(6) - mySerial1.peek(5))
-                + "=" + mySerial1.peek(6)
+                + " "  +  mySerial1.peek(M_TIME_RX_END) 
+                + " +" + (mySerial1.peek(M_TIME_BEGIN_START) - mySerial1.peek(M_TIME_RX_END))
+                + "= " +  mySerial1.peek(M_TIME_BEGIN_START) 
+                + " +" + (mySerial1.peek(M_TIME_BEGIN_END)   - mySerial1.peek(M_TIME_BEGIN_START)) 
+                + "="  +  mySerial1.peek(M_TIME_BEGIN_END) 
+                + " +" + (mySerial1.peek(M_TIME_AVAIL_START) - mySerial1.peek(M_TIME_BEGIN_END))
+                + "="  +  mySerial1.peek(M_TIME_AVAIL_START)
+                + " +" + (mySerial1.peek(M_TIME_AVAIL_END)   - mySerial1.peek(M_TIME_AVAIL_START))
+                + "="  +  mySerial1.peek(M_TIME_AVAIL_END)
                 ) ;  
 
         mySerial1.end();      // flush the buffer (if any) v38
         mySerial1.flush();      // flush the buffer (if any)
         if (outputOnSerial)
             Serial.println((String) ", "
-                + " " + mySerial1.peek(0)
-                + ". " + mySerial1.peek(1)
-                + "+"+ (mySerial1.peek(2) - mySerial1.peek(1))
-                + "=" + mySerial1.peek(2)
+                + " "  +  mySerial1.peek(M_TIME_START)
+                + ". " +  mySerial1.peek(M_TIME_START)
+                + "+"  + (mySerial1.peek(M_TIME_RX_END)      - mySerial1.peek(M_TIME_START))
+                + "="  +  mySerial1.peek(M_TIME_RX_END)
                 + ". "
                 );
     
@@ -2955,29 +2960,32 @@ void readTelegramWL() {
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
 
                   if (outputOnSerial)
+                  
                       Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial2 time "
-                          + " " + mySerial2.peek(0)
-                          + " " + mySerial2.peek(1)
+                          + " " + mySerial2.peek(M_TIME_START)
+                          + " " + mySerial2.peek(M_TIME_RX_START)
                           + ". "
-                          + " " + mySerial2.peek(2) 
-                          + " +" + (mySerial2.peek(3) - mySerial2.peek(2))
-                          + "= "+ mySerial2.peek(3) 
-                          + " +" + (mySerial2.peek(4) - mySerial2.peek(3)) 
-                          + "="+ mySerial2.peek(4) 
-                          + " +"+ (mySerial2.peek(5) - mySerial2.peek(4))
-                          + "=" + mySerial2.peek(5)
-                          + " +"+ (mySerial2.peek(6) - mySerial2.peek(5))
-                          + "=" + mySerial2.peek(6)
+                          + " "  +  mySerial2.peek(M_TIME_RX_END) 
+                          + " +" + (mySerial2.peek(M_TIME_BEGIN_START)  - mySerial2.peek(M_TIME_RX_END))
+                          + "= " +  mySerial2.peek(M_TIME_BEGIN_START) 
+                          + " +" + (mySerial2.peek(M_TIME_BEGIN_END)    - mySerial2.peek(M_TIME_BEGIN_START)) 
+                          + "="  +  mySerial2.peek(M_TIME_BEGIN_END) 
+                          + " +" + (mySerial2.peek(M_TIME_AVAIL_START)  - mySerial2.peek(M_TIME_BEGIN_END))
+                          + "="  +  mySerial2.peek(M_TIME_AVAIL_START)
+                          + " +" + (mySerial2.peek(M_TIME_AVAIL_END)    - mySerial2.peek(M_TIME_AVAIL_START))
+                          + "="  +  mySerial2.peek(M_TIME_AVAIL_END)
+
                           ) ;  
 
                   mySerial2.end();          // v38 Stop- if any - GJ communication
                   mySerial2.flush();        // v38 Clear GJ buffer
                   if (outputOnSerial)
                       Serial.println((String) ", "
-                          + " " + mySerial2.peek(0)
-                          + ". " + mySerial2.peek(1)
-                          + "+"+ (mySerial2.peek(2) - mySerial2.peek(1))
-                          + "=" + mySerial2.peek(2)
+                          + " "  +  mySerial2.peek(M_TIME_START)
+                          + ". " +  mySerial2.peek(M_TIME_START)
+                          + "+"  + (mySerial2.peek(M_TIME_RX_END) - mySerial2.peek(M_TIME_START))
+                          + "="  +  mySerial2.peek(M_TIME_RX_END)
+
                           + ". "
                           );
 

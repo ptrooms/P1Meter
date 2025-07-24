@@ -30,12 +30,31 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // the constructor however has an optional rx buffer size.
 // Speed up to 115200 can be used.
 
+#define SERIAL_RECORDTYPE_PORT 0    // read physical serialport for reading data
+#define SERIAL_RECORDTYPE_P1   1    // use simulated data in P1 energy format (default)
+#define SERIAL_RECORDTYPE_WL   2    // use simulated data in WL heat format
+#define SERIAL_RECORDTYPE_P1_B 3    // and do bittiming for P1
+#define SERIAL_RECORDTYPE_WL_B 4    // and do bittiming for WL
+
+#define M_TIME_ENTRIES     10  // Numbeer of entries in M_TIME table
+#define M_TIME_START       0   // cyclenumber start of Ovject
+#define M_TIME_RX_START    1   // cyclenumber start of void SoftwareSerial::enableRx Attach
+#define M_TIME_RX_END      2   // cyclenumber end of void SoftwareSerial::enableRx Detach
+#define M_TIME_BEGIN_START 3   // cyclenumber start of  SoftwareSerial::begin
+#define M_TIME_BEGIN_END   4   // cyclenumber end of  SoftwareSerial::begin
+#define M_TIME_AVAIL_START 5   // cyclenumber start of void SoftwareSerial::enableRx Attach
+#define M_TIME_AVAIL_END   6   // cyclenumber start of void SoftwareSerial::enableRx Attach
+
+#define M_BIT_CYCLE_VALUE (getCycleCountIram() % 4096);     // get distance
 
 class SoftwareSerial : public Stream
 {
 public:
+   // SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
+   SoftwareSerial(int receivePin, int transmitPin, int  inverse_logic = 3    , unsigned int buffSize = 64);
    SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
    ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
+
 
    void begin(long speed);
    void begin(long speed, int);
@@ -55,9 +74,11 @@ public:
 
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
+   void enableRx(bool on, int recorrtype);      // to use/do bittiming
 
-   void rxRead();		// witp1active detection beween / and !
-   void rxRead2();		// without p1active detection beween / and !
+   void rxRead();		   // BitBang with    p1active detection beween / and !
+   void rxRead2();		// BitBang without p1active detection beween / and !
+   void rxTriggerBit(); // use bittiming every flank change allocates a time
 
    // AVR compatibility methods
    bool listen() { enableRx(true); return true; }
@@ -85,7 +106,14 @@ private:
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
    uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes)
-   unsigned long *m_buffer_time;  // time-array
+
+   unsigned long *m_buffer_bits;         // time-array
+   unsigned int m_buffer_bits_inPos;        // position in buffer
+   unsigned int m_buffer_bits_outPos;        // position in buffer
+   int          m_buffer_bitValue;       // Last time detected
+   unsigned long *m_buffer_time;         // time-array
+   unsigned int m_buffer_timePos;        // position in buffer
+   
       
    // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;
    // 497-501-505 // 425 115k2@80MHz 
