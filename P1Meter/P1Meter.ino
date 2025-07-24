@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "58" // number this version
+#define VERSION_NUMBER "59" // number this version
 
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
@@ -102,6 +102,14 @@
 */
 
 /* change history
+  - v58d, v58e error; reworked to v58d1 and v58d2 to new v59 
+    - added overloaded for SoftwareSerial to prepare for serial bittiming
+    - we played around with calloc. Woirks great as test (*activate D-dip;lay to) show timers
+      using peek(int i) thar interrogates the timer array pf serial1 and serial2
+                  M_TIME_START  RX_START     RX_END          BEGIN             END                   AVAIL_         END   
+      x1 serial1 time  4318330 1973965602.  1973918650 +754= 1973919404 +46922=1973966326 +395253309=2369219635 +10=2369219645,  
+                    START  START              RX_END
+                  4318330. 4318330+2390910242=2395228572
   - v58c refactor len to myLen, debugging options
     - testing for (int i = 14; i < 11; i--) {asm NOP}
     - adding 4 delay()s to check if this stabilizes the COP_MODE version
@@ -5901,21 +5909,22 @@ void command_testH4(){    // code to maken things stable teststable
 
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
+
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
 #ifdef TEST_MODE                    
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
