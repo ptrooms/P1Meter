@@ -43,7 +43,8 @@ public:
    void setTransmitEnablePin(int transmitEnablePin);
 
    bool overflow();
-   int peek() override;
+   int peek();
+   unsigned long peek(int);
 
    virtual size_t write(uint8_t byte) override;
    virtual int read() override;
@@ -83,8 +84,9 @@ private:
    bool m_highSpeed;
    unsigned int m_inPos, m_outPos;
    int m_buffSize;
-   uint8_t *m_buffer;
-   
+   uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes)
+   unsigned long *m_buffer_time;  // time-array
+      
    // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;
    // 497-501-505 // 425 115k2@80MHz 
    unsigned long m_wait; 
