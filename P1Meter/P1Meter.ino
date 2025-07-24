@@ -2757,8 +2757,33 @@ void readTelegramP1() {
         if (intervalP1cnt < 1140) intervalP1cnt++ ; // increase survived read count
 
         p1SerialFinish = true; // indicate mainloop we can stop P1 serial for a while
+        if (outputOnSerial)
+            Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 time "
+                + " "  +  mySerial1.peek(M_TIME_START)
+                + " "  +  mySerial1.peek(M_TIME_RX_START)
+                + ". "
+                + " "  +  mySerial1.peek(M_TIME_RX_END) 
+                + " +" + (mySerial1.peek(M_TIME_BEGIN_START) - mySerial1.peek(M_TIME_RX_END))
+                + "= " +  mySerial1.peek(M_TIME_BEGIN_START) 
+                + " +" + (mySerial1.peek(M_TIME_BEGIN_END)   - mySerial1.peek(M_TIME_BEGIN_START)) 
+                + "="  +  mySerial1.peek(M_TIME_BEGIN_END) 
+                + " +" + (mySerial1.peek(M_TIME_AVAIL_START) - mySerial1.peek(M_TIME_BEGIN_END))
+                + "="  +  mySerial1.peek(M_TIME_AVAIL_START)
+                + " +" + (mySerial1.peek(M_TIME_AVAIL_END)   - mySerial1.peek(M_TIME_AVAIL_START))
+                + "="  +  mySerial1.peek(M_TIME_AVAIL_END)
+                ) ;  
+
         mySerial1.end();      // flush the buffer (if any) v38
         mySerial1.flush();      // flush the buffer (if any)
+        if (outputOnSerial)
+            Serial.println((String) ", "
+                + " "  +  mySerial1.peek(M_TIME_START)
+                + ". " +  mySerial1.peek(M_TIME_START)
+                + "+"  + (mySerial1.peek(M_TIME_RX_END)      - mySerial1.peek(M_TIME_START))
+                + "="  +  mySerial1.peek(M_TIME_RX_END)
+                + ". "
+                );
+    
         bSerial1State = false; // v57 indicate state
 
       }
@@ -2928,8 +2953,38 @@ void readTelegramWL() {
                 if (telegram2Record[0] == '/' && telegram2Record[telegram2_Pos - 5] == '!')  {
                   bGot_Telegram2Record = true;
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
+
+                  if (outputOnSerial)
+                  
+                      Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial2 time "
+                          + " " + mySerial2.peek(M_TIME_START)
+                          + " " + mySerial2.peek(M_TIME_RX_START)
+                          + ". "
+                          + " "  +  mySerial2.peek(M_TIME_RX_END) 
+                          + " +" + (mySerial2.peek(M_TIME_BEGIN_START)  - mySerial2.peek(M_TIME_RX_END))
+                          + "= " +  mySerial2.peek(M_TIME_BEGIN_START) 
+                          + " +" + (mySerial2.peek(M_TIME_BEGIN_END)    - mySerial2.peek(M_TIME_BEGIN_START)) 
+                          + "="  +  mySerial2.peek(M_TIME_BEGIN_END) 
+                          + " +" + (mySerial2.peek(M_TIME_AVAIL_START)  - mySerial2.peek(M_TIME_BEGIN_END))
+                          + "="  +  mySerial2.peek(M_TIME_AVAIL_START)
+                          + " +" + (mySerial2.peek(M_TIME_AVAIL_END)    - mySerial2.peek(M_TIME_AVAIL_START))
+                          + "="  +  mySerial2.peek(M_TIME_AVAIL_END)
+
+                          ) ;  
+
                   mySerial2.end();          // v38 Stop- if any - GJ communication
                   mySerial2.flush();        // v38 Clear GJ buffer
+                  if (outputOnSerial)
+                      Serial.println((String) ", "
+                          + " "  +  mySerial2.peek(M_TIME_START)
+                          + ". " +  mySerial2.peek(M_TIME_START)
+                          + "+"  + (mySerial2.peek(M_TIME_RX_END) - mySerial2.peek(M_TIME_START))
+                          + "="  +  mySerial2.peek(M_TIME_RX_END)
+
+                          + ". "
+                          );
+
+
                   bSerial2State = false; // v57 indicate state
                   if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
                       // debug print positions
