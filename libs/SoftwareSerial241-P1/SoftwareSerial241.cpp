@@ -162,7 +162,11 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long speed) {
    // Use getCycleCount() loop to get as exact timing as possible
-   Serial.print((String) ":B@"+ m_rxPin);      /// v58b diagnose
+   Serial.print((String) ":B" + (portActive() ? "!" : "@") + m_rxPin);      /// v58b/v59 diagnose
+   this->begin(speed,SERIAL_RECORDTYPE_PORT);   // do normal serial
+   
+   /*
+
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
    // m_wait = m_bitTime + m_bitTime/3 - 500;      // calculate timer waits midship done in ISR
                                                    // 497-501-505 // 425 115k2@80MHz 
@@ -171,10 +175,12 @@ void SoftwareSerial::begin(long speed) {
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
    if (!m_rxEnabled)
      enableRx(true);
+   */
 }
 
 /*
    Simulate input: 
+   0 = none, use physical
    1 = produce P1/power telegram
    2 = produce WL/heat telegram
 */
@@ -184,18 +190,24 @@ void SoftwareSerial::begin(long speed, int recordtype) {
    const char * str2 = "_/VALID-VI\\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
 
    m_buffer_time[M_TIME_BEGIN_START] = getCycleCountIram();   // initialise
+   m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
+   m_highSpeed = speed > 9600;
+   m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
+   Serial.print((String) (portActive() ? "!" : "@") ); // v58b/v59 diagnose
    if (recordtype == SERIAL_RECORDTYPE_PORT ) {
+         Serial.print((String) "\b" +  (m_rxPin == 14 ? "p" : "w" ) );         // v59 print indication which port to activate
+         if (!m_rxEnabled) enableRx(true);
+         else Serial.print((String) "\b" +  (m_rxPin == 14 ? "P" : "W" ));    // v59 print indication thingy was already active
+         /*
          // Serial.print((String) "\tset@"+ m_rxPin + "=>"); // v58b diagnose
          // note: plain use will calll somethign else and produeces
          this->begin(speed);   // do normal serial
-   } else {
+         */
+      } else {
+         Serial.print((String) "\b\tuse@");  
          // char *  str = warning: deprecated conversion from string constant to 'char*'
          // corrected to const char * str
-         Serial.print((String) "\tuse@"+ m_rxPin + ":"  + recordtype  + "\t"); // v58b diagnose
-         // Serial.print((String) "\r\n using serial " + __FILE__ +  "\r\n" + str);
-         m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
-         m_highSpeed = speed > 9600;   
-         m_P1active = false;
+         // Serial.print((String) "\r\n using serial " + __FILE__ +  "\r\n" + str);         
          this->enableRx(false, recordtype);     // will set m_rxEnabled = false;
          m_outPos = 0;        // position to start of buffer
          // msg3.concat("
@@ -222,8 +234,8 @@ void SoftwareSerial::begin(long speed, int recordtype) {
 
          m_inPos++;  // position after  last one
          // Serial.print((String) "<\r\n Serialsize=" + m_inPos + " + \r\n");
-         Serial.print((String) "$");
-
+         Serial.print((String)  m_rxPin + (portActive() ? "I" : "i" ) + ":"  + recordtype + " "); /// v59 diagnose
+         if (false) Serial.println(" Dummy print line" + __LINE__ );   // v59 just checking if this influences stability
 
    }
    m_buffer_time[M_TIME_BEGIN_END] = getCycleCountIram();   // initialise
@@ -249,9 +261,11 @@ void SoftwareSerial::enableRx(bool on) {
       if (on) {
          attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
          m_buffer_time[M_TIME_RX_START] = getCycleCountIram();   // initialise
+         m_port_state = true;    // v59
       } else {
          detachInterrupt(m_rxPin);
          m_buffer_time[M_TIME_RX_END] = getCycleCountIram();   // initialise
+         m_port_state = false;    // v59
       }         
       m_rxEnabled = on;
       /*
@@ -269,29 +283,34 @@ void SoftwareSerial::enableRx(bool on) {
 }
 
 void SoftwareSerial::enableRx(bool on, int recordtype) {
+   m_port_state = false;    // v59
    if (m_rxValid) {
-      if (on && 
-            (recordtype == SERIAL_RECORDTYPE_P1_B || recordtype == SERIAL_RECORDTYPE_WL_B)) {
-         if      (m_rxPin ==  4) attachInterrupt(m_rxPin, ISRList[16], m_invert ? RISING : FALLING);
-         else if (m_rxPin == 14) attachInterrupt(m_rxPin, ISRList[17], m_invert ? RISING : FALLING);
-         m_buffer_time[M_TIME_RX_START] = getCycleCountIram();   // initialise
-      } else {
-         detachInterrupt(m_rxPin);
-         m_buffer_time[M_TIME_RX_END] = getCycleCountIram();   // initialise
-      }         
-      m_rxEnabled = on;
-      /*
-      if (on)  // diagnose v58
-        Serial.print((String) "\r\n Serial " + m_rxPin +  " On  " + (m_invert ? "RISING" : "FALLING") + " " );
-      else        
-        Serial.print((String) " Serial " + m_rxPin +  " OFF " + (m_invert ? "RISING" : "FALLING") + "\r\n" );
-      
-         Serial.print((String) " Serial " + m_rxPin 
-                     + ", enableRx=" + (m_rxEnabled ? "ON" : "OFF")
-                     + ", m_bitWait=" + m_bitWait 
-                     + ", flank=" + (m_invert ? "RISING" : "FALLING") + "\r\n" );
-      */
-   }
+      if (on) {
+         if (recordtype == SERIAL_RECORDTYPE_P1_B || recordtype == SERIAL_RECORDTYPE_WL_B) {
+            if      (m_rxPin ==  4) attachInterrupt(m_rxPin, ISRList[16], m_invert ? RISING : FALLING);
+            else if (m_rxPin == 14) attachInterrupt(m_rxPin, ISRList[17], m_invert ? RISING : FALLING);
+         } else {
+                                    attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
+         }
+         m_port_state = true;    // v59
+      }
+      m_buffer_time[M_TIME_RX_START] = getCycleCountIram();   // initialise
+   } else {
+      detachInterrupt(m_rxPin);
+      m_buffer_time[M_TIME_RX_END] = getCycleCountIram();   // initialise
+   }         
+   m_rxEnabled = on;
+   /*
+   if (on)  // diagnose v58
+     Serial.print((String) "\r\n Serial " + m_rxPin +  " On  " + (m_invert ? "RISING" : "FALLING") + " " );
+   else        
+     Serial.print((String) " Serial " + m_rxPin +  " OFF " + (m_invert ? "RISING" : "FALLING") + "\r\n" );
+   
+      Serial.print((String) " Serial " + m_rxPin 
+                  + ", enableRx=" + (m_rxEnabled ? "ON" : "OFF")
+                  + ", m_bitWait=" + m_bitWait 
+                  + ", flank=" + (m_invert ? "RISING" : "FALLING") + "\r\n" );
+   */
 }
 
 
@@ -305,6 +324,11 @@ int SoftwareSerial::read() {
 
 bool SoftwareSerial::P1active() {                // When / is read on serial P1Active, at ! this is stopped
    if (m_P1active) return true;                  // 28mar21 added Ptro for P1 serialisation (to checkout)
+   return false;
+}
+
+bool SoftwareSerial::portActive() {                // v59 indicate portstatus
+   if (m_port_state) return true;
    return false;
 }
 

@@ -60,7 +60,7 @@
       Check if/do water trigger
       If P2 Do WL process 
       If P1 Do P1 process, when data processGpio() functions, publishP1ToMqtt();  
-      set timings, trace line and "loopcnt % 10"
+      set timings, trace line and "loopCnt % 10"
       If no data: do forced processGpio() functions, publishP1ToMqtt();  
       OTA handle
 
@@ -955,7 +955,7 @@ unsigned long startMicrosP1  = 0; // micros() when P1 went active (reading heade
 
 // used to research and find position of wdt resets
 unsigned long test_WdtTime = 0;   // time the mainloop
-unsigned long loopcnt = 0;        // count the loop
+unsigned long loopCnt = 0;        // count the loop
 
 // control the informative led within the loop
 unsigned long previousBlinkMillis = 0; // used to shortblink the BLUELED, at serialinput this is set to high value
@@ -1322,7 +1322,8 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
   // 274 rubbish // SoftwareSerial mySerial1(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
   SoftwareSerial mySerial1(SERIAL_RX, -1          , bSERIAL_INVERT  , MAXLINELENGTH); // (RX, TX. inverted, buffer)
   SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2 , bSERIAL2_INVERT , MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
-  SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 3, 100);   // (RX, TX. bittiming)
+  SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 3, 100);   // (RX, bittiming)
+  SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 3, 100);   // (RX, TX2. bittiming)
   // SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 3, 100);   // (RX, TX, bittiming)
   // next causes a problem
   // SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 10, MAXLINELENGTH); // (RX, TX. inverted, buffer)
@@ -2059,7 +2060,7 @@ void setup()
 
     waterTriggerTime = 0;  // ensure and assum no trigger yet
     test_WdtTime = 0;  // set first loop timer
-    loopcnt = 0;              // set loopcount to 0
+    loopCnt = 0;              // set loopcount to 0
     Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
   //  WiFi.printDiag(Serial);   // print data
   } // setup
@@ -2130,14 +2131,15 @@ void loop()
   
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
-    loopcnt++ ;
+    loopCnt++ ;
     /* 
         here we display the number of line loops -0-1-2-3-4-5-6-7-8-9    
     */
-    // Serial.print((String)"-" +(loopcnt%10)+" \b");
+    // Serial.print((String)"-" +(loopCnt%10)+" \b");
     
     // Serial.print((String) (
-    //   (waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopcnt % 10)+" \b"); // v47 test water tapping 
+    //   (waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopCnt % 10)+" \b"); // v47 test water tapping 
+    
     Serial.print((String) (                             // display diagnostic second loopcounter
           (waterReadCounter != waterReadCounterPrevious) ?   // v47 check test water tapping active
               (bSerial1State ? 
@@ -2147,8 +2149,10 @@ void loop()
               (bSerial1State ? 
                   (bSerial2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
                  :(bSerial2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
-          )
-          +   (loopcnt % 10)+" \b");
+          ) );
+    if (mySerial1.portActive() !=  bSerial1State) Serial.print((String) "E");   // v59 check if driver matches the portstate
+    if (mySerial2.portActive() !=  bSerial2State) Serial.print((String) "e");   // v59 check if driver matches the portstate
+    Serial.print((String) +   (loopCnt % 10)+" \b");                          // display diagnostic second loopcounter
 
     test_WdtTime = currentMillis - test_WdtTime;          
     if (verboseLevel == 1 && test_WdtTime != 1UL )  {      // v58 print long looptimes to diagnose excessive delays
@@ -2224,18 +2228,23 @@ void loop()
       telegramError = 0;        // start with no errors
       // Start secondary serial connection if not yet active
       if (!serial1Stop) {
+          // mySerial1.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
+          mySerial1.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial1.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          if (mySerial1.portActive()) Serial.print((String) "#!1#" );
         #ifdef UseNewSoftSerialLIB
           // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
           mySerial1.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
           // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
         #else
-          // mySerial1.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          mySerial1.end();          // v58b: not sure  but to acertain,  finish any active
-          mySerial1.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
           mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
           // mySerial1.begin(serial1Baudrate);  // < v58a ss241 P1 meter port   115k2    // required during test without P1
         #endif
           bSerial1State = true; // v57 indicate state
+          if (bSerial1State != mySerial1.portActive()) Serial.print((String) "?" +
+                                                        + (bSerial1State ? "A" : "a")
+                                                        + (mySerial1.portActive() ? "I" : "i")
+                                                        +  "?");
       }        
 
     } else {    // if (!p1SerialActive)
@@ -2270,6 +2279,7 @@ void loop()
                 (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
           if (!serial2Stop) {
+            
               #ifdef UseNewSoftSerialLIB
                 // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
                 // mySerial1.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
@@ -2279,6 +2289,7 @@ void loop()
                 // mySerial2.begin(serial2Baudrate);    // P1 meter port 115200 baud
                 mySerial2.end();          // v58b: not sure  but to acertain,  finish any active
                 mySerial2.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+                if (mySerial2.portActive()) Serial.print((String) "#!2#" );
                 mySerial2.begin(serial2Baudrate,serial2PortMode);    // v58a, v58b ss241 =0 or simulate 1=P1; 2=RX/WL data.
                 // #else 
                 //   mySerial2.begin(serial2Baudrate,0);    // Using physical 0-port
@@ -3824,7 +3835,9 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         else if ((char)payload[1] == '\x00') serial1Stop = !serial1Stop;
 
         if (outputOnSerial) Serial.print((String) 
-              " Serial1 P1="  + (!serial1Stop  ? "Active" : "disabled") +
+              " Serial1 P1 state " 
+            +  (serial1Stop  ? "disabled" : "Enabled") 
+            +  (mySerial1.portActive() ? "/ISR" : "/---")   // v59 display if port has ISR activated
             + " mode="        + serial1PortMode    // v58b
             + " Finish="  + (p1SerialFinish  ? "1" : "0") + " )" 
             + " Active="  + (p1SerialActive  ? "1" : "0") + " )" ) ;
@@ -3842,10 +3855,14 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         else if ((char)payload[1] == 'T') serial2PortMode = 2;    // v58b use internal simulation  SS241
         else if ((char)payload[1] == '\x00') serial2Stop = !serial2Stop;
         
+
         if (outputOnSerial) Serial.print((String) 
-              " Serial2 WL="" (" + (!serial2Stop  ? "Active" : "disabled") 
+              " Serial2 WL state " 
+            +  (serial2Stop  ? "disabled" : "Enabled") 
+            +  (mySerial2.portActive() ? "/ISR" : "/---")    // v59 display if port has ISR activated
             + " mode="           + serial2PortMode    // v58b   
             + " interval="       + rx2ReadInterval ) ;   //  % mqttCnt
+
         else Serial.print((String) "\tserial2=" 
               + (!serial2Stop  ? "e" : "d") 
               + serial2PortMode + "\t"  );
@@ -3920,6 +3937,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                         + "\t" + (!serial1Stop  ? "Yes" : "No") 
                         + "\tserial1P1-"
                         + (bSerial1State  ? "A" : "i")
+                        +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
                         + " , bittime=" + temp1
                         + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
                         + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
@@ -3931,6 +3949,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                         + " \t" + (!serial2Stop  ? "Yes" : "No")          
                         + "\tserial2P2-"
                         + (bSerial2State  ? "A" : "i")
+                        +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
                         + " , bittime=" + temp2
                         + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
                         + ", interval:"+ rx2ReadInterval  

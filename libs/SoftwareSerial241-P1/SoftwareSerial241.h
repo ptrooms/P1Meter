@@ -69,6 +69,7 @@ public:
    virtual int available() override;
    virtual void flush() override;
    virtual bool P1active();          // defined class used during P1 serilisation
+   virtual bool portActive();        // check if port is active
    operator bool() {return m_rxValid || m_txValid;}
 
    // Disable or enable interrupts on the rx pin
@@ -98,6 +99,7 @@ private:
    bool m_txValid, m_txEnableValid;
    bool m_invert;
    bool m_P1active;                 // Ptro 28mar21 to support P1 messageing
+   bool m_port_state;               // v59 contains status of (in)activated ISR
    bool m_overflow;
    unsigned long m_bitTime;
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
