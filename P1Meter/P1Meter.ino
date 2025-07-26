@@ -102,10 +102,14 @@
 */
 
 /* change history
+  - v59b - testdata, preparing for alternative ISR (bittiming) routine, print time table serial_Print_PeekBits command t(1,2,3)
+  - v59a - diagfnostics and prepare multiport threading, all serial combinaed in a single routine
+  - v59  - added extra telegram bash scripts to feed test data
+  - 58d2 - moved to production
   - v58d, v58e error; reworked to v58d1 and v58d2 to new v59 
     - added overloaded for SoftwareSerial to prepare for serial bittiming
     - we played around with calloc. Woirks great as test (*activate D-dip;lay to) show timers
-      using peek(int i) thar interrogates the timer array pf serial1 and serial2
+      using peekTime(int i) thar interrogates the timer array pf serial1 and serial2
                   M_TIME_START  RX_START     RX_END          BEGIN             END                   AVAIL_         END   
       x1 serial1 time  4318330 1973965602.  1973918650 +754= 1973919404 +46922=1973966326 +395253309=2369219635 +10=2369219645,  
                     START  START              RX_END
@@ -2159,8 +2163,11 @@ void loop()
                   (bSerial2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
                  :(bSerial2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
           ) );
+    // -Ee -->  serial1state active while port is inactive, serial2state inactive and port2 is active, 
+
     if (mySerial1.portActive() !=  bSerial1State) Serial.print((String) "E");   // v59 check if driver matches the portstate
     if (mySerial2.portActive() !=  bSerial2State) Serial.print((String) "e");   // v59 check if driver matches the portstate
+
     Serial.print((String) +   (loopCnt % 10)+" \b");                          // display diagnostic second loopcounter
 
     test_WdtTime = currentMillis - test_WdtTime;          
@@ -2764,32 +2771,10 @@ void readTelegramP1() {
         if (intervalP1cnt < 1140) intervalP1cnt++ ; // increase survived read count
 
         p1SerialFinish = true; // indicate mainloop we can stop P1 serial for a while
-        if (outputOnSerial)
-            Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 time "
-                + " "  +  mySerial1.peek(M_TIME_START)
-                + " "  +  mySerial1.peek(M_TIME_RX_START)
-                + ". "
-                + " "  +  mySerial1.peek(M_TIME_RX_END) 
-                + " +" + (mySerial1.peek(M_TIME_BEGIN_START) - mySerial1.peek(M_TIME_RX_END))
-                + "= " +  mySerial1.peek(M_TIME_BEGIN_START) 
-                + " +" + (mySerial1.peek(M_TIME_BEGIN_END)   - mySerial1.peek(M_TIME_BEGIN_START)) 
-                + "="  +  mySerial1.peek(M_TIME_BEGIN_END) 
-                + " +" + (mySerial1.peek(M_TIME_AVAIL_START) - mySerial1.peek(M_TIME_BEGIN_END))
-                + "="  +  mySerial1.peek(M_TIME_AVAIL_START)
-                + " +" + (mySerial1.peek(M_TIME_AVAIL_END)   - mySerial1.peek(M_TIME_AVAIL_START))
-                + "="  +  mySerial1.peek(M_TIME_AVAIL_END)
-                ) ;  
+        if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_P1_DATA, M_TIME_AVAIL_END);         // v59b print all timers
         openCloseSerial(SERIALPORT_P1_DATA, SERIALPORT_CLOSE);            
-        if (outputOnSerial)
-            Serial.println((String) ", "
-                + " "  +  mySerial1.peek(M_TIME_START)
-                + ". " +  mySerial1.peek(M_TIME_START)
-                + "+"  + (mySerial1.peek(M_TIME_RX_END)      - mySerial1.peek(M_TIME_START))
-                + "="  +  mySerial1.peek(M_TIME_RX_END)
-                + ". "
-                );
-    
-        bSerial1State = false; // v57 indicate state
+        if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_P1_DATA, M_TIME_RX_END);    // v59b print 4 timers
+         // bSerial1State = false; // v57 indicate state
 
       }
       /* //debugCRC
@@ -2959,36 +2944,12 @@ void readTelegramWL() {
                   bGot_Telegram2Record = true;
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
 
+                  if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_WL_DATA, M_TIME_AVAIL_END);         // v59b print all timers
+                  openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_CLOSE);
                   if (outputOnSerial)
-                  
-                      Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial2 time "
-                          + " " + mySerial2.peek(M_TIME_START)
-                          + " " + mySerial2.peek(M_TIME_RX_START)
-                          + ". "
-                          + " "  +  mySerial2.peek(M_TIME_RX_END) 
-                          + " +" + (mySerial2.peek(M_TIME_BEGIN_START)  - mySerial2.peek(M_TIME_RX_END))
-                          + "= " +  mySerial2.peek(M_TIME_BEGIN_START) 
-                          + " +" + (mySerial2.peek(M_TIME_BEGIN_END)    - mySerial2.peek(M_TIME_BEGIN_START)) 
-                          + "="  +  mySerial2.peek(M_TIME_BEGIN_END) 
-                          + " +" + (mySerial2.peek(M_TIME_AVAIL_START)  - mySerial2.peek(M_TIME_BEGIN_END))
-                          + "="  +  mySerial2.peek(M_TIME_AVAIL_START)
-                          + " +" + (mySerial2.peek(M_TIME_AVAIL_END)    - mySerial2.peek(M_TIME_AVAIL_START))
-                          + "="  +  mySerial2.peek(M_TIME_AVAIL_END)
+                  if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_WL_DATA, M_TIME_RX_END);         // v59b print all timers
 
-                          ) ;  
-                  openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_CLOSE);            
-                  if (outputOnSerial)
-                      Serial.println((String) ", "
-                          + " "  +  mySerial2.peek(M_TIME_START)
-                          + ". " +  mySerial2.peek(M_TIME_START)
-                          + "+"  + (mySerial2.peek(M_TIME_RX_END) - mySerial2.peek(M_TIME_START))
-                          + "="  +  mySerial2.peek(M_TIME_RX_END)
-
-                          + ". "
-                          );
-
-
-                  bSerial2State = false; // v57 indicate state
+                  // bSerial2State = false; // v57 indicate state
                   if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
                       // debug print positions
                       Serial.print("\nns1=")          ; // debug v38 print processing
@@ -3860,6 +3821,17 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           if ( (char)payload[1] == '2') command_testH2();    // v52: check mqtt empty strings
           if ( (char)payload[1] == '3') command_testH3();    // v55 
           if ( (char)payload[1] == '4') command_testH4();    // v55a redudant delay()
+
+    } else  if ((char)payload[0] == 't') {    // v59b print bittime ttable
+            if ( ( (char)payload[1] == '1' || (char)payload[1] == '2') &&
+                 ( (char)payload[2] >= '1' && (char)payload[2] <= '4') ) {
+                 int peekport = (((int)payload[1] - 48));   // set portnumber
+                       if ( (char)payload[2] == '1') serial_Print_PeekBits(peekport,  32);
+                  else if ( (char)payload[2] == '2') serial_Print_PeekBits(peekport,  64);
+                  else if ( (char)payload[2] == '3') serial_Print_PeekBits(peekport, 128);
+                  else if ( (char)payload[2] == '4') serial_Print_PeekBits(peekport, 256);   // 200mS print time
+            } else                                   serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
+
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\r\n? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
@@ -3886,6 +3858,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
+          Serial.println((String)"t 0-4 Print Bit table");        // v59
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -6011,7 +5984,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
       } else if (serial_port_number == SERIALPORT_WL_DATA && serial_port_mode == SERIALPORT_CLOSE) {
           mySerial2.end();          // v58b: not sure  but to acertain,  finish any active
           mySerial2.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
-          bSerial1State = false; // v57 indicate state
+          bSerial2State = false; // v57 indicate state
           if (mySerial2.portActive()) Serial.print((String) "#!2#" );
       } else if (serial_port_number == SERIALPORT_WL_DATA && serial_port_mode == SERIALPORT_OPEN ) {
           if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
@@ -6021,7 +5994,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
           #else
             mySerial2.begin(serial1Baudrate, serial2PortMode);    // v58a, V58b Use simulated data P1
           #endif
-            bSerial1State = true; // v57 indicate state
+            bSerial2State = true; // v57 indicate state
 
       } else if (serial_port_number == SERIALPORT_P1_TIME && serial_port_mode == SERIALPORT_CLOSE) {
           mySerial3.end();          // v58b: not sure  but to acertain,  finish any active
@@ -6066,4 +6039,105 @@ void printf_port_state_isr() {
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 2, (bSerial2State ? 1 : 0) , (mySerial2.portActive() ? 1 : 0));
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 3, (bSerial3State ? 1 : 0) , (mySerial3.portActive() ? 1 : 0));
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 4, (bSerial4State ? 1 : 0) , (mySerial4.portActive() ? 1 : 0));
+}
+
+/*
+  Diagnose, print a series of Times as collected by softserial
+*/
+void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
+  if (time_port == 1) {
+    Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 time "     // print first 4 (time initiated an port allocated)
+        + " "  +  mySerial1.peekTime(M_TIME_START)
+        + " "  +  mySerial1.peekTime(M_TIME_RX_START)
+        + ". "
+        + " "  +  mySerial1.peekTime(M_TIME_RX_END));
+    if (m_time_request > M_TIME_RX_END )              // print all standard
+    Serial.print((String) 
+        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
+        + "= " +  mySerial1.peekTime(M_TIME_BEGIN_START) 
+        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
+        + "="  +  mySerial1.peekTime(M_TIME_BEGIN_END) 
+        + " +" + (mySerial1.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
+        + "="  +  mySerial1.peekTime(M_TIME_AVAIL_START)
+        + " +" + (mySerial1.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
+        + "="  +  mySerial1.peekTime(M_TIME_AVAIL_END)
+        );  
+  }                
+  if (time_port == 2) {
+    Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial2 time "     // print first 4 (time initiated an port allocated)
+        + " "  +  mySerial2.peekTime(M_TIME_START)
+        + " "  +  mySerial2.peekTime(M_TIME_RX_START)
+        + ". "
+        + " "  +  mySerial2.peekTime(M_TIME_RX_END));
+    if (m_time_request > M_TIME_RX_END )              // print all standard
+    Serial.print((String) 
+        + " +" + (mySerial2.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
+        + "= " +  mySerial2.peekTime(M_TIME_BEGIN_START) 
+        + " +" + (mySerial2.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
+        + "="  +  mySerial2.peekTime(M_TIME_BEGIN_END) 
+        + " +" + (mySerial2.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
+        + "="  +  mySerial2.peekTime(M_TIME_AVAIL_START)
+        + " +" + (mySerial2.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
+        + "="  +  mySerial2.peekTime(M_TIME_AVAIL_END)
+        );
+  }                
+
+}
+
+/*
+  Diagnose, print a series of Bit Times as collected by softserial
+*/
+void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
+  if (bit_port == 1) {
+    Serial.print((String) "\r\n Print bit time sequences"+ 
+                  + " serial port="+ bit_port 
+                  + " #Inpos=" + mySerial1.peekBitPos()
+                  + "-------------time:" + micros()
+                  + " \r\n");
+    for (int i = 0; i <= bit_sequence; i++ )  {
+      // Serial.print((String) "\t" + mySerial1.peekBit(i));
+      if (i > 0) {
+           Serial.print((String) "\t" + (mySerial1.peekBit(i)-mySerial1.peekBit(i-1)) + "-" );
+                   if (isprint(mySerial1.peekByte(i-1))) {             // v45 revise to improve print debug 
+                Serial.print((char) mySerial1.peekByte(i-1));
+            } else if ( mySerial1.peekByte(i-1) == '\x0d') {
+                Serial.print("<");
+            } else if ( mySerial1.peekByte(i-1) == '\x0a') {
+                Serial.print("|");
+            } else if ( mySerial1.peekByte(i-1) == '\x00') {
+                Serial.print("_");
+            } else  {
+                Serial.print("?");
+            }
+      }
+      if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial1.peekBit(i) + "> " );  // next line time
+    }
+  }    
+  if (bit_port == 2) {
+    Serial.print((String) "\r\n Print bit time sequences"+ 
+                  + " serial port="+ bit_port 
+                  + " #Inpos=" + mySerial2.peekBitPos()
+                  + "-------------time:" + micros()
+                  + " \r\n");
+    for (int i = 0; i <= bit_sequence; i++ )  {
+      // Serial.print((String) "\t" + mySerial2.peekBit(i));
+      if (i > 0) {
+           Serial.print((String) "\t" + (mySerial2.peekBit(i)-mySerial2.peekBit(i-1)) + "-" );
+                   if (isprint(mySerial2.peekByte(i-1))) {             // v45 revise to improve print debug 
+                Serial.print((char) mySerial2.peekByte(i-1));
+            } else if ( mySerial2.peekByte(i-1) == '\x0d') {
+                Serial.print("<");
+            } else if ( mySerial2.peekByte(i-1) == '\x0a') {
+                Serial.print("|");
+            } else if ( mySerial2.peekByte(i-1) == '\x00') {
+                Serial.print("_");
+            } else  {
+                Serial.print("?");
+            }
+      }
+      if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial2.peekBit(i) + "> " );  // next line time
+    }
+  }    
+
+  Serial.print((String) "\r\n-------------time:" + micros() + "\r\n");
 }

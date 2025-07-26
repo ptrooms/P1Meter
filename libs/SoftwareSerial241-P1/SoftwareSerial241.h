@@ -36,14 +36,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SERIAL_RECORDTYPE_P1_B 3    // and do bittiming for P1
 #define SERIAL_RECORDTYPE_WL_B 4    // and do bittiming for WL
 
-#define M_TIME_ENTRIES     10  // Numbeer of entries in M_TIME table
-#define M_TIME_START       0   // cyclenumber start of Ovject
-#define M_TIME_RX_START    1   // cyclenumber start of void SoftwareSerial::enableRx Attach
-#define M_TIME_RX_END      2   // cyclenumber end of void SoftwareSerial::enableRx Detach
-#define M_TIME_BEGIN_START 3   // cyclenumber start of  SoftwareSerial::begin
-#define M_TIME_BEGIN_END   4   // cyclenumber end of  SoftwareSerial::begin
-#define M_TIME_AVAIL_START 5   // cyclenumber start of void SoftwareSerial::enableRx Attach
-#define M_TIME_AVAIL_END   6   // cyclenumber start of void SoftwareSerial::enableRx Attach
+
+#ifndef M_TIME_NAMES
+   #define M_TIME_NAMES           // Indicate our name
+   #define M_TIME_ENTRIES     10  // Numbeer of entries in M_TIME table
+   #define M_TIME_START       0   // cyclenumber start of Ovject
+   #define M_TIME_RX_START    1   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_RX_END      2   // cyclenumber end of void SoftwareSerial::enableRx Detach
+   #define M_TIME_BEGIN_START 3   // cyclenumber start of  SoftwareSerial::begin
+   #define M_TIME_BEGIN_END   4   // cyclenumber end of  SoftwareSerial::begin
+   #define M_TIME_AVAIL_START 5   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_AVAIL_END   6   // cyclenumber start of void SoftwareSerial::enableRx Attach
+#endif
 
 #define M_BIT_CYCLE_VALUE (getCycleCountIram() % 4096);     // get distance
 
@@ -54,30 +58,33 @@ public:
       SoftwareSerial(int receivePin, int transmitPin, int  inverse_logic = 10   , unsigned int buffSize = 64);
    ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
 
-   void begin(long speed);
-   void begin(long speed, int);
+   void begin(long speed);             // will call/do  SERIAL_RECORDTYPE_PORT
+   void begin(long speed, int);        // elect type of port 0-physical/ 1-simulatedP1 / 2-simulatatedWL
    long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
 
    bool overflow();
    int peek();
-   unsigned long peek(int);
-   unsigned long peekbit(int);
+   // unsigned long peek(int);
+   unsigned long peekBit(int);            // v59b return request Time of inserted entry
+   unsigned long peekBitPos();            // v59b return last entry in BitTime table
+   unsigned long peekTime(int);           // v59b return Time where driver is
+   int           peekByte(int);           // v59b return this Byte in Buffer
 
    virtual size_t write(uint8_t byte) override;
    virtual int read() override;
    virtual int available() override;
    virtual void flush() override;
-   virtual bool P1active();          // defined class used during P1 serilisation
-   virtual bool portActive();        // check if port is active
+   virtual bool P1active();          // check if driver is active beween header-/ and trailer byte-!
+   virtual bool portActive();        // check if port is active (m_port_state)
    operator bool() {return m_rxValid || m_txValid;}
 
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
-   void enableRx(bool on, int recorrtype);      // to use/do bittiming
+   void enableRx(bool on, int recordtype);      // v58 to use/do/selec type of data 0-physical/ 1-simulatedP1 / 2-simulatatedWL
 
-   void rxRead();		   // BitBang with    p1active detection beween / and !
-   void rxRead2();		// BitBang without p1active detection beween / and !
+   void rxRead();		   // BitBang P1 with    p1active detection beween / and !
+   void rxRead2();		// BitBang Wl without p1active detection beween / and !
    void rxTriggerBit(); // use bittiming every flank change allocates a time
 
    // AVR compatibility methods
@@ -109,8 +116,9 @@ private:
    uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
    unsigned long *m_buffer_bits;         // 4096-value time-array  index m_inPos, m_outPos;
-   // unsigned int m_buffer_bits_inPos;        // position in buffer
-   // unsigned int m_buffer_bits_outPos;        // position in buffer
+   unsigned int m_buffer_bits_inPos;        // position in buffer
+   unsigned int m_buffer_bits_outPos;        // position in buffer
+   
    int          m_buffer_bitValue;       // Last time detected index by 
    
    unsigned long *m_buffer_time;         // time-array
@@ -123,6 +131,8 @@ private:
 
 
 };
+
+// ??  ESP.getCycleCount()
 
 uint32_t ICACHE_RAM_ATTR SoftwareSerial::getCycleCountIram()
 {

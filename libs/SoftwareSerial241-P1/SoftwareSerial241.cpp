@@ -42,6 +42,8 @@ extern "C" {
 
 #define MAX_PIN 15
 
+#define GET_CYCLE_COUNT  ESP.getCycleCount()       // get the esp cycle counter
+
 // As the Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible GPIO pins have to be defined
 SoftwareSerial *ObjList[MAX_PIN+3];
@@ -83,9 +85,12 @@ static void (*ISRList[MAX_PIN+3])() = {
       sws_isr_17
 };
 
-SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logic, unsigned int buffSize) {
+/* 
+   Serial 3 & 4
+*/
+SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logic, unsigned int buffSize) {    // v58: method of CHANGE ISR
    m_rxValid = m_txValid = m_txEnableValid = false;
-   Serial.println((String) "\n\r >>>>>> Allocated overloaded inverse_logic=" +  inverse_logic);
+   // Serial.println((String) "\n\r >>>>>> Allocated overloaded inverse_logic=" +  inverse_logic);  // print does not work here
    // SoftwareSerial(receivePin,transmitPin, true, buffSize);  // will cause crash
    m_rxValid = m_txValid = m_txEnableValid = false;
    m_buffer = NULL;
@@ -95,11 +100,54 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
    // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
    m_bitWait = 509;
-   
+
+   if (receivePin == 4 || receivePin == 14 ) {
+      m_rxPin = receivePin;
+      m_buffSize = buffSize;
+      m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+                                       // https://www.guru99.com/difference-between-malloc-and-calloc.html
+                                       // malloc allocates a single block of uninitialized memory
+                                       // calloc allocates multiple blocks of memory and initializes them to zero.
+                                       // 10*4*1024 = 61.6% (used 50448 bytes from 81920 bytes)
+                                       // *1 = heap =20472   *2 = heap 15872 *3 = heap 11024      
+      
+      m_buffer_timePos  = M_TIME_START;
+      m_buffer_time = (unsigned long*)calloc(M_TIME_ENTRIES, sizeof(unsigned long));               // v58d_ss241 ytimer positions
+      m_buffer_time[M_TIME_START]  = GET_CYCLE_COUNT;   // initialise
+      m_buffer_bits = (unsigned long*)calloc((m_buffSize)*1, sizeof(unsigned long));    // v58d_ss241 2-10 bit-transitions 
+      // m_buffer_bitValue = 0;
+      m_buffer_bitValue = M_BIT_CYCLE_VALUE  // initialise this 
+
+      // --> if (m_buffer != NULL && m_buffer_time[0] == 0UL) {  causes boot loop
+
+      if (m_buffer != NULL) {          // check we have memory // v58d_ss241
+         m_rxValid = true;
+         m_inPos = m_outPos = 0;
+         pinMode(m_rxPin, INPUT);
+
+         if (receivePin ==  4) ObjList[16] = this;
+         if (receivePin == 14) ObjList[17] = this;
+         enableRx(true);
+      } else {
+         Serial.println((String) "Serial Buffer allocation error.");
+      }
+   }
+   if (isValidGPIOpin(transmitPin) || transmitPin == 16) {
+      m_txValid = true;
+      m_txPin = transmitPin;
+      pinMode(m_txPin, OUTPUT);
+      digitalWrite(m_txPin, !m_invert);
+   }
+   // Default speed
+   SoftwareSerial::begin(9600);
 }
 
-SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {
-   Serial.println((String) "\n\r >>>>>> Allocated non overloaded inverse_logic=" +  inverse_logic);
+
+/*
+   Serial 1 & 2
+*/
+SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic, unsigned int buffSize) {   // v58: method of FALL/RISE ISR
+   // Serial.println((String) "\n\r >>>>>> Allocated non overloaded inverse_logic=" +  inverse_logic); // print does not work here
    m_rxValid = m_txValid = m_txEnableValid = false;
    m_buffer = NULL;
    m_invert = inverse_logic;
@@ -117,9 +165,10 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
                                        // calloc allocates multiple blocks of memory and initializes them to zero.
                                        // 10*4*1024 = 61.6% (used 50448 bytes from 81920 bytes)
                                        // *1 = heap =20472   *2 = heap 15872 *3 = heap 11024      
+      
       m_buffer_timePos  = M_TIME_START;
       m_buffer_time = (unsigned long*)calloc(M_TIME_ENTRIES, sizeof(unsigned long));               // v58d_ss241 ytimer positions
-      m_buffer_time[M_TIME_START]  = getCycleCountIram();   // initialise
+      m_buffer_time[M_TIME_START]  = GET_CYCLE_COUNT;   // initialise
       m_buffer_bits = (unsigned long*)calloc((m_buffSize)*1, sizeof(unsigned long));    // v58d_ss241 2-10 bit-transitions 
       // m_buffer_bitValue = 0;
       m_buffer_bitValue = M_BIT_CYCLE_VALUE  // initialise this 
@@ -154,6 +203,9 @@ SoftwareSerial::~SoftwareSerial() {    // P1meter never called as we keep the bu
       free(m_buffer);
    if (m_buffer_time)          // v58d_ss241
       free(m_buffer_time);
+   if (m_buffer_bits)          // v59b
+      free(m_buffer_bits);
+
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
@@ -188,8 +240,8 @@ void SoftwareSerial::begin(long speed) {
 void SoftwareSerial::begin(long speed, int recordtype) {
    const char * str1 = "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n\xFF";                 
    const char * str2 = "_/VALID-VI\\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
-
-   m_buffer_time[M_TIME_BEGIN_START] = getCycleCountIram();   // initialise
+   // Serial.print((String) "\r\nBegin port" + m_rxPin  + " cycle" + GET_CYCLE_COUNT + "\r\n");
+   m_buffer_time[M_TIME_BEGIN_START] = GET_CYCLE_COUNT;   // initialise
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
    m_highSpeed = speed > 9600;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
@@ -238,7 +290,7 @@ void SoftwareSerial::begin(long speed, int recordtype) {
          if (false) Serial.println(" Dummy print line" + __LINE__ );   // v59 just checking if this influences stability
 
    }
-   m_buffer_time[M_TIME_BEGIN_END] = getCycleCountIram();   // initialise
+   m_buffer_time[M_TIME_BEGIN_END] = GET_CYCLE_COUNT;   // initialise
 }
 
 long SoftwareSerial::baudRate() {
@@ -260,11 +312,11 @@ void SoftwareSerial::enableRx(bool on) {
    if (m_rxValid) {
       if (on) {
          attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
-         m_buffer_time[M_TIME_RX_START] = getCycleCountIram();   // initialise
+         m_buffer_time[M_TIME_RX_START] = GET_CYCLE_COUNT;   // initialise
          m_port_state = true;    // v59
       } else {
          detachInterrupt(m_rxPin);
-         m_buffer_time[M_TIME_RX_END] = getCycleCountIram();   // initialise
+         m_buffer_time[M_TIME_RX_END] = GET_CYCLE_COUNT;   // initialise
          m_port_state = false;    // v59
       }         
       m_rxEnabled = on;
@@ -294,10 +346,10 @@ void SoftwareSerial::enableRx(bool on, int recordtype) {
          }
          m_port_state = true;    // v59
       }
-      m_buffer_time[M_TIME_RX_START] = getCycleCountIram();   // initialise
+      m_buffer_time[M_TIME_RX_START] = GET_CYCLE_COUNT;   // initialise
    } else {
       detachInterrupt(m_rxPin);
-      m_buffer_time[M_TIME_RX_END] = getCycleCountIram();   // initialise
+      m_buffer_time[M_TIME_RX_END] = GET_CYCLE_COUNT;   // initialise
    }         
    m_rxEnabled = on;
    /*
@@ -335,10 +387,10 @@ bool SoftwareSerial::portActive() {                // v59 indicate portstatus
 int SoftwareSerial::available() {
    if (m_P1active) return 0;                     // Return 0 if P1 is active, buffer will be filled until receive '!'
    if (!m_rxValid) return 0;
-   m_buffer_time[M_TIME_AVAIL_START] = getCycleCountIram();   // initialise
+   m_buffer_time[M_TIME_AVAIL_START] = GET_CYCLE_COUNT;   // initialise
    int avail = m_inPos - m_outPos;
    if (avail < 0) avail += m_buffSize;
-   m_buffer_time[M_TIME_AVAIL_END] = getCycleCountIram();   // initialise
+   m_buffer_time[M_TIME_AVAIL_END] = GET_CYCLE_COUNT;   // initialise
    return avail;
 }
 
@@ -392,10 +444,38 @@ int SoftwareSerial::peek() {
    return m_buffer[m_outPos];
 }
 
-unsigned long SoftwareSerial::peek(int buffer_time_Pos ) {
-   if (!m_rxValid || (m_inPos == m_outPos)) return -1;
+/*
+   return request Time entry where driver is see for names M_TIME_NAMES
+*/
+unsigned long SoftwareSerial::peekTime(int buffer_time_Pos ) {
+   // if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    return m_buffer_time[buffer_time_Pos];
 }
+
+/*
+   Return requested BitTime entry
+*/
+unsigned long SoftwareSerial::peekBit(int buffer_bit_Pos ) {
+   // if (!m_rxValid || (m_inPos == m_outPos)) return -1;
+   return m_buffer_bits[buffer_bit_Pos];
+}
+
+/*
+   Return requested BitTime entry
+*/
+int SoftwareSerial::peekByte(int buffer_byte_Pos ) {
+   // if (!m_rxValid || (m_inPos == m_outPos)) return -1;
+   return m_buffer[buffer_byte_Pos];
+}
+
+
+/*
+   return number of entries in BitTime table
+*/
+unsigned long SoftwareSerial::peekBitPos() {
+   return m_inPos;
+}
+
 
 
 // added wait test to prevent overrunning when Clocks are slower (10000 works ok, 2021-05-05 22:01:29: testing #7000)
@@ -439,6 +519,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+   m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
      WAITIram4w; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
@@ -492,7 +573,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    unsigned long wait = m_bitTime + m_bitTime/3 -  m_bitWait;	// v58 m_bitwait = 498 goes ok // 501 // 425 115k2@80MHz
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
-   unsigned long start = getCycleCountIram();      
+   unsigned long start = getCycleCountIram();
    /* ---------------------------------------------------------------------------------------------------------
     - timing:
                80Mhz --. approx 12.5 ns          per cycle or 80 cycles per microsecond. 
@@ -507,6 +588,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
                      total    =  86,4µSec                  7.100
              protection limit =                            7.000 cycles = 84µSec
    ---------------------------------------------------------------------------------------------------------- */   
+   m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;     /// 236:	01a0d2    	            movi	a13, 1  
    for (int i = 0; i < 8; i++) {    /// 233:	08a0f2     	movi	a15, 8  
      WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
