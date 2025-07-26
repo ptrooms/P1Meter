@@ -287,8 +287,8 @@ void SoftwareSerial::enableRx(bool on, int recordtype) {
    if (m_rxValid) {
       if (on) {
          if (recordtype == SERIAL_RECORDTYPE_P1_B || recordtype == SERIAL_RECORDTYPE_WL_B) {
-            if      (m_rxPin ==  4) attachInterrupt(m_rxPin, ISRList[16], m_invert ? RISING : FALLING);
-            else if (m_rxPin == 14) attachInterrupt(m_rxPin, ISRList[17], m_invert ? RISING : FALLING);
+            if      (m_rxPin ==  4) attachInterrupt(m_rxPin, ISRList[16], CHANGE);
+            else if (m_rxPin == 14) attachInterrupt(m_rxPin, ISRList[17], CHANGE);
          } else {
                                     attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
          }
@@ -393,6 +393,7 @@ int SoftwareSerial::peek() {
 }
 
 unsigned long SoftwareSerial::peek(int buffer_time_Pos ) {
+   if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    return m_buffer_time[buffer_time_Pos];
 }
 
@@ -491,9 +492,23 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    unsigned long wait = m_bitTime + m_bitTime/3 -  m_bitWait;	// v58 m_bitwait = 498 goes ok // 501 // 425 115k2@80MHz
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
-   unsigned long start = getCycleCountIram();
-   uint8_t rec = 0;     /// 236:	01a0d2               	movi	a13, 1  
-   for (int i = 0; i < 8; i++) {    /// 233:	08a0f2               	movi	a15, 8  
+   unsigned long start = getCycleCountIram();      
+   /* ---------------------------------------------------------------------------------------------------------
+    - timing:
+               80Mhz --. approx 12.5 ns          per cycle or 80 cycles per microsecond. 
+               115200 bit timing is approx: 8,6µS --> ~      694 cycles
+               10bits = 86µSec -->                         6.940 cycles
+               1024bytes ==>  ~  89,5mS minimal        7.111.111 cycles ==> 
+          scoped USB: 875bytes: 245mS                 21.016.666
+               interline time =   8-9mS                  650.666 cyles (19 bytes take=1.6mS = 133.333 cycles)
+               startbit-down  =   8,6µSec                    700 cycles (sustains a rise -7.3µS) = 
+                databits 8x:  =  69,2µSec                  5.750 cycles     
+                stopbit up    =   8,6µSec                    700  
+                     total    =  86,4µSec                  7.100
+             protection limit =                            7.000 cycles = 84µSec
+   ---------------------------------------------------------------------------------------------------------- */   
+   uint8_t rec = 0;     /// 236:	01a0d2    	            movi	a13, 1  
+   for (int i = 0; i < 8; i++) {    /// 233:	08a0f2     	movi	a15, 8  
      WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;         ///  2bd:	41d1d0               	srli	a13, a13, 1   
      if (digitalRead(m_rxPin))

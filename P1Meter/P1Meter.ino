@@ -1064,6 +1064,8 @@ bool p1SerialFinish   = false;    // transaction finished (at end of !xxxx )
 
 bool bSerial1State = false; // v57 indicate state
 bool bSerial2State = false; // v57 indicate state
+bool bSerial3State = false; // v59a indicate state
+bool bSerial4State = false; // v59b indicate state
 
 
 long serial1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
@@ -2080,6 +2082,13 @@ void setup()
   // Serial.printDiag(Wifi);
   // WiFi.printDiag(Serial);
 */
+#define SERIALPORT_P1_DATA 1 
+#define SERIALPORT_WL_DATA 2 
+#define SERIALPORT_P1_TIME 3 
+#define SERIALPORT_WL_TIME 4 
+#define SERIALPORT_OPEN   0 
+#define SERIALPORT_CLOSE  1 
+
 void loop()
 { 
   if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
@@ -2220,27 +2229,15 @@ void loop()
       if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial started at " + currentMillis);
       p1SerialActive = !p1SerialActive ; // indicate we have started
       p1SerialFinish = false; // and let transaction finish
-      mySerial2.end();          // Stop- if any - GJ communication
-      mySerial2.flush();        // Clear GJ buffer
-      bSerial2State = false; // v57 indicate state
+
+    /* #define SERIALPORT_P1/WL_DATA/TIME  SERIALPORT_OPEN/CLOSE */
+      openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_CLOSE);
       if (loopbackRx2Mode > 0) Serial.print((String) "_}" ); // v54 print incoming
       
       telegramError = 0;        // start with no errors
-      // Start secondary serial connection if not yet active
+      // Start first serial connection if not yet active
       if (!serial1Stop) {
-          // mySerial1.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          mySerial1.end();          // v58b: not sure  but to acertain,  finish any active
-          mySerial1.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
-          if (mySerial1.portActive()) Serial.print((String) "#!1#" );
-        #ifdef UseNewSoftSerialLIB
-          // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-          mySerial1.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
-          // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-        #else
-          mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
-          // mySerial1.begin(serial1Baudrate);  // < v58a ss241 P1 meter port   115k2    // required during test without P1
-        #endif
-          bSerial1State = true; // v57 indicate state
+          openCloseSerial(SERIALPORT_P1_DATA, SERIALPORT_OPEN);
           if (bSerial1State != mySerial1.portActive()) Serial.print((String) "?" +
                                                         + (bSerial1State ? "A" : "a")
                                                         + (mySerial1.portActive() ? "I" : "i")
@@ -2266,9 +2263,8 @@ void loop()
 
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
-        mySerial1.end();    // P1 meter port deactivated
-        mySerial1.flush();  // Clear P1 buffer
-        bSerial1State = false; // v57 indicate state
+        
+        openCloseSerial(SERIALPORT_P1_DATA, SERIALPORT_CLOSE);
 
         loopTelegram2cnt = 0;  // allow readtelegram2  for a maximum of "6 loops" of actual receives
 
@@ -2279,25 +2275,8 @@ void loop()
                 (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
           if (!serial2Stop) {
-            
-              #ifdef UseNewSoftSerialLIB
-                // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-                // mySerial1.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-                // mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
-                 mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2);
-              #else
-                // mySerial2.begin(serial2Baudrate);    // P1 meter port 115200 baud
-                mySerial2.end();          // v58b: not sure  but to acertain,  finish any active
-                mySerial2.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
-                if (mySerial2.portActive()) Serial.print((String) "#!2#" );
-                mySerial2.begin(serial2Baudrate,serial2PortMode);    // v58a, v58b ss241 =0 or simulate 1=P1; 2=RX/WL data.
-                // #else 
-                //   mySerial2.begin(serial2Baudrate,0);    // Using physical 0-port
-                // #endif
-              #endif
-              bSerial2State = true; // v57 indicate state
+              openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_OPEN);            
               if (loopbackRx2Mode > 0) Serial.print((String) "{_" ); // v54 print incoming
-              // Serial.print((String) "{_" ); // v54 print incoming
           }
         }
         
@@ -2800,9 +2779,7 @@ void readTelegramP1() {
                 + " +" + (mySerial1.peek(M_TIME_AVAIL_END)   - mySerial1.peek(M_TIME_AVAIL_START))
                 + "="  +  mySerial1.peek(M_TIME_AVAIL_END)
                 ) ;  
-
-        mySerial1.end();      // flush the buffer (if any) v38
-        mySerial1.flush();      // flush the buffer (if any)
+        openCloseSerial(SERIALPORT_P1_DATA, SERIALPORT_CLOSE);            
         if (outputOnSerial)
             Serial.println((String) ", "
                 + " "  +  mySerial1.peek(M_TIME_START)
@@ -2999,9 +2976,7 @@ void readTelegramWL() {
                           + "="  +  mySerial2.peek(M_TIME_AVAIL_END)
 
                           ) ;  
-
-                  mySerial2.end();          // v38 Stop- if any - GJ communication
-                  mySerial2.flush();        // v38 Clear GJ buffer
+                  openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_CLOSE);            
                   if (outputOnSerial)
                       Serial.println((String) ", "
                           + " "  +  mySerial2.peek(M_TIME_START)
@@ -6007,4 +5982,88 @@ void command_testH5(){    // code to maken things stable teststable v57c-1 no-ef
     publishMqtt(mqttErrorTopic, msg3);       // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
     publishMqtt(mqttErrorTopic, msgpub3);    // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
 
+}
+
+/*
+  Open Close a specific Serial Port
+  routine will call save close if already open.
+*/
+void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIALPORT_P1/WL_DATA/TIME , SERIALPORT_OPEN/CLOSE
+
+      if        (serial_port_number == SERIALPORT_P1_DATA && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial1.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial1.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial1State = false; // v57 indicate state
+          if (mySerial1.portActive()) Serial.print((String) "#!1#" );
+      } else if (serial_port_number == SERIALPORT_P1_DATA && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial1.portActive()) openCloseSerial(SERIALPORT_P1_DATA,SERIALPORT_CLOSE );
+          if (mySerial3.portActive()) openCloseSerial(SERIALPORT_P1_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+            mySerial1.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+            // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
+          #else
+            mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
+            // mySerial1.begin(serial1Baudrate);  // < v58a ss241 P1 meter port   115k2    // required during test without P1
+          #endif
+            bSerial1State = true; // v57 indicate state
+
+      } else if (serial_port_number == SERIALPORT_WL_DATA && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial2.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial2.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial1State = false; // v57 indicate state
+          if (mySerial2.portActive()) Serial.print((String) "#!2#" );
+      } else if (serial_port_number == SERIALPORT_WL_DATA && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
+          if (mySerial4.portActive()) openCloseSerial(SERIALPORT_WL_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            mySerial2.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          #else
+            mySerial2.begin(serial1Baudrate, serial2PortMode);    // v58a, V58b Use simulated data P1
+          #endif
+            bSerial1State = true; // v57 indicate state
+
+      } else if (serial_port_number == SERIALPORT_P1_TIME && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial3.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial3.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial3State = false; // v57 indicate state
+          if (mySerial3.portActive()) Serial.print((String) "#!3#" );
+      } else if (serial_port_number == SERIALPORT_P1_TIME && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial1.portActive()) openCloseSerial(SERIALPORT_P1_DATA,SERIALPORT_CLOSE );
+          if (mySerial3.portActive()) openCloseSerial(SERIALPORT_P1_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            mySerial3.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          #else
+            mySerial3.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
+          #endif
+            bSerial3State = true; // v57 indicate state
+
+      } else if (serial_port_number == SERIALPORT_WL_TIME && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial4.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial4.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial4State = false; // v57 indicate state
+          if (mySerial4.portActive()) Serial.print((String) "#!4#" );
+      } else if (serial_port_number == SERIALPORT_WL_TIME && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
+          if (mySerial4.portActive()) openCloseSerial(SERIALPORT_WL_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            mySerial4.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          #else
+            mySerial4.begin(serial2Baudrate, serial2PortMode);    // v58a, V58b Use simulated data P1
+          #endif
+            bSerial4State = true; // v57 indicate state
+      } else { 
+        Serial.printf("\r\nWrong call %d using seria %d mode %d , states:\r\n", __LINE__, serial_port_number, serial_port_mode );
+        printf_port_state_isr();
+      }
+}      
+
+/*
+    Print our serial portstates and their ISR status
+*/
+void printf_port_state_isr() {
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 1, (bSerial1State ? 1 : 0) , (mySerial1.portActive() ? 1 : 0));
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 2, (bSerial2State ? 1 : 0) , (mySerial2.portActive() ? 1 : 0));
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 3, (bSerial3State ? 1 : 0) , (mySerial3.portActive() ? 1 : 0));
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 4, (bSerial4State ? 1 : 0) , (mySerial4.portActive() ? 1 : 0));
 }
