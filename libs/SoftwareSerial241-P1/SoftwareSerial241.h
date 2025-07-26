@@ -83,7 +83,7 @@ public:
    void enableRx(bool on);
    void enableRx(bool on, int recordtype);      // v58 to use/do/selec type of data 0-physical/ 1-simulatedP1 / 2-simulatatedWL
 
-   void rxRead();		   // BitBang P1 with    p1active detection beween / and !
+   volatile void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
    void rxRead2();		// BitBang Wl without p1active detection beween / and !
    void rxTriggerBit(); // use bittiming every flank change allocates a time
 
@@ -105,13 +105,13 @@ private:
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
    bool m_invert;
-   bool m_P1active;                 // Ptro 28mar21 to support P1 messageing
+   volatile bool m_P1active;                 // Ptro 28mar21 to support P1 messageing, volatile v59b
    bool m_port_state;               // v59 contains status of (in)activated ISR
-   bool m_overflow;
+   volatile bool m_overflow;        // volatile v59b
    unsigned long m_bitTime;
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
-   unsigned int m_inPos, m_outPos;
+   volatile unsigned int m_inPos, m_outPos;     // volatile v59b
    int m_buffSize;
    uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
@@ -127,7 +127,7 @@ private:
       
    // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;
    // 497-501-505 // 425 115k2@80MHz 
-   unsigned long m_wait; 
+   volatile unsigned long m_wait; 
 
 
 };
