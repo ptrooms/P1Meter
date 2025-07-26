@@ -42,7 +42,10 @@ extern "C" {
 
 #define MAX_PIN 15
 
+#define BYTE_MAXWAIT_1 7100    // maximum cycles per bit which floats between 6930-7012
+
 #define GET_CYCLE_COUNT  ESP.getCycleCount()       // get the esp cycle counter
+
 
 // As the Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible GPIO pins have to be defined
@@ -99,7 +102,8 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
    m_rxEnabled = false;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
    // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
-   m_bitWait = 509;
+   m_bitWait = 509;     // before we added cycletime table
+   // m_bitWait = 511;        
 
    if (receivePin == 4 || receivePin == 14 ) {
       m_rxPin = receivePin;
@@ -478,12 +482,14 @@ unsigned long SoftwareSerial::peekBitPos() {
 
 
 
-// added wait test to prevent overrunning when Clocks are slower (10000 works ok, 2021-05-05 22:01:29: testing #7000)
+// added wait test to prevent overrunning when Clocks are slower (10000 works ok, 2021-05-05 22:01:29: testing #BYTE_MAXWAIT_1)
 // note: wait starts at approx 500
 // getCycleCountIram = cycle counter, which increments with each clock cycle  (doc: v55d)
-#define WAITIram4 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
-#define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
-#define WAITIram5 { while (wait<7000 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
+// BYTE_MAXWAIT_1 was 7000, changed in v59b to 7100
+#define WAITIram4  { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<BYTE_MAXWAIT_1); wait += m_bitTime; }
+#define WAITIram4b { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+#define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+#define WAITIram5  { while (wait<BYTE_MAXWAIT_1 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
 // at 115k2 --> m_bittime = 694 cycles
 
 /*
@@ -529,7 +535,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    //   else                     // v52 balance isr rxread always doing or operation
    //     rec |= 0x00;
    }
-   
+
    if (m_invert) rec = ~rec;
    // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
    // wait = wait - 400; // try to play with this time
@@ -541,7 +547,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
    #ifdef TEST_MODE
-      if (next != m_outPos && m_wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+      if (next != m_outPos && m_wait < BYTE_MAXWAIT_1) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
    #else
       if (next != m_outPos) {  // this works best in production
    #endif
@@ -588,10 +594,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
                      total    =  86,4µSec                  7.100
              protection limit =                            7.000 cycles = 84µSec
    ---------------------------------------------------------------------------------------------------------- */   
-   m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
+   
+   // m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng, unstable P1
+
    uint8_t rec = 0;     /// 236:	01a0d2    	            movi	a13, 1  
    for (int i = 0; i < 8; i++) {    /// 233:	08a0f2     	movi	a15, 8  
-     WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4b; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;         ///  2bd:	41d1d0               	srli	a13, a13, 1   
      if (digitalRead(m_rxPin))
        rec |= 0x80;     /// 239:	81af52               	movi	a5, -127   
@@ -604,7 +612,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
    // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
    //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4b; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;

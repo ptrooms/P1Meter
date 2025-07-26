@@ -103,6 +103,7 @@
 
 /* change history
   - v59b - testdata, preparing for alternative ISR (bittiming) routine, print time table serial_Print_PeekBits command t(1,2,3)
+    - introduced #define BYTE_MAXWAIT_1 7100 @ SoftwareSerial241.cpp  // maximum cycles per byte which floats between 6930-7012 cycles
   - v59a - diagfnostics and prepare multiport threading, all serial combinaed in a single routine
   - v59  - added extra telegram bash scripts to feed test data
   - 58d2 - moved to production
@@ -3824,12 +3825,14 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
 
     } else  if ((char)payload[0] == 't') {    // v59b print bittime ttable
             if ( ( (char)payload[1] == '1' || (char)payload[1] == '2') &&
-                 ( (char)payload[2] >= '1' && (char)payload[2] <= '4') ) {
+                 ( (char)payload[2] >= '1' && (char)payload[2] <= '6') ) {
                  int peekport = (((int)payload[1] - 48));   // set portnumber
-                       if ( (char)payload[2] == '1') serial_Print_PeekBits(peekport,  32);
-                  else if ( (char)payload[2] == '2') serial_Print_PeekBits(peekport,  64);
-                  else if ( (char)payload[2] == '3') serial_Print_PeekBits(peekport, 128);
-                  else if ( (char)payload[2] == '4') serial_Print_PeekBits(peekport, 256);   // 200mS print time
+                       if ( (char)payload[2] == '1') serial_Print_PeekBits(peekport,   32);
+                  else if ( (char)payload[2] == '2') serial_Print_PeekBits(peekport,   64);
+                  else if ( (char)payload[2] == '3') serial_Print_PeekBits(peekport,  128);
+                  else if ( (char)payload[2] == '4') serial_Print_PeekBits(peekport,  256);   // 200mS print time
+                  else if ( (char)payload[2] == '5') serial_Print_PeekBits(peekport,  512);   // 200mS print time
+                  else if ( (char)payload[2] == '6') serial_Print_PeekBits(peekport, 1024);   // 200mS print time
             } else                                   serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
 
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
@@ -6094,24 +6097,20 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + " #Inpos=" + mySerial1.peekBitPos()
                   + "-------------time:" + micros()
                   + " \r\n");
-    for (int i = 0; i <= bit_sequence; i++ )  {
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
-           Serial.print((String) "\t" + (mySerial1.peekBit(i)-mySerial1.peekBit(i-1)) + "-" );
-                   if (isprint(mySerial1.peekByte(i-1))) {             // v45 revise to improve print debug 
-                Serial.print((char) mySerial1.peekByte(i-1));
-            } else if ( mySerial1.peekByte(i-1) == '\x0d') {
-                Serial.print("<");
-            } else if ( mySerial1.peekByte(i-1) == '\x0a') {
-                Serial.print("|");
-            } else if ( mySerial1.peekByte(i-1) == '\x00') {
-                Serial.print("_");
-            } else  {
-                Serial.print("?");
-            }
-      }
+         Serial.print((String) "\t" + (mySerial1.peekBit(i)-mySerial1.peekBit(i-1)) + "-" );
+         Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
+        }     
       if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial1.peekBit(i) + "> " );  // next line time
     }
+    Serial.print((String) "\r\n data0:\t");                 // print character line data
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
+         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
+         if (convert_p1_print( mySerial1.peekByte(i)) == '|')     // check if we are going to new P1 record
+             Serial.print((String) "\r\n data"+ i + ":\t");  
+    }     
   }    
   if (bit_port == 2) {
     Serial.print((String) "\r\n Print bit time sequences"+ 
@@ -6119,7 +6118,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + " #Inpos=" + mySerial2.peekBitPos()
                   + "-------------time:" + micros()
                   + " \r\n");
-    for (int i = 0; i <= bit_sequence; i++ )  {
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
       // Serial.print((String) "\t" + mySerial2.peekBit(i));
       if (i > 0) {
            Serial.print((String) "\t" + (mySerial2.peekBit(i)-mySerial2.peekBit(i-1)) + "-" );
@@ -6140,4 +6139,15 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   }    
 
   Serial.print((String) "\r\n-------------time:" + micros() + "\r\n");
+}
+
+
+/* return printabel character for diagnose */
+int convert_p1_print(int data_in) {
+  int data_out = '?';
+       if (isprint(data_in)  ) data_out = data_in;
+  else if ( data_in == '\x0d') data_out = '<';
+  else if ( data_in == '\x0a') data_out = '|';
+  else if ( data_in == '\x00') data_out = '_';
+  return data_out;
 }
