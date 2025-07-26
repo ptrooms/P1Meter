@@ -6104,12 +6104,14 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
          Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
         }     
       if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial1.peekBit(i) + "> " );  // next line time
+      if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
     Serial.print((String) "\r\n data0:\t");                 // print character line data
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
          Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
          if (convert_p1_print( mySerial1.peekByte(i)) == '|')     // check if we are going to new P1 record
              Serial.print((String) "\r\n data"+ i + ":\t");  
+         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
     }     
   }    
   if (bit_port == 2) {
