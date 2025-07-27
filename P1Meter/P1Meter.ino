@@ -6112,27 +6112,35 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
   Diagnose, print a series of Bit Times as collected by softserial
 */
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
+  
+  unsigned long temp = 0UL;               // check duplicates
   if (bit_port == 1) {
     Serial.print((String) "\r\n Print bit time sequences"+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial1.peekBitPos()
                   + "-------------time:" + micros()
                   + " \r\n");
+
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
-         Serial.print((String) "\t" + (mySerial1.peekBit(i)-mySerial1.peekBit(i-1)) + "-" );
+          if (temp == (mySerial1.peekBit(i)-mySerial1.peekBit(i-1))) {
+              Serial.print((String) "\t---- " ); // same data
+          } else {
+              temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1);
+              Serial.print((String) "\t" + temp + " " );
+          }
          Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
-        }     
+        }
       if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial1.peekBit(i) + "> " );  // next line time
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
     Serial.print((String) "\r\n data0:\t");                 // print character line data
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
-         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
-         if (convert_p1_print( mySerial1.peekByte(i)) == '|')     // check if we are going to new P1 record
-             Serial.print((String) "\r\n data"+ i + ":\t");  
-         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
+        Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
+        if (convert_p1_print( mySerial1.peekByte(i)) == '|')     // check if we are going to new P1 record
+            Serial.print((String) "\r\n data"+ i + ":\t");  
+        if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
     }     
   }    
   if (bit_port == 2) {
@@ -6142,11 +6150,17 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + "-------------time:" + micros()
                   + " \r\n");
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
+      unsigned long temp = 0UL;
       // Serial.print((String) "\t" + mySerial2.peekBit(i));
       if (i > 0) {
-         Serial.print((String) "\t" + (mySerial2.peekBit(i)-mySerial2.peekBit(i-1)) + "-" );
+          if (temp == (mySerial2.peekBit(i)-mySerial2.peekBit(i-1))) {
+              Serial.print((String) "\t---- " ); // same data
+          } else {
+              temp = mySerial2.peekBit(i)-mySerial2.peekBit(i-1);
+              Serial.print((String) "\t" + temp + " " );
+          }
          Serial.print((char) convert_p1_print( mySerial2.peekByte(i-1)) );
-        }     
+        }
       if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial2.peekBit(i) + "> " );  // next line time
       if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }

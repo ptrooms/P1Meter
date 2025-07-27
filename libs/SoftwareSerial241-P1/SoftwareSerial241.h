@@ -105,10 +105,10 @@ private:
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
    bool m_invert;
-   volatile bool m_P1active;                 // Ptro 28mar21 to support P1 messageing, volatile v59b
+   volatile bool m_P1active;                 // Ptro 28mar21 to support P1 messageing, volatile v59b used in ISR
    bool m_port_state;               // v59 contains status of (in)activated ISR
-   volatile bool m_overflow;        // volatile v59b
-   unsigned long m_bitTime;
+   volatile bool m_overflow;        // volatile v59b , used in ISR
+   volatile unsigned long m_bitTime;  // volatile v60a, used in ISR
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
    volatile unsigned int m_inPos, m_outPos;     // volatile v59b
