@@ -39,7 +39,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifndef M_TIME_NAMES
    #define M_TIME_NAMES           // Indicate our name
-   #define M_TIME_ENTRIES     10  // Numbeer of entries in M_TIME table
+   #define M_TIME_ENTRIES    20  // Numbeer of entries in M_TIME table
    #define M_TIME_START       0   // cyclenumber start of Ovject
    #define M_TIME_RX_START    1   // cyclenumber start of void SoftwareSerial::enableRx Attach
    #define M_TIME_RX_END      2   // cyclenumber end of void SoftwareSerial::enableRx Detach
@@ -47,6 +47,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #define M_TIME_BEGIN_END   4   // cyclenumber end of  SoftwareSerial::begin
    #define M_TIME_AVAIL_START 5   // cyclenumber start of void SoftwareSerial::enableRx Attach
    #define M_TIME_AVAIL_END   6   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_BIT_START   7   // v60a Cycle ISR START
+   #define M_TIME_BIT_STOP    8   // v60a Cycle ISR AFTER STOPBIT
+   #define M_TIME_BIT_START1  9   // v60a Cycle ISR Nominal end Actual End (inclusdng get cycle)
+   #define M_TIME_BIT_STOPT  10   // v60a Cycle ISR Nominal to save 
+   #define M_TIME_BIT_STOP1  10   // v60a Cycle ISR Nominal end
+   #define M_TIME_BIT_END1   11   // v60a Cycle ISR END
+   #define M_TIME_BIT_END2   12   // v60a Cycle ISR Nominal end
 #endif
 
 #define M_BIT_CYCLE_VALUE (getCycleCountIram() % 4096);     // get distance
@@ -112,7 +119,7 @@ private:
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
    volatile unsigned int m_inPos, m_outPos;     // volatile v59b
-   int m_buffSize;
+   volatile int m_buffSize;
    uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
    unsigned long *m_buffer_bits;         // 4096-value time-array  index m_inPos, m_outPos;

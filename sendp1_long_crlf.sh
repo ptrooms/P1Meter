@@ -27,5 +27,5 @@ sleep 0.010; echo  -e -n '0-0:96.13.0()\r\n'
 sleep 0.010; echo  -e -n '1-0:31.7.0(002*A)\r\n'
 sleep 0.010; echo  -e -n '1-0:21.7.0(00.560*kW)\r\n'
 sleep 0.010; echo  -e -n '1-0:22.7.0(00.000*kW)\r\n'
-sleep 0.010; echo  -e -n '!31E6 sendp1_long_crlf.sh record\r\n'
+sleep 0.010; echo  -e -n '!1680 sendp1_long_crlf.sh record\r\n'
  

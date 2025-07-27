@@ -1910,7 +1910,8 @@ void setup()
     // #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
     // Checktiming for test only
     unsigned long m_bitTime = ESP.getCpuFreqMHz() * 1000000 / 115200;
-    unsigned long wait = m_bitTime + m_bitTime / 3 - 500;  // 425 115k2@80MHz
+    unsigned long m_bitWait = 539;
+    unsigned long wait = m_bitTime + m_bitTime/3 -  m_bitWait;  // =  m_bitTime + m_bitTime / 3 - 500;  // 425 115k2@80MHz
     unsigned long start = ESP.getCycleCount();
 
     unsigned long startMicro1 = micros();
@@ -3528,6 +3529,21 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                  + ( (char)payload[1] == '1' ?  serial1Baudrate : serial2Baudrate )
                  + "\t" );
         }
+    } else  if ( (char)payload[0] == 'K' || (char)payload[0] == 'k' ) {   // v60a change l_bitwait
+          Serial.print((String) "\n\rM_TIME_BIT_START=" + mySerial1.peekTime(M_TIME_BIT_START) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_STOP) - mySerial1.peekTime(M_TIME_BIT_START)) + ")"
+                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_STOP))  
+                        + "\r\n" ); 
+          Serial.print((String) "M_TIME_BIT_START1=" + mySerial1.peekTime(M_TIME_BIT_START1) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_STOP1) - mySerial1.peekTime(M_TIME_BIT_START1)) + ")"
+                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_STOP1))  
+                        + "\r\n" ); 
+          Serial.print((String) "M_TIME_BIT_STOP=" + mySerial1.peekTime(M_TIME_BIT_STOP) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_END1) - mySerial1.peekTime(M_TIME_BIT_STOP)) + ")"          
+                        + "=\t M_TIME_BIT_END1=" + mySerial1.peekTime(M_TIME_BIT_END1) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_END2) - mySerial1.peekTime(M_TIME_BIT_END1)) + ")"
+                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_END2))  
+                        + "\r\n" ); 
     } else  if (  ( (char)payload[0] == 'J' || (char)payload[0] == 'j' )  &&              // v58 change m_bitwait
                   ( (char)payload[1] == '+' || (char)payload[1] == '-')   &&
                   ( (char)payload[2] >= '0' && (char)payload[2] <= '9') ) {
@@ -3542,12 +3558,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
               temp = mySerial1.m_bitWait + temp;
         else  temp = mySerial2.m_bitWait + temp;
 
-        Serial.print((String)"\tBitait"
+        Serial.print((String)"\tBitwait" + 
               + ( (char)payload[0] == 'J' ? "P1" : "WL" )
               + "=" + temp + "\t" ) ;
 
         if ( (char)payload[0] == 'J' ) 
-              mySerial1.m_bitWait   = temp;
+              mySerial1.m_bitWait  = temp;
         else  mySerial2.m_bitWait  = temp;
 
   /* DNO , leave it to investigate how to force an exception
