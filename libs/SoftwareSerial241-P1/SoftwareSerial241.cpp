@@ -163,6 +163,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    // m_bitWait = 515;                     // v58: production & copy , 498 is bottom, v59b changed from 498 to 515
    // m_bitWait = 519;                        // v60 changed from 515 to 521 (interbyte time 6931)
    m_bitWait = 539;                        // v60a after we moved the the m_buffer_bits[m_inPos-1] = start to end of ISR
+                                           // 539
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
@@ -567,6 +568,7 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    uint8_t rec = 0;
 
    #define WAITIram5l { while (SoftwareSerial::getCycleCountIram()-l_start < l_wait && l_wait<BYTE_MAXWAIT_1); l_wait += l_bitTime; }
+   
    for (int i = 0; i < 8; i++) {
      WAITIram5l; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;

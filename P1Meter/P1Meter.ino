@@ -1910,7 +1910,7 @@ void setup()
     // #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
     // Checktiming for test only
     unsigned long m_bitTime = ESP.getCpuFreqMHz() * 1000000 / 115200;
-    unsigned long m_bitWait = 539;
+    unsigned long m_bitWait = 539;      
     unsigned long wait = m_bitTime + m_bitTime/3 -  m_bitWait;  // =  m_bitTime + m_bitTime / 3 - 500;  // 425 115k2@80MHz
     unsigned long start = ESP.getCycleCount();
 
@@ -3529,6 +3529,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                  + ( (char)payload[1] == '1' ?  serial1Baudrate : serial2Baudrate )
                  + "\t" );
         }
+    } else  if ( (char)payload[0] == '\\') {   // v60a change l_bitwait        
+          Serial.println("hello");
     } else  if ( (char)payload[0] == 'K' || (char)payload[0] == 'k' ) {   // v60a change l_bitwait
           Serial.print((String) "\n\rM_TIME_BIT_START=" + mySerial1.peekTime(M_TIME_BIT_START) 
                         + "(" + (mySerial1.peekTime(M_TIME_BIT_STOP) - mySerial1.peekTime(M_TIME_BIT_START)) + ")"
@@ -3548,23 +3550,52 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                   ( (char)payload[1] == '+' || (char)payload[1] == '-')   &&
                   ( (char)payload[2] >= '0' && (char)payload[2] <= '9') ) {
         
-        int temp = (((int)payload[2] - 48));
+        int temp  = (((int)payload[2] - 48));
         if ( (char)payload[2] == '9')  temp = 10;   // increase by 10 if 9
         // Serial.print((String)"\r\n Changing m_bitwait with " + temp ) ;
         if ((char)payload[1] == '-') temp = temp * -1;
         // Serial.print((String)"\r\n to " + temp ) ;
 
-        if ( (char)payload[0] == 'J' ) 
-              temp = mySerial1.m_bitWait + temp;
-        else  temp = mySerial2.m_bitWait + temp;
-
+        /*
+            Get timer values
+        */
+        unsigned long m_bitWait = 0;
+        unsigned long speed = 0;
+        if ( (char)payload[0] == 'J' ) {
+          temp  = mySerial1.m_bitWait + temp;
+          m_bitWait = mySerial1.m_bitWait;
+          speed = serial1Baudrate;
+        } else  {
+          temp  = mySerial2.m_bitWait + temp;
+          m_bitWait = mySerial2.m_bitWait;
+          speed = serial2Baudrate;
+        }
         Serial.print((String)"\tBitwait" + 
               + ( (char)payload[0] == 'J' ? "P1" : "WL" )
-              + "=" + temp + "\t" ) ;
+              + "=" + temp + ", " 
+              ) ;
 
+        /*
+            set timer in Driver
+        */
         if ( (char)payload[0] == 'J' ) 
               mySerial1.m_bitWait  = temp;
         else  mySerial2.m_bitWait  = temp;
+
+      /*
+          Routine to simulate timer parts of bitbang SoftwareSerial241.cpp
+      */
+      unsigned long m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
+      unsigned long l_bitTime = m_bitTime;
+      unsigned long l_wait = l_bitTime + l_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
+      unsigned long l_start = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+      Serial.print((String)" l_wait" + l_wait + "...");
+      #define BYTE_MAXWAIT_T 7100
+      #define WAITIram5K { while (ESP.getCycleCount()-l_start < l_wait && l_wait<BYTE_MAXWAIT_T); l_wait += l_bitTime; }
+      WAITIram5K;
+      temp = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+      Serial.print((String)", t_wait=" + (temp - l_start) + "\t" ) ;
+
 
   /* DNO , leave it to investigate how to force an exception
       } else  if ((char)payload[0] == 'e') {    // here
