@@ -6214,15 +6214,18 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
               }
               Serial.print((String) "\r\n dataC"+ i + ":\t");  
-              for (int m = j; m <= i; m++ )  {      // v61 print differences line
-                if (telegram_crcOut[m] == mySerial1.peekByte(m)) Serial.print(" "); else Serial.print("^");
+              for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
+                if (telegram_crcOut[m] == mySerial1.peekByte(m) &&
+                    telegram_crcOut[m] != 'X') 
+                    Serial.print(" "); 
+                else Serial.print("^");
               }
               j = i + 1;
           }
 
           Serial.print((String) "\r\n dataR"+ j + ":\t");  
         }
-        
+
         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
     }     
   }    
