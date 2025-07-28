@@ -102,6 +102,7 @@
 */
 
 /* change history
+  - v61a - changewd bitwait to make things stable
   - v60 - stabilised, using m_bitwaittime 521 for production to have bytecycle from 6940 to range of 6930-6935
   - v59b - testdata, preparing for alternative ISR (bittiming) routine, print time table serial_Print_PeekBits command t(1,2,3)
     - introduced #define BYTE_MAXWAIT_1 7100 @ SoftwareSerial241.cpp  // maximum cycles per byte which floats between 6930-7012 cycles
@@ -1062,7 +1063,11 @@ unsigned long previousLoop_Millis = 0; // this tracks the main loop-() < 1080mSe
 //for debugging, outputs info to serial port and mqtt function 'f' will cycle
 bool blue_led2_Water = false;    // Use blue_led2 to indicate Watertrigger
 bool blue_led2_HotWater = false; // Use blue_led2 to indicate Hotstate
-bool blue_led2_Crc = true;       // Use blue_led2 to indicate valid Crc
+#if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK) || defined(BITTEST_BLUE_ACTIVE) // Monitor SoftwareSerial241.cpp
+  bool blue_led2_Crc = true;       // Use blue_led2 to indicate valid Crc
+#else
+  bool blue_led2_Crc = false;       // Use blue_led2 to indicate valid Crc
+#endif
 
 bool allowOtherActivities = true; // allow other activities if not reading serial P1 port
 bool p1SerialActive   = false;    // start program with inactive P1 port
@@ -4051,7 +4056,6 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       }
       digitalWrite(BLUE_LED, LOW);   //Turn the ESPLED on
     */
-
     // digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off to signal a short
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
     delay(250);
