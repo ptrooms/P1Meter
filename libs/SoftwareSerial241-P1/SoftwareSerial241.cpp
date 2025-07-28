@@ -163,11 +163,11 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    // m_bitWait = 515;                     // v58: production & copy , 498 is bottom, v59b changed from 498 to 515
    // m_bitWait = 519;                        // v60 changed from 515 to 521 (interbyte time 6931)
 
-   #if defined(PROD_MODE) || defined(COP_MODE)
+   #if defined(PROD_MODE)
       // m_bitWait = 443;  // v61a   t_wait =6052  // v60a after we moved the the m_buffer_bits[m_inPos-1] = start to end of ISR
       m_bitWait = 433;  // v61a   t_wait =6052  // v60a after we moved the the m_buffer_bits[m_inPos-1] = start to end of ISR
    #else
-      m_bitWait = 472;  // v61a                 // v60 changed from 515 to 521 to 539 (interbyte time 6931)
+      m_bitWait = 469;  // v61a                 // v60 changed from 515 to 521 to 539 (interbyte time 6931)
    #endif      
                                            // 539
    if (isValidGPIOpin(receivePin)) {
@@ -520,6 +520,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 /*
   Do BitBang serial port1, store Byte in m_buffer[m_inPos] and check for P1 and
 */
+// #define BITTEST_BLUE_SYNC     // cycle Blueled on rythm of ISR
+// #define BITTEST_BLUE_MARK     // finisch cycle Bl;ueled with short its for scoping
 volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    
    /* ---------------------------------------------------------------------------------------------------------
@@ -559,14 +561,24 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // failed // unsigned long wait = 427UL;		// 501 // 425 115k2@80MHz   
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
+   #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
+      digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+   #endif      
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
    m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
      WAITIram4w; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
-     if (digitalRead(m_rxPin))
+     if (digitalRead(m_rxPin)) {
+         #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
+            digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+         #endif
        rec |= 0x80;
+      }
+      #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
+         else digitalWrite(D0, HIGH);      //Turn the LED gpio16 ON  (active-low)
+      #endif
    //   else                     // v52 balance isr rxread always doing or operation
    //     rec |= 0x00;
    }           // 8th bit
@@ -578,6 +590,14 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
       // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
       //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
    WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+
+   #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)      
+      digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)      
+   #endif
+
+   #ifdef BITTEST_BLUE_MARK
+      WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   #endif
    
       // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
@@ -594,6 +614,17 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
       m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
       m_overflow = true;
    }
+   #if defined(BITTEST_BLUE_MARK)      // cycle port for scoop measure
+      if (m_wait != 0) {
+         digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+      }      
+      digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)
+      if (rec == '1') digitalWrite(D0, LOW);  else digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)
+      for (int i = 0; i < 32; i++) { m_wait++;}
+      if (rec == '1') digitalWrite(D0, HIGH); else digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+      digitalWrite(D0, HIGH);              //Turn the LED gpio16 ON  (active-low)
+   #endif      
+   
    // Must clear bit in the interrupt register,
    // it gets set even when interrupts are disabled
    // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);

@@ -3628,10 +3628,11 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.print(rx2_function == true ? "ON" : "OFF");
       }
 
-    } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //herev38
+    } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //v61a revise CRC->Off->Water->Hot
       if (blue_led2_Water) {
-          blue_led2_Water = !blue_led2_Water;
-          blue_led2_HotWater = !blue_led2_HotWater;          
+          blue_led2_Water    = false;
+          blue_led2_Crc      = false;
+          blue_led2_HotWater = true;
         #ifdef NoTx2Function                    
           if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);   // OFF
         #endif                    
@@ -3639,19 +3640,22 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           // Serial.print(""); // stability test v43 // extra
           // Serial.print(""); // stability test v43
           Serial.print("."); // stability test v43
-
-          // Serial.print("BlueLed2 = HotWater.");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
           // Serial.print(""); // stability test v38    // stability deactive v44
           // Serial.print("."); // stability test v38   // stability deactive v44
       } else if (blue_led2_HotWater) {
-          blue_led2_HotWater = !blue_led2_HotWater;
-          blue_led2_Crc = !blue_led2_Crc;
+          blue_led2_Water    = false;
+          blue_led2_Crc      = true;
+          blue_led2_HotWater = false;
           Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Crc check to BleuLed2 , initial On
       } else if (blue_led2_Crc) {
-          blue_led2_Crc = !blue_led2_Crc;
+          blue_led2_Crc      = false;
+          blue_led2_Water    = false;
+          blue_led2_HotWater = false;
           Serial.print("BlueLed2 = Off");            // BlueLed2 Off
       } else {
-          blue_led2_Water = !blue_led2_Water;
+          blue_led2_Water    = true;
+          blue_led2_Crc      = false;
+          blue_led2_HotWater = false;
         #ifdef NoTx2Function                                       
           if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
         #endif
