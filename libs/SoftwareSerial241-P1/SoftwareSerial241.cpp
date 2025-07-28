@@ -162,7 +162,12 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
    // m_bitWait = 515;                     // v58: production & copy , 498 is bottom, v59b changed from 498 to 515
    // m_bitWait = 519;                        // v60 changed from 515 to 521 (interbyte time 6931)
-   m_bitWait = 539;                        // v60a after we moved the the m_buffer_bits[m_inPos-1] = start to end of ISR
+
+   #if defined(PROD_MODE) || defined(COP_MODE)
+      m_bitWait = 442;  // v61a   t_wait =6052  // v60a after we moved the the m_buffer_bits[m_inPos-1] = start to end of ISR
+   #else
+      m_bitWait = 472;  // v61a                 // v60 changed from 515 to 521 to 539 (interbyte time 6931)
+   #endif      
                                            // 539
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
