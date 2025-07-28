@@ -92,7 +92,7 @@ public:
 
    void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
    void rxRead2();		// BitBang Wl without p1active detection beween / and !
-   void rxRead58();		// BitBang routine v58 
+   void rxRead59();		// BitBang routine v58 
    void rxRead60();		// BitBang routine v60
    void rxTriggerBit(); // use bittiming every flank change allocates a time
 

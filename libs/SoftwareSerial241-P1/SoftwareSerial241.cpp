@@ -56,6 +56,17 @@ extern "C" {
 #else   
    #define BITWAIT1 469
 #endif
+
+// check test
+#undef BITWAIT1
+#define BITWAIT1 509
+   // v59: m_bitWait = 509;   rxRead59
+   // v60: m_bitWait = 519;   rxRead60
+   // v60: m_bitWait = 519;   rxRead60
+
+/*
+   test diagnostics v61+ in rxRead60
+*/
 // #define BITTEST_BLUE_SYNC     // activate Blueled on rythme of ISR
 // #define BITTEST_BLUE_MARK     // finisch cycle Blueled with short spike its for scope
 // #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
@@ -74,7 +85,7 @@ void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 // void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
-void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead58(); };     // v60 v58
+void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead59(); };     // choose v60 v59
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming
 void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxTriggerBit(); };  // use gpio14 for bittiming
@@ -534,6 +545,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 // #define BITTEST_BLUE_SYNC     // activate Blueled on rythme of ISR
 // #define BITTEST_BLUE_MARK     // finisch cycle Blueled with short spike its for scope
 // #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
+#define WAITIram4w60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    
    /* ---------------------------------------------------------------------------------------------------------
@@ -585,7 +597,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram4w; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4w60; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin)) {
          #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
@@ -606,14 +618,14 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
       // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
       // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
       //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4w60; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
 
    #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)      
       digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)      
    #endif
 
    #ifdef BITTEST_BLUE_MARK
-      WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+      WAITIram4w60; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    #endif
    
       // Store the received value in the buffer unless we have an overflow
@@ -788,8 +800,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
 }
 
 
-#define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
+#define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 // rxread taken from v58
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
@@ -809,7 +821,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram4w58; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4w59; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
@@ -823,7 +835,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
    // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
    //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4w58; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4w59; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
