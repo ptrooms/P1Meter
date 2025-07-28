@@ -6215,8 +6215,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               }
               Serial.print((String) "\r\n dataC"+ i + ":\t");  
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
-                if (telegram_crcOut[m] == mySerial1.peekByte(m) &&
-                    telegram_crcOut[m] != 'X') 
+                if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
+                    telegram_crcOut[m] == 'X') 
                     Serial.print(" "); 
                 else Serial.print("^");
               }
