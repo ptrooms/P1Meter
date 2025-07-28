@@ -705,3 +705,82 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 }
 
 
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead3() {
+   // copy taken from v60a
+   /* ---------------------------------------------------------------------------------------------------------
+    - time claculated and measured by oscilloscoop:
+               80Mhz --. approx 12.5 ns          per cycle or 80 cycles per microsecond. 
+               115200 bit timing is approx: 8,6µS --> ~      694 cycles
+               10bits = 86µSec -->                         6.940 cycles
+               1024bytes ==>  ~  89,5mS minimal        7.111.111 cycles ==> 
+          scoped USB: 875bytes: 245mS                 21.016.666
+               interline time =   8-9mS                  650.666 cyles (19 bytes take=1.6mS = 133.333 cycles)
+               startbit-down  =   8,6µSec                    700 cycles (sustains a rise -7.3µS) = 
+                databits 8x:  =  69,2µSec                  5.750 cycles     
+                stopbit up    =   8,6µSec                    700  
+                     total    =  86,4µSec                  7.100
+             protection limit =                            7.000 cycles = 84µSec
+    - time by program is very fluid and volatile use timer (table display) command: "t"dto display the table.
+         - we have 6931-6932cycles betwee Bytes, equalling 83,14µsec
+         - sometimes we have readfailuers when  a bitprocessing prematurely finished, 
+            causing a bit-miss that alters de byte value.
+         - Luckly each new byte is resyncrhonised by its startbit that triggers de ISR.
+         - The P1  is buffering its data by 19 to 64 bytes with an inverval of approx -50mS (220.000 cycles)
+           
+   ---------------------------------------------------------------------------------------------------------- */   
+   
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+  
+      // Advance the starting point for the samples but compensate for the
+      // initial delay which occurs before the interrupt is delivered
+      // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
+
+      // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz /
+      unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
+      // stored as m_wait
+
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
+
+   // failed // unsigned long wait = 427UL;		// 501 // 425 115k2@80MHz   
+   // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
+   // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
+   unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+   m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
+   uint8_t rec = 0;
+   for (int i = 0; i < 8; i++) {
+     WAITIram4w; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     rec >>= 1;
+     if (digitalRead(m_rxPin))
+       rec |= 0x80;
+   //   else                     // v52 balance isr rxread always doing or operation
+   //     rec |= 0x00;
+   }           // 8th bit
+
+   if (m_invert) rec = ~rec;
+      // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
+      // wait = wait - 400; // try to play with this time
+      // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
+      // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
+      //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
+   WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   
+      // Store the received value in the buffer unless we have an overflow
+   int next = (m_inPos+1) % m_buffSize;
+   #ifdef TEST_MODE
+      if (next != m_outPos && m_wait < BYTE_MAXWAIT_1) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+   #else
+      if (next != m_outPos) {  // this works best in production
+   #endif
+      if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
+      if (rec == '!') m_P1active = false ;  // 26mar21 Ptro P1 messageing has ended due valid trailer
+      m_buffer[m_inPos] = rec;
+      m_inPos = next;
+   } else {
+      m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
+      m_overflow = true;
+   }
+   // Must clear bit in the interrupt register,
+   // it gets set even when interrupts are disabled
+   // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
+   // Serial.print("-"); // this blocks and make the routine inoperable
+}
