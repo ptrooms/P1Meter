@@ -5949,7 +5949,6 @@ void command_testH4(){    // code to maken things stable teststable
                 // v57c-0  added multiple combinations, things remain instable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
-
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability
@@ -5960,16 +5959,9 @@ void command_testH4(){    // code to maken things stable teststable
 
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability   // v58c 3
-
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
 
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
@@ -5979,6 +5971,14 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
 #ifdef TEST_MODE                    
+
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
@@ -6213,7 +6213,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               for (int m = j; m <= i; m++ )  {
                   Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
               }
-              Serial.print((String) "\r\n dataC"+ i + ":\t");  
+              Serial.print((String) "\r\n dataC"+ j + ":\t");  
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
                 if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
                     telegram_crcOut[m] == 'X') 
