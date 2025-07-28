@@ -90,8 +90,9 @@ public:
    void enableRx(bool on);
    void enableRx(bool on, int recordtype);      // v58 to use/do/selec type of data 0-physical/ 1-simulatedP1 / 2-simulatatedWL
 
-   volatile void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
+   void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
    void rxRead2();		// BitBang Wl without p1active detection beween / and !
+   void rxRead3();		// BitBang routine v60
    void rxTriggerBit(); // use bittiming every flank change allocates a time
 
    // AVR compatibility methods

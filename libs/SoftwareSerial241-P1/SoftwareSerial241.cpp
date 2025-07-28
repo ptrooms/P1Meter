@@ -73,7 +73,8 @@ void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 // Pin 6 to 11 can not be used
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
+// void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
+void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead3(); };     // v61a using the copy ov v61
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming
 void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxTriggerBit(); };  // use gpio14 for bittiming
@@ -533,7 +534,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 // #define BITTEST_BLUE_SYNC     // activate Blueled on rythme of ISR
 // #define BITTEST_BLUE_MARK     // finisch cycle Blueled with short spike its for scope
 // #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
-volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
@@ -705,7 +706,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 }
 
 
-volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead3() {
+#define WAITIram4w3 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead3() {
    // copy taken from v60a
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
@@ -748,7 +750,7 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead3() {
    m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram4w; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4w3; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
@@ -762,7 +764,7 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead3() {
       // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
       // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
       //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4w3; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
       // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
