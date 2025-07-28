@@ -3570,11 +3570,13 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           m_bitWait = mySerial2.m_bitWait;
           speed = serial2Baudrate;
         }
-        Serial.print((String)"\tBitwait" + 
-              + ( (char)payload[0] == 'J' ? "P1" : "WL" )
-              + "=" + temp + ", " 
-              ) ;
 
+        Serial.print((String) "\r\n"
+              + (char)payload[0] + (char)payload[1] + (char)payload[2] 
+              + "-> Bitwait-" + 
+              + ( (char)payload[0] == 'J' ? "P1" : "WL" )
+              + "=" + temp 
+              ) ;
         /*
             set timer in Driver
         */
@@ -3587,14 +3589,28 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       */
       unsigned long m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
       unsigned long l_bitTime = m_bitTime;
+
+
       unsigned long l_wait = l_bitTime + l_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
-      unsigned long l_start = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
-      Serial.print((String)" l_wait" + l_wait + "...");
+      Serial.print((String) ", l_bitTime="+ l_bitTime +", l_wait=" + l_wait + "..(");
       #define BYTE_MAXWAIT_T 7100
       #define WAITIram5K { while (ESP.getCycleCount()-l_start < l_wait && l_wait<BYTE_MAXWAIT_T); l_wait += l_bitTime; }
-      WAITIram5K;
+      uint8_t rec = 0;
+      cli();   // hold interrupts ( or noInterrupts() )
+      unsigned long l_start = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+         for (int i = 0; i < 8; i++) {
+            WAITIram5K;
+            rec >>= 1;
+            if (digitalRead(SERIAL_RX))
+              rec |= 0x80;
+            else                    // v52 balance isr rxread always doing or operation
+              rec |= 0x00;
+         }  
+         WAITIram5K;                // stopbit
       temp = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
-      Serial.print((String)", t_wait=" + (temp - l_start) + "\t" ) ;
+      sei();   // resume interrupts
+  
+      Serial.print((String)"t_wait=" + (temp - l_start) + ")..\t" ) ;   // 407
 
 
   /* DNO , leave it to investigate how to force an exception
