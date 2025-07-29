@@ -139,6 +139,7 @@ private:
    // 497-501-505 // 425 115k2@80MHz 
    unsigned long m_wait; 
 
+   bool m_d4_isr_state;        // v61b track ISR state
 
 };
 

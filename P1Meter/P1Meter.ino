@@ -2219,7 +2219,7 @@ void loop()
     // WiFi.printDiag(Serial);   // print data ESP8266WiFiClass::printDiag(Print& p)
   }
 
-  mqtt_local_yield();      //   client.loop( ); // handle mqtt
+  // mqtt_local_yield();      //   client.loop( ); // handle mqtt, v61 30jul25 disbale this here
 
   //  --------------------------------------------------------------------------------------------- START allowOtherActivities
   if (!allowOtherActivities) {     // are we outside P1 Telegram processing (require serial-timeing)
@@ -2825,6 +2825,8 @@ void readTelegramWL() {
     }
   #endif  
 
+  mqtt_local_yield();   // v61b 30jul25 , program remains stable
+
   if (serial2Stop) return;    // v52 return if we have stopped this serial
   if (!bSerial2State) return;  // v58 useless to continue without active serial
 
@@ -3272,14 +3274,16 @@ void readTelegramWL() {
 
               if (tHeatFlowConsumption < 1) {       // check for valid value, must be at WL
                 Serial.print("-X");                
-              } else if ( telegram2[valChar+1] == 'G' ) { // record is expressed in GJ
+              } else if ( telegram2[valChar+1] == 'G'     // record is expressed in GJ
+                       || telegram2[valChar+2] == 'G') {  // v61b support for shifted (test) COP_MODE records
                 HeatFlowConsumption = 0;                  // reset as we have Heat
                 HeatConsumptionOld = HeatConsumption;     // save previous read
                 HeatConsumption = tHeatFlowConsumption;   // get new read  
                 if (HeatConsumptionOld == 0  && HeatConsumption > 0) {  // do not apply compare when 0
                     HeatConsumptionOld = HeatConsumption ;
                 }
-              } else if ( telegram2[valChar+1] == 'm') {  // record is expressed in m3
+              } else if ( telegram2[valChar+1] == 'm'     // record is expressed in m3
+                     ||   telegram2[valChar+2] == 'm') {  // v61b support for shifted (test) COP_MODE records
                 HeatConsumption = 0;                      // v46 reset as we have Flow
                 HeatFlowConsumption = tHeatFlowConsumption;  
               }
@@ -3556,7 +3560,10 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                   ( (char)payload[2] >= '0' && (char)payload[2] <= '9') ) {
         
         int temp  = (((int)payload[2] - 48));
-        if ( (char)payload[2] == '9')  temp = 10;   // increase by 10 if 9
+        if ( (char)payload[2] == '6')  temp =  10;   // increase by more
+        if ( (char)payload[2] == '7')  temp =  25;   // increase by more
+        if ( (char)payload[2] == '8')  temp =  50;   // increase by more
+        if ( (char)payload[2] == '9')  temp = 100;   // increase by more
         // Serial.print((String)"\r\n Changing m_bitwait with " + temp ) ;
         if ((char)payload[1] == '-') temp = temp * -1;
         // Serial.print((String)"\r\n to " + temp ) ;
@@ -3634,13 +3641,19 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       }
 
     } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //v61a revise CRC->Off->Water->Hot
-      if (blue_led2_Water) {
+      if ((char)payload[1] == '0'  ||(char)payload[1] == '1') {
+          blue_led2_Water    = false;
+          blue_led2_Crc      = false;
+          blue_led2_HotWater = false;
+          #ifdef NoTx2Function                    
+            if ((char)payload[1] == '0'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
+            if ((char)payload[1] == '1'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);  // OFF
+          #endif                    
+          Serial.print("BlueLed2 = Inact");           // BlueLed2 Off
+      } else if (blue_led2_Water) {
           blue_led2_Water    = false;
           blue_led2_Crc      = false;
           blue_led2_HotWater = true;
-        #ifdef NoTx2Function                    
-          if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);   // OFF
-        #endif                    
           Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
           // Serial.print(""); // stability test v43 // extra
           // Serial.print(""); // stability test v43
@@ -3661,9 +3674,6 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           blue_led2_Water    = true;
           blue_led2_Crc      = false;
           blue_led2_HotWater = false;
-        #ifdef NoTx2Function                                       
-          if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
-        #endif
           Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
       }
        // Clear GJ buffer
@@ -5715,6 +5725,7 @@ void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubcli
     // Allow / Do (likely) superfluous control to esp8266 routines
   yield();        // give control to wifi management
   // delay(50);      // delay 50 mSec
+  // delay(1);      // delay 50 mSec v61b 30jul25 make things unstable
   ESP.wdtFeed();  // feed the hungry timer
   if (client.connected()) client.loop();  // feed the mqtt client, required to collect mqtt commands
 }
@@ -5958,6 +5969,7 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v58 add to check for stability
+#ifdef TEST_MODE                    
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability   // v58c 267 + asm 10
@@ -5978,7 +5990,6 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
-#ifdef TEST_MODE                    
 
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
