@@ -59,10 +59,12 @@ extern "C" {
 
 // check test
 #undef BITWAIT1
-#define BITWAIT1 509
-   // v59: m_bitWait = 509;   rxRead59
+// #define BITWAIT1 509       
+#define BITWAIT1 419    // v61b with rxread59
+   // v59: m_bitWait = 509;   rxRead59 59a/59b
    // v60: m_bitWait = 519;   rxRead60
    // v60: m_bitWait = 435;   rxRead61
+   // v61b --> 419
 
 /*
    test diagnostics v61+ in rxRead60
@@ -85,7 +87,7 @@ void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 // void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
-void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };     // choose v60 v59
+void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead59(); };     // choose v60 v59
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming
 void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxTriggerBit(); };  // use gpio14 for bittiming
