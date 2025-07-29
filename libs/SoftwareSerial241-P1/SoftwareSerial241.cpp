@@ -62,7 +62,7 @@ extern "C" {
 #define BITWAIT1 509
    // v59: m_bitWait = 509;   rxRead59
    // v60: m_bitWait = 519;   rxRead60
-   // v60: m_bitWait = 519;   rxRead60
+   // v60: m_bitWait = 435;   rxRead61
 
 /*
    test diagnostics v61+ in rxRead60
@@ -85,7 +85,7 @@ void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 // void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
-void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead59(); };     // choose v60 v59
+void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };     // choose v60 v59
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming
 void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxTriggerBit(); };  // use gpio14 for bittiming
@@ -539,45 +539,20 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 }
 
 
+
 /*
-  Do BitBang serial port1, store Byte in m_buffer[m_inPos] and check for P1 and
+  Do BitBang of v59, store Byte in m_buffer[m_inPos] and check for P1 and
 */
-// #define BITTEST_BLUE_SYNC     // activate Blueled on rythme of ISR
-// #define BITTEST_BLUE_MARK     // finisch cycle Blueled with short spike its for scope
-// #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
-#define WAITIram4w60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-   
-   /* ---------------------------------------------------------------------------------------------------------
-    - time claculated and measured by oscilloscoop:
-               80Mhz --. approx 12.5 ns          per cycle or 80 cycles per microsecond. 
-               115200 bit timing is approx: 8,6µS --> ~      694 cycles
-               10bits = 86µSec -->                         6.940 cycles
-               1024bytes ==>  ~  89,5mS minimal        7.111.111 cycles ==> 
-          scoped USB: 875bytes: 245mS                 21.016.666
-               interline time =   8-9mS                  650.666 cyles (19 bytes take=1.6mS = 133.333 cycles)
-               startbit-down  =   8,6µSec                    700 cycles (sustains a rise -7.3µS) = 
-                databits 8x:  =  69,2µSec                  5.750 cycles     
-                stopbit up    =   8,6µSec                    700  
-                     total    =  86,4µSec                  7.100
-             protection limit =                            7.000 cycles = 84µSec
-    - time by program is very fluid and volatile use timer (table display) command: "t"dto display the table.
-         - we have 6931-6932cycles betwee Bytes, equalling 83,14µsec
-         - sometimes we have readfailuers when  a bitprocessing prematurely finished, 
-            causing a bit-miss that alters de byte value.
-         - Luckly each new byte is resyncrhonised by its startbit that triggers de ISR.
-         - The P1  is buffering its data by 19 to 64 bytes with an inverval of approx -50mS (220.000 cycles)
-           
-   ---------------------------------------------------------------------------------------------------------- */   
-   
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
-  
-      // Advance the starting point for the samples but compensate for the
-      // initial delay which occurs before the interrupt is delivered
-      // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
+
+   // Advance the starting point for the samples but compensate for the
+   // initial delay which occurs before the interrupt is delivered
+   // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
 
       // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz /
-   unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
+      unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505 // 425 115k2@80MHz /
       // stored as m_wait
 
    // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
@@ -585,83 +560,48 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
    // failed // unsigned long wait = 427UL;		// 501 // 425 115k2@80MHz   
    // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
    // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
-   #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK) 
-      digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
-   #endif
-   #if defined(BITTEST_BLUE_ACTIVE)     // mark end of ISR
-      digitalWrite(D0, HIGH);              //Turn the LED gpio16 ON  (active-low)
-   #endif
-
-   
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
-   m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram4w60; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4w; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
-     if (digitalRead(m_rxPin)) {
-         #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
-            digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
-         #endif
+     if (digitalRead(m_rxPin))
        rec |= 0x80;
-      }
-      #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
-         else digitalWrite(D0, HIGH);      //Turn the LED gpio16 ON  (active-low)
-      #endif
-      //   else                     // v52 balance isr rxread always doing or operation
-      //     rec |= 0x00;
-   }           // 8th bit
-
-   if (m_invert) rec = ~rec;
-      // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
-      // wait = wait - 400; // try to play with this time
-      // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
-      // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
-      //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4w60; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
-
-   #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)      
-      digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)      
-   #endif
-
-   #ifdef BITTEST_BLUE_MARK
-      WAITIram4w60; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
-   #endif
+   //   else                     // v52 balance isr rxread always doing or operation
+   //     rec |= 0x00;
+   }
    
-      // Store the received value in the buffer unless we have an overflow
+   if (m_invert) rec = ~rec;
+   // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
+   // wait = wait - 400; // try to play with this time
+   // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
+   // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
+   //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
+   WAITIram4w; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   
+   // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
-   if (next != m_outPos 
+
+      if (next != m_outPos
          #ifdef TEST_MODE
-               && m_wait < BYTE_MAXWAIT_1          // added for test_mode only
-         #endif            
-      ) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+            && m_wait < 7000  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+         #endif
+         ) {
       if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
-      if (rec == '!') m_P1active = false ;  // 26mar21 Ptro P1 messageing has ended due valid trailer
+      if (rec == '!') m_P1active = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
       m_buffer[m_inPos] = rec;
       m_inPos = next;
    } else {
       m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
       m_overflow = true;
    }
-   #if defined(BITTEST_BLUE_MARK)      // cycle port for scoop measure
-      if (m_wait != 0) {
-         digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
-      }      
-      digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)
-      if (rec == '1') digitalWrite(D0, LOW);  else digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)
-      for (int i = 0; i < 32; i++) { m_wait++;}
-      if (rec == '1') digitalWrite(D0, HIGH); else digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
-      digitalWrite(D0, HIGH);              //Turn the LED gpio16 ON  (active-low)
-   #endif      
    
-   // Must clear bit in the interrupt register,
+   // Must clear this bit in the interrupt register,
    // it gets set even when interrupts are disabled
    // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
    // Serial.print("-"); // this blocks and make the routine inoperable
-   #if defined(BITTEST_BLUE_ACTIVE)     // mark end of ISR
-      digitalWrite(D0, LOW);              //Turn the LED gpio16 ON  (active-low)
-   #endif
 }
+
 
 /*
   Do BitBang serial port2, store Byte in m_buffer[m_inPos]
@@ -780,11 +720,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    
       // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
-   #ifdef TEST_MODE
-      if (next != m_outPos && m_wait < BYTE_MAXWAIT_1) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
-   #else
-      if (next != m_outPos) {  // this works best in production
-   #endif
+   if (next != m_outPos  // this works best in production
+            #ifdef TEST_MODE
+            && m_wait < 7000  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+         #endif
+      ) {
       if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
       if (rec == '!') m_P1active = false ;  // 26mar21 Ptro P1 messageing has ended due valid trailer
       m_buffer[m_inPos] = rec;
@@ -802,7 +742,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
 
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
-// rxread taken from v58
+// rxread taken from v59
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
    // Advance the starting point for the samples but compensate for the
@@ -839,11 +779,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
-   #ifdef TEST_MODE
-      if (next != m_outPos && m_wait < 7000) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
-   #else
-      if (next != m_outPos) {  // this works best in production
-   #endif
+   if (next != m_outPos  // this works best in production
+            #ifdef TEST_MODE
+            && m_wait < 7000  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+         #endif
+      ) {
       if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
       if (rec == '!') m_P1active = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
       m_buffer[m_inPos] = rec;
@@ -857,4 +797,128 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    // it gets set even when interrupts are disabled
    // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
    // Serial.print("-"); // this blocks and make the routine inoperable
+}
+
+/*
+  Do BitBang serial port1, store Byte in m_buffer[m_inPos] and check for P1 and
+*/
+// #define BITTEST_BLUE_SYNC     // activate Blueled on rythme of ISR
+// #define BITTEST_BLUE_MARK     // finisch cycle Blueled with short spike its for scope
+// #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
+#define WAITIram4w61 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead61() {
+   
+   /* ---------------------------------------------------------------------------------------------------------
+    - time claculated and measured by oscilloscoop:
+               80Mhz --. approx 12.5 ns          per cycle or 80 cycles per microsecond. 
+               115200 bit timing is approx: 8,6µS --> ~      694 cycles
+               10bits = 86µSec -->                         6.940 cycles
+               1024bytes ==>  ~  89,5mS minimal        7.111.111 cycles ==> 
+          scoped USB: 875bytes: 245mS                 21.016.666
+               interline time =   8-9mS                  650.666 cyles (19 bytes take=1.6mS = 133.333 cycles)
+               startbit-down  =   8,6µSec                    700 cycles (sustains a rise -7.3µS) = 
+                databits 8x:  =  69,2µSec                  5.750 cycles     
+                stopbit up    =   8,6µSec                    700  
+                     total    =  86,4µSec                  7.100
+             protection limit =                            7.000 cycles = 84µSec
+    - time by program is very fluid and volatile use timer (table display) command: "t"dto display the table.
+         - we have 6931-6932cycles betwee Bytes, equalling 83,14µsec
+         - sometimes we have readfailuers when  a bitprocessing prematurely finished, 
+            causing a bit-miss that alters de byte value.
+         - Luckly each new byte is resyncrhonised by its startbit that triggers de ISR.
+         - The P1  is buffering its data by 19 to 64 bytes with an inverval of approx -50mS (220.000 cycles)
+           
+   ---------------------------------------------------------------------------------------------------------- */   
+   
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+  
+      // Advance the starting point for the samples but compensate for the
+      // initial delay which occurs before the interrupt is delivered
+      // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
+
+      // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz /
+   unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
+      // stored as m_wait
+
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz
+
+   // failed // unsigned long wait = 427UL;		// 501 // 425 115k2@80MHz   
+   // unsigned long wait = m_bitWait;		// 425 115k2@80MHz // goes stuck
+   // unsigned long wait = 425; // harcoded too fast as cycles for the calculation time are omitted
+   #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK) 
+      digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+   #endif
+   #if defined(BITTEST_BLUE_ACTIVE)     // mark end of ISR
+      digitalWrite(D0, HIGH);              //Turn the LED gpio16 ON  (active-low)
+   #endif
+
+   
+   unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+   m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
+   uint8_t rec = 0;
+   for (int i = 0; i < 8; i++) {
+     WAITIram4w61; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     rec >>= 1;
+     if (digitalRead(m_rxPin)) {
+         #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
+            digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+         #endif
+       rec |= 0x80;
+      }
+      #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)
+         else digitalWrite(D0, HIGH);      //Turn the LED gpio16 ON  (active-low)
+      #endif
+      //   else                     // v52 balance isr rxread always doing or operation
+      //     rec |= 0x00;
+   }           // 8th bit
+
+   if (m_invert) rec = ~rec;
+      // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
+      // wait = wait - 400; // try to play with this time
+      // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
+      // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
+      //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
+   WAITIram4w61; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+
+   #if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK)      
+      digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)      
+   #endif
+
+   #ifdef BITTEST_BLUE_MARK
+      WAITIram4w61; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   #endif
+   
+      // Store the received value in the buffer unless we have an overflow
+   int next = (m_inPos+1) % m_buffSize;
+   if (next != m_outPos 
+         #ifdef TEST_MODE
+               && m_wait < BYTE_MAXWAIT_1          // added for test_mode only
+         #endif            
+      ) {  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
+      if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
+      if (rec == '!') m_P1active = false ;  // 26mar21 Ptro P1 messageing has ended due valid trailer
+      m_buffer[m_inPos] = rec;
+      m_inPos = next;
+   } else {
+      m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
+      m_overflow = true;
+   }
+   #if defined(BITTEST_BLUE_MARK)      // cycle port for scoop measure
+      if (m_wait != 0) {
+         digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+      }      
+      digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)
+      if (rec == '1') digitalWrite(D0, LOW);  else digitalWrite(D0, HIGH);             //Turn the LED gpio16 ON  (active-low)
+      for (int i = 0; i < 32; i++) { m_wait++;}
+      if (rec == '1') digitalWrite(D0, HIGH); else digitalWrite(D0, LOW);             //Turn the LED gpio16 ON  (active-low)
+      digitalWrite(D0, HIGH);              //Turn the LED gpio16 ON  (active-low)
+   #endif      
+   
+   // Must clear bit in the interrupt register,
+   // it gets set even when interrupts are disabled
+   // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
+   // Serial.print("-"); // this blocks and make the routine inoperable
+   #if defined(BITTEST_BLUE_ACTIVE)     // mark end of ISR
+      digitalWrite(D0, LOW);              //Turn the LED gpio16 ON  (active-low)
+   #endif
 }

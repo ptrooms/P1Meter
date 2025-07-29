@@ -94,6 +94,7 @@ public:
    void rxRead2();		// BitBang Wl without p1active detection beween / and !
    void rxRead59();		// BitBang routine v58 
    void rxRead60();		// BitBang routine v60
+   void rxRead61();		// BitBang routine v61
    void rxTriggerBit(); // use bittiming every flank change allocates a time
 
    // AVR compatibility methods
