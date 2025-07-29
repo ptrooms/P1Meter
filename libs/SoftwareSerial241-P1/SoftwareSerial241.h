@@ -116,12 +116,12 @@ private:
    bool m_invert;
    volatile bool m_P1active;                 // Ptro 28mar21 to support P1 messageing, volatile v59b used in ISR
    bool m_port_state;               // v59 contains status of (in)activated ISR
-   volatile bool m_overflow;        // volatile v59b , used in ISR
+   bool m_overflow;        // volatile v59b , used in ISR
    volatile unsigned long m_bitTime;  // volatile v60a, used in ISR
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
-   volatile unsigned int m_inPos, m_outPos;     // volatile v59b
-   volatile int m_buffSize;
+   unsigned int m_inPos, m_outPos;
+   int m_buffSize;
    uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
    unsigned long *m_buffer_bits;         // 4096-value time-array  index m_inPos, m_outPos;
@@ -136,7 +136,7 @@ private:
       
    // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;
    // 497-501-505 // 425 115k2@80MHz 
-   volatile unsigned long m_wait; 
+   unsigned long m_wait; 
 
 
 };
