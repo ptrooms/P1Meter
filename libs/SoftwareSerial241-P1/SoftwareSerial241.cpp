@@ -50,6 +50,7 @@ extern "C" {
    Timer control by experience
 */
 
+// #define USE_RXREAD56          // use this gpio implementation        cop/dup=549, prod=419 else=469
 // #define USE_RXREAD59          // use this gpio implementation        cop/dup=549, prod=419 else=469
 #define USE_RXREAD60          // use this gpio implementation     ?? 519 , 435 ?? ?? 59a/b 509
 // #define USE_RXREAD61          // use this gpio implementation     61b 419
@@ -93,7 +94,9 @@ void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 // void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
-#if defined (USE_RXREAD59)
+#if defined (USE_RXREAD58)
+   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead58(); };     // choose implementation of v59
+#elif defined (USE_RXREAD59)
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead59(); };     // choose implementation of v59
 #elif defined (USE_RXREAD60)
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead60(); };     // choose implementation of v60
@@ -677,6 +680,40 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
    // Serial.print("-"); // this blocks and make the routine inoperable
 }
+
+
+/*
+   below rxread taken from stable version 58
+*/
+#define WAITIram4w56 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+   unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz
+   unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+   uint8_t rec = 0;
+   for (int i = 0; i < 8; i++) {
+     WAITIram4w58; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     rec >>= 1;
+     if (digitalRead(m_rxPin))
+       rec |= 0x80;
+     else                     // v52 balance isr rxread always doing or operation
+       rec |= 0x00;
+   }
+   if (m_invert) rec = ~rec;
+   WAITIram4w58; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   int next = (m_inPos+1) % m_buffSize;
+   if (next != m_outPos) {  // this works best in production
+      if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
+      if (rec == '!') m_P1active = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
+      m_buffer[m_inPos] = rec;
+      m_inPos = next;
+   } else {
+      m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
+      m_overflow = true;
+   }
+}
+
+
 
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
