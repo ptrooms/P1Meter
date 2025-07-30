@@ -52,22 +52,26 @@ extern "C" {
 
 // #define USE_RXREAD56          // use this gpio implementation        cop/dup=549, prod=419 else=469
 // #define USE_RXREAD59          // use this gpio implementation        cop/dup=549, prod=419 else=469
-#define USE_RXREAD60          // use this gpio implementation     ?? 519 , 435 ?? ?? 59a/b 509
+#define USE_RXREAD60             // PROD/419 TEST/519
 // #define USE_RXREAD61          // use this gpio implementation     61b 419
 // else RXREAD2                  // w.i.p
 
 #if defined(COP_MODE) || defined(DUP_MODE)
-   #define BITWAIT1 549       // v61b rxread59 549 t_wait=6287
+   // #define BITWAIT1 549       // v61b rxread59 549 t_wait=6287
+   #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
 #elif defined(PROD_MODE) 
    #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
 #else   
    #define BITWAIT1 469       // else test
 #endif
 
+//30jul25 COP_MODE RXREAD60 BITWAIT1 524
+
 // check test
 // #undef BITWAIT1
-// #define BITWAIT1 509       
+// #define BITWAIT1 509
 // #define BITWAIT1 419    // v61b with rxread59 PROD
+   // v58: m_bitWait = 498;   rxread58
    // v59: m_bitWait = 509;   rxRead59 59a/59b
    // v60: m_bitWait = 519;   rxRead60
    // v60: m_bitWait = 435;   rxRead61
@@ -685,7 +689,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 /*
    below rxread taken from stable version 58
 */
-#define WAITIram4w56 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+#define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
    unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz

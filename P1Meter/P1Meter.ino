@@ -6312,12 +6312,23 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   Convert and print binary  (recursive)
 */
 void print_binary(unsigned int number) {
-    if (number >> 1) {
-        print_binary(number >> 1);
-    }
+  if (number <= 255) {                      // print byte
+    Serial.print((String) " ");
+    Serial.print((String) (number & 0x40 ? '1' : '0'));
+    Serial.print((String) (number & 0x20 ? '1' : '0'));
+    Serial.print((String) (number & 0x10 ? '1' : '0'));
+    Serial.print((String) (number & 0x80 ? '1' : '0'));
+    Serial.print((String) " ");
+    Serial.print((String) (number & 0x08 ? '1' : '0'));
+    Serial.print((String) (number & 0x04 ? '1' : '0'));
+    Serial.print((String) (number & 0x02 ? '1' : '0'));
+    Serial.print((String) (number & 0x01 ? '1' : '0'));
+    Serial.print((String) " ");    
+  } else {
+    if (number >> 1) print_binary(number >> 1);
     Serial.print((String) (number & 1 ? '1' : '0'));
+  }
 }
-
 
 /* return printabel character for diagnose */
 int convert_p1_print(int data_in) {
