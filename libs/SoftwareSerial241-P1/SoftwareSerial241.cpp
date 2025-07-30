@@ -678,8 +678,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // Serial.print("-"); // this blocks and make the routine inoperable
 }
 
-
-
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 // rxread taken from v59
@@ -740,7 +738,20 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    // Serial.print("-"); // this blocks and make the routine inoperable
 }
 
-#define WAITIram4w60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+
+#define WAITIram4w60 { \
+  unsigned long cc = SoftwareSerial::getCycleCountIram(); \
+  while (SoftwareSerial::getCycleCountIram()-start < m_wait) \
+  { \
+    if (SoftwareSerial::getCycleCountIram() < cc) { \
+      start += m_bitTime; \
+      m_wait += m_bitTime; \
+    } \
+  } \
+  m_wait += m_bitTime; \
+}
+
+#define WAITIram4s60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------

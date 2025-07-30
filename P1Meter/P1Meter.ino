@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "62" // number this version
+#define VERSION_NUMBER "62a" // number this version
 
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
