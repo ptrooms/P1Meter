@@ -50,18 +50,33 @@ extern "C" {
    Timer control by experience
 */
 
-// #define USE_RXREAD56          // use this gpio implementation        cop/dup=549, prod=419 else=469
+// #define USE_RXREAD58          // use this gpio implementation        cop/dup=549, prod=419 else=469
 // #define USE_RXREAD59          // use this gpio implementation        cop/dup=549, prod=419 else=469
-#define USE_RXREAD60             // PROD/419 TEST/519
+// #define USE_RXREAD60             // PROD/419 TEST/519
 // #define USE_RXREAD61          // use this gpio implementation     61b 419
 // else RXREAD2                  // w.i.p
 
 #if defined(COP_MODE) || defined(DUP_MODE)
-   // #define BITWAIT1 549       // v61b rxread59 549 t_wait=6287
-   #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+   #define USE_RXREAD60             // PROD/419 TEST/519
+
+   #ifdef USE_RXREAD59
+      #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+   #endif
+   #ifdef USE_RXREAD60
+      // #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+      #define BITWAIT1 594 // rx60=594 rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+   #endif
 #elif defined(PROD_MODE) 
-   #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
+   #define USE_RXREAD59
+
+   #ifdef USE_RXREAD59
+      #define BITWAIT1 509       // v59 rxread59 509
+   #endif
+   #ifdef USE_RXREAD60
+      #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
+   #endif
 #else   
+   #define USE_RXREAD58
    #define BITWAIT1 469       // else test
 #endif
 
@@ -99,7 +114,7 @@ void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 // void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
 #if defined (USE_RXREAD58)
-   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead58(); };     // choose implementation of v59
+   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead58(); };     // choose implementation of v58
 #elif defined (USE_RXREAD59)
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead59(); };     // choose implementation of v59
 #elif defined (USE_RXREAD60)
@@ -718,11 +733,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 }
 
 
-
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
-// rxread taken from v59
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+  // cli();   // hold interrupts ( or noInterrupts() )
+   // rxread taken from v59 ,  v62 clear interrupt rxPin moved to bottom
 
    // Advance the starting point for the samples but compensate for the
    // initial delay which occurs before the interrupt is delivered
@@ -773,10 +787,23 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
       m_overflow = true;
    }
    
-   // Must clear this bit in the interrupt register,
-   // it gets set even when interrupts are disabled
-   // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
-   // Serial.print("-"); // this blocks and make the routine inoperable
+   
+   // Serial.print("-"); // this blocks as print is interrupt drived and make the routine inoperable
+
+   /* 
+      26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
+      30jul25 Ptro moved back to end , read: https://bbs.espressif.com/viewtopic.php?t=119
+
+      note one can pass a number to the attach that is passed: ETS_GPIO_INTR_ATTACH(iw_GPIO_handler, 123);
+         in this case th declaration of he INTR is ICACHE_RAM_ATTR SoftwareSerial::rxRead59(int8_t key)
+
+      GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif
+         // When an interrupt occurs on a GPIO pin, the corresponding bit in the GPIO_STATUS register is set.
+         // 1 << m_rxPin  shifts the binary value 1 to the left by the number of bits specified rxPin.
+         //                to clear the interrupt flag and allow and future interrupts on that pin
+   */      
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif
+  // sei();   // resume interrupts   (or interrupts() )
 }
 
 
@@ -794,6 +821,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 
 #define WAITIram4p60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
+   cli();         // v62a 30jul25 trial and error
    // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
@@ -817,7 +845,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
            
    ---------------------------------------------------------------------------------------------------------- */   
    
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+   // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
    digitalWrite(D4, m_d4_isr_state);
       // Advance the starting point for the samples but compensate for the
       // initial delay which occurs before the interrupt is delivered
@@ -867,13 +895,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
       m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
       m_overflow = true;
    }
-   // Must clear bit in the interrupt register,
-   // it gets set even when interrupts are disabled
-   // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
-   // Serial.print("-"); // this blocks and make the routine inoperable
    m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    m_d4_isr_state = !m_d4_isr_state;             // v61 track ISR state
    // digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
+  sei();
+  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 }
 
 
