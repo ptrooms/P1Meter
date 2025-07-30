@@ -2591,7 +2591,7 @@ void readTelegramP1() {
     }
     p1TriggerTime = millis();
   }
-
+  
   #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
     /*
       Using our 241 adapted library, we wait between / and ! 
@@ -2599,6 +2599,8 @@ void readTelegramP1() {
     if ( mySerial1.P1active())  {    // does not seem to activate
         if (!bP1Active_signalled) Serial.print((String) "\\" ); // myLength processed previous line
         bP1Active_signalled = true;
+        // ESP.wdtFeed();              // v58 feed the hungry timer
+        // delay(0);       // this causes unread
         return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
     }
   #endif  
@@ -3914,6 +3916,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             //      --  - defaul print fst 16 bytes of P1 record
             if ( ( (char)payload[1] == '1' || (char)payload[1] == '2') &&
                  ( ( (char)payload[2] >= '1' && (char)payload[2] <= '6' ) ||
+                     (char)payload[2] == 'b' ||  
                      (char)payload[2] == 'c' )
                ) {
                  int peekport = (((int)payload[1] - 48));   // set portnumber
@@ -3924,6 +3927,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                   else if ( (char)payload[2] == '5') serial_Print_PeekBits(peekport,  512);   // 200mS print time
                   else if ( (char)payload[2] == '6') serial_Print_PeekBits(peekport, 1024);   // 200mS print time
                   else if ( (char)payload[2] == 'c') serial_Print_PeekBits(peekport, 2048);   // use text compare
+                  else if ( (char)payload[2] == 'b') serial_Print_PeekBits(peekport,-2048);   // print bit compare
                  } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
             else if ((char)payload[1] == 's') {
                       Serial.println((String)"\n\rT-imer Porstate: ");
@@ -5969,14 +5973,13 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v58 add to check for stability
-#ifdef TEST_MODE                    
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability   // v58c 267 + asm 10
 
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability  // v58c 10
-
+#ifdef TEST_MODE
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability   // v58c 3
                     delay(0);     // v57 add to check for stability
@@ -6210,13 +6213,13 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
-          if (temp == (mySerial1.peekBit(i)-mySerial1.peekBit(i-1))) {
+          temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1);
+          if (temp == 0UL) {
               Serial.print((String) "\t---- " ); // same data
           } else {
-              temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1);
               Serial.print((String) "\t" + temp + " " );
           }
-         Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
+          Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
         }
       if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial1.peekBit(i) + "> " );  // next line time
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
@@ -6247,7 +6250,30 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
     }     
-  }    
+
+    if (bit_sequence < 0) {   // print only bitchanges in Binary with/when range is negative
+      Serial.print((String) "\r\n Check binary: 0  to " +  (bit_sequence * -1) );
+      int cnt = 0;
+      for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
+        if ( ! (telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
+          Serial.print((String) "\r\n Data:" + m +  "\t");
+          Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+          print_binary(mySerial1.peekByte(m));
+          Serial.print((String)+  " <i-M> " );
+          print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
+          Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
+          cnt++; // maximize
+        }
+        if (  telegram_crcOut[m]    == '!'    ||
+              mySerial1.peekByte(m) == '!'    || 
+              cnt > 15) {
+          Serial.println((String) "\r\n break diffs=" + cnt );
+          break; // terminate at end
+        }            
+      }     
+    }
+
+  }
 
   if (bit_port == 2) {
     Serial.print((String) "\r\n Print bit time sequences"+ 
@@ -6280,6 +6306,16 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   }    
 
   Serial.print((String) "\r\n-------------time:" + micros() + "\r\n");
+}
+
+/*
+  Convert and print binary  (recursive)
+*/
+void print_binary(unsigned int number) {
+    if (number >> 1) {
+        print_binary(number >> 1);
+    }
+    Serial.print((String) (number & 1 ? '1' : '0'));
 }
 
 
