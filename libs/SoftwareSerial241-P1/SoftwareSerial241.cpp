@@ -739,7 +739,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 }
 
 
-#define WAITIram4w60 { \
+#define WAITIram4t60 { \
   unsigned long cc = SoftwareSerial::getCycleCountIram(); \
   while (SoftwareSerial::getCycleCountIram()-start < m_wait) \
   { \
@@ -751,7 +751,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
   m_wait += m_bitTime; \
 }
 
-#define WAITIram4s60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+#define WAITIram4p60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
@@ -795,7 +795,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
-     WAITIram4w60; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4p60; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
      if (digitalRead(m_rxPin))
        rec |= 0x80;
@@ -809,7 +809,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
       // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
       // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
       //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4w60; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4p60; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
       // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
