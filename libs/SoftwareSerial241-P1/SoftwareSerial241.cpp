@@ -66,6 +66,7 @@ extern "C" {
       // #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
       #define BITWAIT1 594 // rx60=594 rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
    #endif
+
 #elif defined(PROD_MODE) 
    #define USE_RXREAD59
 
@@ -735,7 +736,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
-  // cli();   // hold interrupts ( or noInterrupts() )
+ // cli();   // hold interrupts ( or noInterrupts() )
    // rxread taken from v59 ,  v62 clear interrupt rxPin moved to bottom
 
    // Advance the starting point for the samples but compensate for the
@@ -802,8 +803,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
          // 1 << m_rxPin  shifts the binary value 1 to the left by the number of bits specified rxPin.
          //                to clear the interrupt flag and allow and future interrupts on that pin
    */      
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif
-  // sei();   // resume interrupts   (or interrupts() )
+ GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif
+ // sei();   // resume interrupts   (or interrupts() )
 }
 
 
@@ -820,8 +821,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 }
 
 #define WAITIram4p60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+// waittime (digwrite/cli.....sei) = 594-640
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
-   cli();         // v62a 30jul25 trial and error
+ digitalWrite(D4, m_d4_isr_state); // cycle down-up = 1.0µsec
+ cli();         // v62a 30jul25 trial and error
    // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
@@ -846,7 +849,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    ---------------------------------------------------------------------------------------------------------- */   
    
    // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
-   digitalWrite(D4, m_d4_isr_state);
+   // digitalWrite(D4, m_d4_isr_state);
       // Advance the starting point for the samples but compensate for the
       // initial delay which occurs before the interrupt is delivered
       // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
@@ -863,14 +866,22 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
    m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
    uint8_t rec = 0;
-   for (int i = 0; i < 8; i++) {
-     WAITIram4p60; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
-     rec >>= 1;
+      //                                  until here is approx 3.4µSec
+      // digitalWrite(D4, m_d4_isr_state) // cycle down-up = 1.0µsec
+      // WAITIram4p60; // at Bitwait-P1=594, l_bitTime=694, l_wait=331..(t_wait=5904) approx 4µSec scoped startbit
+      // digitalWrite(D4, m_d4_isr_state); // cycle down-up = 1.0µsec      
+   for (int i = 0; i < 8; i++) {     // loop@594=75,8µsec
+     WAITIram4p60;                   // @494=5.48 @594=4.35µsec @694=3.08
+     rec >>= 1;                      // rec/if/read :==> takes  1.2µsec
      if (digitalRead(m_rxPin))
        rec |= 0x80;
+     // WAITIram4p60;
+     // digitalWrite(D4, !m_d4_isr_state);
    //   else                     // v52 balance isr rxread always doing or operation
    //     rec |= 0x00;
    }           // 8th bit
+   // digitalWrite(D4, !m_d4_isr_state);
+   // digitalWrite(D4, m_d4_isr_state);
 
    if (m_invert) rec = ~rec;
       // Stop bit , time betweeen bytes should not be needed to time as we have processed the databits (ISR is RISING or FALLING start bit, )
@@ -880,10 +891,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
       //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
    WAITIram4p60; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
-      // Store the received value in the buffer unless we have an overflow
+   // Store the received value in the buffer unless we have an overflow
+         // time:  if/if/if/move/set :==>  1.5µsec
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos  // this works best in production
-            #ifdef TEST_MODE
+         #ifdef TEST_MODE
             && m_wait < 7000  // abort if wait exceeded the expected readtime (test=OK, in production=NOK will cause more timeouts)
          #endif
       ) {
@@ -895,11 +907,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
       m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
       m_overflow = true;
    }
-   m_buffer_bits[m_inPos] = start;                    // v59_first try to get timnng
+   m_buffer_bits[m_inPos] = start;  
    m_d4_isr_state = !m_d4_isr_state;             // v61 track ISR state
-   // digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
-  sei();
-  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+ sei();
+ GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+ digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
 }
 
 
