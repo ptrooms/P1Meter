@@ -4552,49 +4552,50 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
          }
     */
 
-  } else {  // startChar >= 0
+  } 
+  else {  // startChar >= 0
   
     if (endChar >= 0 && telegramP1header) {   // Are we reading the trailer of the Meter with header passed
 
-      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram) + endChar, 1); // include trailer '!' into CRC, v48-casting
-      char messageCRC[5];
-      strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
-      messageCRC[4] = 0;                                // make it an end of string
+        currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram) + endChar, 1); // include trailer '!' into CRC, v48-casting
+        char messageCRC[5];
+        strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
+        messageCRC[4] = 0;                                // make it an end of string
 
-      validTelegramCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
-      if (doForceFaultP1) validTelegramCRCFound = false;    // v52 enforce P1 error
-      
-      if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
-      // incoperate CRC reciovery function
-      if (validTelegramCRCFound) {   // temporarily test√erify on Debug switch
-        p1ReadRxCnt++ ; // Count times we have had a succesfull CRC read
-        RX_yieldcount = 3; // assume all if well and we had of have surived any yieldcount
-        if (currentCRC == dataInCRC) { // on match build masking array
-          // ----------------------------------------------------------------------------------------------
-          validCrcInFound = validTelegramCRCFound;            // v45 telegram has CRC OK , so CrcIn is OK
-          if  (telegram_crcIn_len == telegram_crcOut_len) {    // do we have a masking array ?
-
-                for (int i=0; i < telegram_crcOut_len; i++) {    // check more masks
-                    if (telegram_crcOut[i] != 'X' && telegram_crcOut[i] != telegram_crcIn[i] ) {
-                          telegram_crcOut_cnt++;                // increase mask count
-                          if (outputOnSerial) Serial.printf(", ms#%d=%c%c", i, telegram_crcIn[i], telegram_crcOut[i]);
-                          telegram_crcOut[i] = 'X' ;            // mask this position
-                    }
-                }
-                if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
-                getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
-          } else {                                            // no or myLength changed masking array
-
-                if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
-                for (int i=0; i < telegram_crcIn_len; i++) {
-                    telegram_crcOut[i] = telegram_crcIn[i];     // (re)create masking array
-                }
-                telegram_crcOut_len = telegram_crcIn_len;
-                telegram_crcOut[telegram_crcOut_len] = 0x00;    // ensure we have a termination string
-                if (outputOnSerial) Serial.printf(", msLo#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
-
-          }
-        } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
+        validTelegramCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
+        if (doForceFaultP1) validTelegramCRCFound = false;    // v52 enforce P1 error
+        
+        if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
+        // incoperate CRC reciovery function
+        if (validTelegramCRCFound) {   // temporarily test√erify on Debug switch
+          p1ReadRxCnt++ ; // Count times we have had a succesfull CRC read
+          RX_yieldcount = 3; // assume all if well and we had of have surived any yieldcount
+          if (currentCRC == dataInCRC) { // on match build masking array
+            // ----------------------------------------------------------------------------------------------
+            validCrcInFound = validTelegramCRCFound;            // v45 telegram has CRC OK , so CrcIn is OK
+            if  (telegram_crcIn_len == telegram_crcOut_len) {    // do we have a masking array ?
+  
+                  for (int i=0; i < telegram_crcOut_len; i++) {    // check more masks
+                      if (telegram_crcOut[i] != 'X' && telegram_crcOut[i] != telegram_crcIn[i] ) {
+                            telegram_crcOut_cnt++;                // increase mask count
+                            if (outputOnSerial) Serial.printf(", ms#%d=%c%c", i, telegram_crcIn[i], telegram_crcOut[i]);
+                            telegram_crcOut[i] = 'X' ;            // mask this position
+                      }
+                  }
+                  if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
+                  getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
+            } else {                                            // no or myLength changed masking array
+  
+                  if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
+                  for (int i=0; i < telegram_crcIn_len; i++) {
+                      telegram_crcOut[i] = telegram_crcIn[i];     // (re)create masking array
+                  }
+                  telegram_crcOut_len = telegram_crcIn_len;
+                  telegram_crcOut[telegram_crcOut_len] = 0x00;    // ensure we have a termination string
+                  if (outputOnSerial) Serial.printf(", msLo#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
+  
+            }
+          } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
 
             Serial.printf(", crE:%x!=%x",currentCRC,messageCRC);
             telegram_crcOut[0] = 0x00;     // reset mask myLength and counters
@@ -4602,81 +4603,101 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
             telegram_crcOut_cnt = 0;
             if (outputOnSerial) Serial.printf(", msk0=%d ",telegram_crcOut_cnt);
 
-        }
-        // ----------------------------------------------------------------------------------------------
-      } else {    // we have a CRC error on running CRC, try to recover using using created mask
-        
-        if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if myLength of error is equal , try to unmask differences  ?
-            for (int i=0; i < telegram_crcIn_len; i++) {
-                if (telegram_crcOut[i] != 'X' && telegram_crcIn[i] != telegram_crcOut[i] ) {   // Unmask the error ??
-                  if (outputOnSerial) {
-                    Serial.printf(", mskio=%d:", i);
-                    if (isprint(telegram_crcIn[i]))  Serial.print(telegram_crcIn[i]); else Serial.print("?");
-                    Serial.print("/");
-                    if (isprint(telegram_crcOut[i])) Serial.print(telegram_crcOut[i]); else Serial.print("?");
+          }
+          // ----------------------------------------------------------------------------------------------
+       } 
+      else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask
+          /* This will recover if & when lengths differ one byte by insertion 
+            */  
+            if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
+                  /* find position with 2 or more successive faults */
+                  int j = 0; int k = 0;
+                  for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error
+                      if ( telegram_crcOut[i]   != 'X' && telegram_crcIn[i]   != telegram_crcOut[i] &&
+                          telegram_crcOut[i+1] != 'X' && telegram_crcIn[i+1] != telegram_crcOut[i+1] ) j = i;
                   }
-                  telegram_crcIn[i] = telegram_crcOut[i];
-                }                 
-            }
-            dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len ); // Get new native Crcin, v48-casting
-            validCrcInFound = (strtol(messageCRC, NULL, 16) == dataInCRC);    // check if we have a 16base-match
-            if (validCrcInFound) {
-              telegram_crcIn_rcv++ ;                       // count we can/could recover this corrupted telegram read
-              if (outputOnSerial) Serial.printf(" crI%d(%d)=%x<=m>%x ,", telegram_crcIn_rcv, telegram_crcIn_len, dataInCRC,strtol(messageCRC, NULL, 16));  // print recovered count and value
-              RecoverTelegram_crcIn();
-            }
-
-        }
-      }
-
-      if (outputOnSerial) Serial.printf(" crJ(%d)\t!%s (arc=%x)", telegram_crcIn_len, messageCRC, currentCRC); // /t produces an error
-      if (outputOnSerial) Serial.printf(", msLx#%d ", telegram_crcOut_len);
-      
-      /* // DebugCRC not activated as most of the time we miss characters which make CRC Invalid
-         if (outputOnSerial)  {
-             if( validTelegramCRCFound) Serial.print((String)  "\nVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
-             if(!validTelegramCRCFound) Serial.print((String)"\nINVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
-             Serial.printf(", crc=%x msg=%s \n",currentCRC,messageCRC);
+                  if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
+                    if (!outputOnSerial) Serial.printf(">"); else Serial.printf(", shift=%d:", j); // indicate we have shifted
+                    k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
+                    for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
+                        j = telegram_crcIn[i];  // save this current one to do next insert
+                        telegram_crcIn[i] = k;  // insert saved 
+                        k = j;                  // ready for next
+                    } // when ready the array Crc-In has shifte one byte to right
+                    telegram_crcIn_len++ ;  // add one to execute the next compare
+                  }
+             }
+          /* This will recover CRC by UnMasking
+            */  
+            if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if myLength of error is equal , try to unmask differences  ?
+                  for (int i=0; i < telegram_crcIn_len; i++) {
+                      if (telegram_crcOut[i] != 'X' && telegram_crcIn[i] != telegram_crcOut[i] ) {   // Unmask the error ??
+                        if (outputOnSerial) {
+                          Serial.printf(", mskio=%d:", i);
+                          if (isprint(telegram_crcIn[i]))  Serial.print(telegram_crcIn[i]); else Serial.print("?");
+                          Serial.print("/");
+                          if (isprint(telegram_crcOut[i])) Serial.print(telegram_crcOut[i]); else Serial.print("?");
+                        }
+                        telegram_crcIn[i] = telegram_crcOut[i];
+                      }                 
+                    }
+                  dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len ); // Get new native Crcin, v48-casting
+                  validCrcInFound = (strtol(messageCRC, NULL, 16) == dataInCRC);    // check if we have a 16base-match
+                  if (validCrcInFound) {
+                    telegram_crcIn_rcv++ ;                       // count we can/could recover this corrupted telegram read
+                    if (outputOnSerial) Serial.printf(" crI%d(%d)=%x<=m>%x ,", telegram_crcIn_rcv, telegram_crcIn_len, dataInCRC,strtol(messageCRC, NULL, 16));  // print recovered count and value
+                    RecoverTelegram_crcIn();
+                  }
+             }
          }
-      */
+        if (outputOnSerial) Serial.printf(" crJ(%d)\t!%s (arc=%x)", telegram_crcIn_len, messageCRC, currentCRC); // /t produces an error
+        if (outputOnSerial) Serial.printf(", msLx#%d ", telegram_crcOut_len);
+        
+          /* // DebugCRC not activated as most of the time we miss characters which make CRC Invalid
+            if (outputOnSerial)  {
+                if( validTelegramCRCFound) Serial.print((String)  "\nVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
+                if(!validTelegramCRCFound) Serial.print((String)"\nINVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
+                Serial.printf(", crc=%x msg=%s \n",currentCRC,messageCRC);
+            }
+          */
 
-      // digitalWrite(LED_BUILTIN, LOW);  // Turn the LED on
-      // digitalWrite(BLUE_LED, HIGH);       //Turn the ESPLED off
-      digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // revert BLUE led
-      allowOtherActivities = true;    // hold off other conflicting acvities
-      /*
-        //DebugCRC
-              if (outputOnSerial)     {
-                // Serial.println("a\n<eof0\nb");
-                for (int cnt = 0; cnt < myLen-2; cnt++) {
+          // digitalWrite(LED_BUILTIN, LOW);  // Turn the LED on
+          // digitalWrite(BLUE_LED, HIGH);       //Turn the ESPLED off
+         digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // revert BLUE led
+         allowOtherActivities = true;    // hold off other conflicting acvities
+          /*
+          //DebugCRC
+                if (outputOnSerial)     {
+                  // Serial.println("a\n<eof0\nb");
+                  for (int cnt = 0; cnt < myLen-2; cnt++) {
 
-                 // copy over the processed data
-                 testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
-                 if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
+                  // copy over the processed data
+                  testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
+                  if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
 
-                  Serial.print(telegram[cnt]);
-                  // Serial.print(".");
-                }
-
-
-                if (mqttCnt < 10 && telegramError == 0) {
-                  Serial.printf("\n\nString>%s< [%u, crc=%x msg=%s ]\n",testTelegram,testTelegramPos,currentCRC,messageCRC);
-                  yield();
-                  Serial.print("\n HEX:>");
-                  for (int cnt=0; cnt <= testTelegramPos; cnt++) {
-        ;                  Serial.printf("%02X",testTelegram[cnt]);
+                    Serial.print(telegram[cnt]);
+                    // Serial.print(".");
                   }
-                  Serial.print("<HEX \n");
-                }
 
-                currentCRC = 0;
 
-                //  Serial.println(" <eof1");
-                //  Serial.println("\r\n"); // disabled at this  interferes with the cast EoT record
-           } // else if (endChar >= 0 && telegramP1header)
-      */
+                  if (mqttCnt < 10 && telegramError == 0) {
+                    Serial.printf("\n\nString>%s< [%u, crc=%x msg=%s ]\n",testTelegram,testTelegramPos,currentCRC,messageCRC);
+                    yield();
+                    Serial.print("\n HEX:>");
+                    for (int cnt=0; cnt <= testTelegramPos; cnt++) {
+          ;                  Serial.printf("%02X",testTelegram[cnt]);
+                    }
+                    Serial.print("<HEX \n");
+                  }
 
-    } else {                                  // We are reading between header and trailer
+                  currentCRC = 0;
+
+                  //  Serial.println(" <eof1");
+                  //  Serial.println("\r\n"); // disabled at this  interferes with the cast EoT record
+            } // else if (endChar >= 0 && telegramP1header)
+          */
+
+    } else {  // if endChar >= 0 && telegramP1header  // We are reading between header and trailer
       
       // currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, myLen - 1); // calculatate CRC upto/including 0x0D
       //    reinterpret_cast<unsigned char*> to prevent "C-style pointer casting" message
@@ -4690,42 +4711,41 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
         // use temporarily literal to add
         unsigned char tempLiteral[] = {0x0A};
         currentCRC = Crc16In(currentCRC, tempLiteral, 1);
-      }
+       }
 
       if (outputOnSerial) {
-        // Serial.print("<");
-        if (myLen > 2) {  // (was > 2)
-          for (int cnt = 0; cnt < myLen - 2; cnt++) {  // read max 64 bytes (was myLen-2)
-            /*// DebugCRC
-              //DebugCRC copy over the processed data
-              testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
-              if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
-            */
-            if (!isPrintable(telegram[cnt]) || telegram[cnt] == ' ' ) telegramError++; // check if data is readable
+          // Serial.print("<");
+          if (myLen > 2) {  // (was > 2)
+            for (int cnt = 0; cnt < myLen - 2; cnt++) {  // read max 64 bytes (was myLen-2)
+              /*// DebugCRC
+                //DebugCRC copy over the processed data
+                testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
+                if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
+              */
+              if (!isPrintable(telegram[cnt]) || telegram[cnt] == ' ' ) telegramError++; // check if data is readable
 
-            /* //debugCRC
-              {
-                  Serial.print(telegram[cnt]);
-              } else {
-                  telegramError++;                  // count as error
-                  // Serial.printf("\?%02\?",telegram[cnt]);
-                  Serial.printf("\?%02\?",telegramLast2[0]);
-                  // Serial.print((String)"?"+String(telegramLast[cnt],HEX)+"?");
-              }
-            */
-          } // for loop
-          //DebugCRC if (outputOnSerial) Serial.printf("{%02X}",telegram[myLen-2]);
-        }
-        /* //DebugCRC
-          if (myLen <= 2) {
-          Serial.print(charArray [myLen]);
+              /* //debugCRC
+                {
+                    Serial.print(telegram[cnt]);
+                } else {
+                    telegramError++;                  // count as error
+                    // Serial.printf("\?%02\?",telegram[cnt]);
+                    Serial.printf("\?%02\?",telegramLast2[0]);
+                    // Serial.print((String)"?"+String(telegramLast[cnt],HEX)+"?");
+                }
+              */
+            } // for loop
+            //DebugCRC if (outputOnSerial) Serial.printf("{%02X}",telegram[myLen-2]);
           }
-          // Serial.print(">\r\n");
-          // Serial.print(">");
-        */
-      } // if output serial
-    } // else if endChar >= 0 && telegramP1header
-
+          /* //DebugCRC
+            if (myLen <= 2) {
+            Serial.print(charArray [myLen]);
+            }
+            // Serial.print(">\r\n");
+            // Serial.print(">");
+          */
+       } // if output serial
+     } // else if endChar >= 0 && telegramP1header
   } // startChar >= 0
 
   // if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
