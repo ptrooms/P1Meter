@@ -71,7 +71,8 @@ extern "C" {
    #define USE_RXREAD59
 
    #ifdef USE_RXREAD59
-      #define BITWAIT1 509       // v59 rxread59 509
+      // #define BITWAIT1 509       // v59 rxread59 509
+      #define BITWAIT1 522       // v62a 524 v59 rxread59 509
    #endif
    #ifdef USE_RXREAD60
       #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
@@ -855,7 +856,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
       // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
 
       // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz /
-      unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
+   unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
       // stored as m_wait
 
    // unsigned long wait = m_bitTime + m_bitTime/3 - 498;		// 501 // 425 115k2@80MHz

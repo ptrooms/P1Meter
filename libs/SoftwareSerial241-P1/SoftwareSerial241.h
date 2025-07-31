@@ -122,7 +122,7 @@ private:
    volatile unsigned long m_bitTime;  // volatile v60a, used in ISR
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
-   unsigned int m_inPos, m_outPos;
+   volatile unsigned int m_inPos, m_outPos;
    int m_buffSize;
    uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
