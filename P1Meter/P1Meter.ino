@@ -2103,7 +2103,7 @@ void setup()
 
 void loop()
 { 
-  if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
+  if (verboseLevel == VERBOSE_ON) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
   // note this loop( ) routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
@@ -2179,7 +2179,7 @@ void loop()
     Serial.print((String) +   (loopCnt % 10)+" \b");                          // display diagnostic second loopcounter
 
     test_WdtTime = currentMillis - test_WdtTime;          
-    if (verboseLevel == 1 && test_WdtTime != 1UL )  {      // v58 print long looptimes to diagnose excessive delays
+    if (verboseLevel == VERBOSE_ON && test_WdtTime != 1UL )  {      // v58 print long looptimes to diagnose excessive delays
         Serial.printf(" looptime=%lu ",  test_WdtTime);
     }
     bP1Active_signalled = false; // v57 reset his inteval of signalled situation
@@ -2497,7 +2497,7 @@ void loop()
   }
 
   ArduinoOTA.handle();             // check if we must service on the Air update
-  if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have left the building
+  if (verboseLevel == VERBOSE_ON) Serial.print(">"); // exit loop to check if we have left the building
 }
 
 /* 
@@ -3488,8 +3488,14 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
     } else  if ((char)payload[0] == 'v') {
       if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') {
           verboseLevel =  (int)payload[1] - 48;   // set number myself
-          if (verboseLevel == 8) Serial.setDebugOutput(true);    // v58
-          if (verboseLevel == 9) Serial.setDebugOutput(false);   // v58
+          if (verboseLevel == 8) {
+            Serial.print("\tv8/setDebugOutput(true)\t");    // v58
+            Serial.setDebugOutput(true);    // v58
+          }                
+          if (verboseLevel == 9) {
+            Serial.print("\tv9/setDebugOutput(false)\t");    // v58            
+            Serial.setDebugOutput(false);   // v58
+          }            
           if (verboseLevel > VERBOSE_MAX) {
             outputOnSerial = true;
             verboseLevel = VERBOSE_MQTT;  // print all below and MQTT
@@ -3686,7 +3692,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
          if (loopbackRx2Mode == 1 || loopbackRx2Mode == 3) {  // v57
             outputOnSerial = false;   // disable debug details as we focus on serial input display
             rx2ReadInterval = 1;      // process this for any RX2 loop
-            verboseLevel = 4;         // v57
+            verboseLevel = VERBOSE_P1;         // v57
          }
         /* 
             Playing here with myserial is useless
@@ -3917,8 +3923,10 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             if ( ( (char)payload[1] == '1' || (char)payload[1] == '2') &&
                  ( ( (char)payload[2] >= '1' && (char)payload[2] <= '6' ) ||
                      (char)payload[2] == 'b' ||  
+                     (char)payload[2] == 'i' ||  
                      (char)payload[2] == 'c' )
                ) {
+
                  int peekport = (((int)payload[1] - 48));   // set portnumber
                        if ( (char)payload[2] == '1') serial_Print_PeekBits(peekport,   32);
                   else if ( (char)payload[2] == '2') serial_Print_PeekBits(peekport,   64);
@@ -3927,7 +3935,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                   else if ( (char)payload[2] == '5') serial_Print_PeekBits(peekport,  512);   // 200mS print time
                   else if ( (char)payload[2] == '6') serial_Print_PeekBits(peekport, 1024);   // 200mS print time
                   else if ( (char)payload[2] == 'c') serial_Print_PeekBits(peekport, 2048);   // use text compare
-                  else if ( (char)payload[2] == 'b') serial_Print_PeekBits(peekport,-2048);   // print bit compare
+                  else if ( (char)payload[2] == 'b') serial_Print_PeekBits(peekport,(-2 * MAXLINELENGTH));   // print bit compare
+                  else if ( (char)payload[2] == 'i') serial_Print_PeekBits(peekport,(-1 * MAXLINELENGTH));   // binary compare CrcIn
                  } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
             else if ((char)payload[1] == 's') {
                       Serial.println((String)"\n\rT-imer Porstate: ");
@@ -3973,7 +3982,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
           Serial.println((String)"Z zero counters " + 
-                + "( faults: " 
+                + "(mqtt=" + mqttCnt              // v63 Output count
+                + " faults: " 
                 + " Miss=" + p1MissingCnt         // v52 failed to read any P1
                 + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
                 + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
@@ -4607,27 +4617,37 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
           // ----------------------------------------------------------------------------------------------
        } 
       else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask
-          /* This will recover if & when lengths differ one byte by insertion 
-            */  
-            if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
+           /* This will size recover when lengths differ one byte by insertion 
+            */ 
+              if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
                   /* find position with 2 or more successive faults */
-                  int j = 0; int k = 0;
+                  int j = 0;
                   for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error
                       if ( telegram_crcOut[i]   != 'X' && telegram_crcIn[i]   != telegram_crcOut[i] &&
-                          telegram_crcOut[i+1] != 'X' && telegram_crcIn[i+1] != telegram_crcOut[i+1] ) j = i;
+                           telegram_crcOut[i+1] != 'X' && telegram_crcIn[i+1] != telegram_crcOut[i+1] ) j = i;
+                  }
+                  if (verboseLevel == VERBOSE_ON) {
+                      Serial.print((String) " CRCio-delta: "
+                            +  " crcI=" + telegram_crcIn_len
+                            + ", crcO=" + telegram_crcOut_len
+                            + ", pos=" + j
+                            + " ");
                   }
                   if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
-                    if (!outputOnSerial) Serial.printf(">"); else Serial.printf(", shift=%d:", j); // indicate we have shifted
-                    k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
+                    if (!outputOnSerial) Serial.print(">"); else Serial.printf(", insert=%d:", j); // indicate we have shifted
+                    int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
                     for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
                         j = telegram_crcIn[i];  // save this current one to do next insert
                         telegram_crcIn[i] = k;  // insert saved 
                         k = j;                  // ready for next
                     } // when ready the array Crc-In has shifte one byte to right
-                    telegram_crcIn_len++ ;  // add one to execute the next compare
+                    telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
+                  } else {
+                    if (!outputOnSerial) Serial.print("<0");  // too short cannot recover, indicate
+                    else Serial.print((String) "shortJ=" + j + "/lenDiff=" + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted
                   }
              }
-          /* This will recover CRC by UnMasking
+           /* This will recover CRC by UnMasking
             */  
             if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if myLength of error is equal , try to unmask differences  ?
                   for (int i=0; i < telegram_crcIn_len; i++) {
@@ -4648,7 +4668,12 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                     if (outputOnSerial) Serial.printf(" crI%d(%d)=%x<=m>%x ,", telegram_crcIn_rcv, telegram_crcIn_len, dataInCRC,strtol(messageCRC, NULL, 16));  // print recovered count and value
                     RecoverTelegram_crcIn();
                   }
-             }
+             } else {
+                if (!doForceFaultP1) {    // no debug/print if we are forcing out due to unconnected P1
+                    if (!outputOnSerial) Serial.print((String) "<" + (telegram_crcOut_len - telegram_crcIn_len));  // too short cannot recover, indicate
+                    else Serial.print((String)" shortCrcLen=" + (telegram_crcOut_len - telegram_crcIn_len) + " "); // indicate we have shifted
+             } 
+         }
          }
         if (outputOnSerial) Serial.printf(" crJ(%d)\t!%s (arc=%x)", telegram_crcIn_len, messageCRC, currentCRC); // /t produces an error
         if (outputOnSerial) Serial.printf(", msLx#%d ", telegram_crcOut_len);
@@ -6223,11 +6248,11 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   
   unsigned long temp = 0UL;               // check duplicates
   if (bit_port == 1) {
-    Serial.print((String) "\r\n Print bit time sequences"+ 
+    Serial.print((String) "\r\n\r\n Print bit time sequences"+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial1.peekBitPos()
-                  + "-------------time:" + micros()
-                  + " \r\n");
+                  + "\t-------------time:" + micros()
+                  );
 
     // print timer table, when in request > then buffer, skip this
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
@@ -6244,7 +6269,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial1.peekBit(i) + "> " );  // next line time
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
-    Serial.print((String) "\r\n dataR0:\t");                 // print character line data
+    if (bit_sequence >=0 )Serial.print((String) "\r\n dataR0:\t");  // v63 tbc, wip preven data cluttereing
     int j = 0;    // v61a: to print CRC character
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
@@ -6272,27 +6297,51 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     }     
 
     if (bit_sequence < 0) {   // print only bitchanges in Binary with/when range is negative
-      Serial.print((String) "\r\n Check binary: 0  to " +  (bit_sequence * -1) );
-      int cnt = 0;
-      for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
-        if ( ! (telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
-          Serial.print((String) "\r\n Data:" + m +  "\t");
-          Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
-          print_binary(mySerial1.peekByte(m));
-          Serial.print((String)+  " <i-M> " );
-          print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
-          Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
-          cnt++; // maximize
-        }
-        if (  telegram_crcOut[m]    == '!'    ||
-              mySerial1.peekByte(m) == '!'    || 
-              cnt > 15) {
-          Serial.println((String) "\r\n break diffs=" + cnt );
-          break; // terminate at end
-        }            
-      }     
-    }
-
+      if (((bit_sequence*-1) / MAXLINELENGTH) == 1 ) {
+        Serial.print((String) "<M> Check binary Mask: 0  to " +  (bit_sequence * -1) );
+        int cnt = 0;
+        for (int m = 0; m <= ( (bit_sequence % MAXLINELENGTH) * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
+          if ( ! (telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
+            Serial.print((String) "\r\n Data:" + m +  "\t");
+            Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+            print_binary(mySerial1.peekByte(m));
+            Serial.print((String)+  " <i-M> " );
+            print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
+            Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
+            Serial.print((String)+  " <m-I> " );
+            Serial.print((String) " " + (char) convert_p1_print(telegram_crcIn[m]) );
+            cnt++; // maximize
+          }
+          if (  telegram_crcOut[m]    == '!'    ||
+                mySerial1.peekByte(m) == '!'    || 
+                cnt > 15) {
+            Serial.println((String) "\r\n break diff cnt=" + cnt  + " at=" + m);
+            break; // terminate at end
+          }            
+        }   
+       } 
+      else {
+        Serial.print((String) "<I> Check binary Read: 0  to " +  (bit_sequence * -1) );
+        int cnt = 0;
+        for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
+          if ( ! (telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
+            Serial.print((String) "\r\n Data:" + m +  "\t");
+            Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+            print_binary(mySerial1.peekByte(m));
+            Serial.print((String)+  " <i-M> " );
+            print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
+            Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
+            cnt++; // maximize
+          }
+          if (  telegram_crcOut[m]    == '!'    ||
+                mySerial1.peekByte(m) == '!'    || 
+                cnt > 15) {
+            Serial.println((String) "\r\n break diff cnt=" + cnt  + " at=" + m);
+            break; // terminate at end
+          }            
+        }   
+      } // ((bit_sequence*1) % MAXLINELENGTH) 
+    } // else bit_sequence < 0
   }
 
   if (bit_port == 2) {
@@ -6325,7 +6374,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     }     
   }    
 
-  Serial.print((String) "\r\n-------------time:" + micros() + "\r\n");
+  Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
 }
 
 /*
