@@ -68,14 +68,16 @@ extern "C" {
    #endif
 
 #elif defined(PROD_MODE) 
-   #define USE_RXREAD59
+   // #define USE_RXREAD59
+   #define USE_RXREAD60
 
    #ifdef USE_RXREAD59
       // #define BITWAIT1 509       // v59 rxread59 509
       #define BITWAIT1 522       // v62a 524 v59 rxread59 509
    #endif
    #ifdef USE_RXREAD60
-      #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
+      // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
+      #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
    #endif
 #else   
    #define USE_RXREAD58
@@ -826,7 +828,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  digitalWrite(D4, m_d4_isr_state); // cycle down-up = 1.0µsec
  cli();         // v62a 30jul25 trial and error
-   // copy taken from v60
+    // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
                80Mhz --. approx 12.5 ns          per cycle or 80 cycles per microsecond. 

@@ -2196,9 +2196,10 @@ void loop()
     if (RX_yieldcount < 1)  RX_yieldcount = 3;   // v56c 8 --> 3 when < 1, pause P1 serial reads ubtuk yield is again < 4
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
     if (outputOnSerial) {
-          Serial.printf("\r\nLoop %6.3f exceeded#%d at prev %6.3f !!yield1080\n", 
+          Serial.printf("\r\nLoop %d exceeded# %6.3f at prev %6.3f !!yield1080\n", 
           RX_yieldcount ,     // v52: print yield value
-          ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+          ((float) currentMicros / 1000000), 
+          ((float) previousLoop_Millis / 1000));
     } else {
       if (RX_yieldcount > 3)  {
           Serial.print("@");  // signal a yieldloop '@'
@@ -2614,7 +2615,7 @@ void readTelegramP1() {
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
   if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s: %5u start: %11.6f \b\b ", 
         RX_yieldcount,    // v52: check countlevel
-        ((float)ESP.getCycleCount()/80000000),
+          ((float)ESP.getCycleCount()/80000000),
           (int) new_ThermostatState, (thermostatReadState ? "d" : "T"),  (thermostatWriteState ? "A" : "i"),
           (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
         (mqttCnt + 1), ((float) startMicros / 1000000));
@@ -3046,7 +3047,7 @@ void readTelegramWL() {
 
                 if ( validTelegram2CRCFound && loopbackRx2Mode == 5 ) {   // v55 debug/print one validated hex characters
                   Serial.println("");
-                  Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
+                  Serial.printf(" crt=%s, crc=%04x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
 
                   for (int i = startChar ; i  < ((endChar-startChar)+1+4); i++ ) {
                     
@@ -3206,7 +3207,7 @@ void readTelegramWL() {
                        Serial.printf("%02x ", telegram2_org[i]); 
 
                     }
-                    Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
+                    Serial.printf(" crt=%s, crc=%04x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
                 }
 
           }
@@ -4025,7 +4026,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           
           Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
           Serial.println((String)"J/j 12/+-/0-8|9 bitwait1 Jserial1=" + mySerial1.m_bitWait
-                                                    + ", jserial2=" + mySerial2.m_bitWait);
+                                                      + ", jserial2=" + mySerial2.m_bitWait);
           
           Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
           
@@ -4607,7 +4608,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
             }
           } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
 
-            Serial.printf(", crE:%x!=%x",currentCRC,messageCRC);
+            Serial.printf(", crE:%04x!=%04x",currentCRC,messageCRC);
             telegram_crcOut[0] = 0x00;     // reset mask myLength and counters
             telegram_crcOut_len = 0;
             telegram_crcOut_cnt = 0;
@@ -4665,7 +4666,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                   validCrcInFound = (strtol(messageCRC, NULL, 16) == dataInCRC);    // check if we have a 16base-match
                   if (validCrcInFound) {
                     telegram_crcIn_rcv++ ;                       // count we can/could recover this corrupted telegram read
-                    if (outputOnSerial) Serial.printf(" crI%d(%d)=%x<=m>%x ,", telegram_crcIn_rcv, telegram_crcIn_len, dataInCRC,strtol(messageCRC, NULL, 16));  // print recovered count and value
+                    if (outputOnSerial) Serial.printf(" crI%d(%d)=%04x<=m>%04x ,", telegram_crcIn_rcv, telegram_crcIn_len, dataInCRC,strtol(messageCRC, NULL, 16));  // print recovered count and value
                     RecoverTelegram_crcIn();
                   }
              } else {
@@ -5273,7 +5274,7 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
       dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len);  // get CRC of whole copied record, v48-casting
       if (outputOnSerial) {   // print serial record count, total receivwed myLength, calculated CRC
         // Serial.println((String)" ct=" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
-        Serial.printf("\tcr0=%x,crc=%d,crl=%d\t", dataInCRC,  telegram_crcIn_cnt, telegram_crcIn_len) ; 
+        Serial.printf("\tcr0=%04x,crc=%d,crl=%d\t", dataInCRC,  telegram_crcIn_cnt, telegram_crcIn_len) ; 
       }
   }
   telegram_crcIn_cnt++;
