@@ -57,8 +57,12 @@ extern "C" {
 // else RXREAD2                  // w.i.p
 
 #if defined(COP_MODE) || defined(DUP_MODE)
-   #define USE_RXREAD60             // PROD/419 TEST/519
+   #define USE_RXREAD58             // v63a enabled
+   // #define USE_RXREAD60          // v63a disabled
 
+   #ifdef USE_RXREAD58
+      #define BITWAIT1 469 // v63a rxread58 469
+   #endif
    #ifdef USE_RXREAD59
       #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
    #endif
@@ -68,9 +72,13 @@ extern "C" {
    #endif
 
 #elif defined(PROD_MODE) 
+   #define USE_RXREAD58          // v63a enabled
    // #define USE_RXREAD59
-   #define USE_RXREAD60
+   // #define USE_RXREAD60       // v63a disabled
 
+   #ifdef USE_RXREAD58
+      #define BITWAIT1 501       // v63a fixed 501
+   #endif
    #ifdef USE_RXREAD59
       // #define BITWAIT1 509       // v59 rxread59 509
       #define BITWAIT1 522       // v62a 524 v59 rxread59 509
@@ -79,10 +87,12 @@ extern "C" {
       // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
       // #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
       #define BITWAIT1 630       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
+      // 01aug25 : bitwait=630 mqtt=2902 faults:  Miss=323, Crc=299, Rcvr=815, Rp1=24, Yld=3, lT2=0
    #endif
+
 #else   
    #define USE_RXREAD58
-   #define BITWAIT1 469       // else test
+   #define BITWAIT1 469       // else test, fixed wait = 500
 #endif
 
 //30jul25 COP_MODE RXREAD60 BITWAIT1 524
@@ -712,7 +722,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 #define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
-   unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz
+   unsigned long wait = m_bitTime + m_bitTime/3 - BITWAIT1;		// v62a fixing at 501
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
