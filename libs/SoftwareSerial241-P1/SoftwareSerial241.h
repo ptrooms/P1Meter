@@ -43,16 +43,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #ifdef USE_RXREAD58
       #define USE_RXREAD USE_RXREAD58
       #ifndef BITWAIT1
-         #define BITWAIT1 469 // v63a rxread58 469
+         #define BITWAIT1 579 // v63a rxread58  479-579-769 
       #endif
-   #endif
-   #ifdef USE_RXREAD59
+   #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
       #ifndef BITWAIT1
          #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
       #endif
-   #endif
-   #ifdef USE_RXREAD60
+   #elif defined(USE_RXREAD60)
       #define USE_RXREAD USE_RXREAD60
       #ifndef BITWAIT1
          // #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
@@ -69,17 +67,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #ifdef USE_RXREAD58
       #define USE_RXREAD USE_RXREAD58
       #ifndef BITWAIT1
-         #define BITWAIT1 500       // v63a fixed 501
+         // #define BITWAIT1 500    // v58 original
+         // #define BITWAIT1 445       // v63a fixed (<-- wdt) 335-445-555 (--> errors) t=
+         #define BITWAIT1 515       // v63a 01aug25 13u47 (note using )
       #endif
-   #endif
-   #ifdef USE_RXREAD59
+   #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
       #ifndef BITWAIT1
          // #define BITWAIT1 509       // v59 rxread59 509
          #define BITWAIT1 522       // v62a 524 v59 rxread59 509
       #endif
-   #endif
-   #ifdef USE_RXREAD60
+   #elif defined(USE_RXREAD60)
       #define USE_RXREAD USE_RXREAD60
       #ifndef BITWAIT1
          // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074

@@ -132,11 +132,13 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
    // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
    // m_bitWait = 509;     // before we added cycletime table
    // m_bitWait = 511;     // v59a
-   #ifdef RXREAD58
-      m_bitWait = 498;
-   #else      
-      m_bitWait = 515;        // after we set plain variables for ISR to volatile, 516 might also usable
-   #endif      
+   m_bitWait = BITWAIT1;   // v63a PROD 515
+
+   // #ifdef RXREAD58
+   //    m_bitWait = 498;
+   // #else      
+   //    m_bitWait = 515;        // after we set plain variables for ISR to volatile, 516 might also usable
+   // #endif      
 
    if (receivePin == 4 || receivePin == 14 ) {
       m_rxPin = receivePin;
@@ -675,9 +677,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 */
 #define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
-   // unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz
-   unsigned long wait = m_bitTime + m_bitTime/3 - BITWAIT1;		// v62a fixing at 501
+   ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz , v63 totally not good
+   // unsigned long wait = m_bitTime + m_bitTime/3 - 469;		// v63a not good
+   unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	// v63a 445 try this
+   // unsigned long wait = m_bitTime + m_bitTime/3 - BITWAIT1;		// v62a fixing at 501
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
    uint8_t rec = 0;
    for (int i = 0; i < 8; i++) {
@@ -700,6 +704,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
       m_overflow = true;
    }
+GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek 
 }
 
 
