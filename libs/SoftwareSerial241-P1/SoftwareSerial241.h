@@ -69,7 +69,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
       #ifndef BITWAIT1
          // #define BITWAIT1 500    // v58 original
          // #define BITWAIT1 445       // v63a fixed (<-- wdt) 335-445-555 (--> errors) t=
-         #define BITWAIT1 515       // v63a 01aug25 13u47 (note using )
+         #define BITWAIT1 525       // v63: 31jul25 14u07 v63a 01aug25 13u47 (note using )
       #endif
    #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
