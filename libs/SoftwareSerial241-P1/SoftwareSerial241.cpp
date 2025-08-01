@@ -77,7 +77,7 @@ extern "C" {
    // #define USE_RXREAD60       // v63a disabled
 
    #ifdef USE_RXREAD58
-      #define BITWAIT1 501       // v63a fixed 501
+      #define BITWAIT1 500       // v63a fixed 501
    #endif
    #ifdef USE_RXREAD59
       // #define BITWAIT1 509       // v59 rxread59 509
