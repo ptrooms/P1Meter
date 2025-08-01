@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "63" // number this version
+#define VERSION_NUMBER "63a" // number this version
 
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
@@ -3617,7 +3617,9 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       #define BYTE_MAXWAIT_T 7100
       #define WAITIram5K { while (ESP.getCycleCount()-l_start < l_wait && l_wait<BYTE_MAXWAIT_T); l_wait += l_bitTime; }
       uint8_t rec = 0;
-      cli();   // hold interrupts ( or noInterrupts() )
+      // cli();   // hold interrupts ( or noInterrupts() )
+      ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
+
       unsigned long l_start = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
          for (int i = 0; i < 8; i++) {
             WAITIram5K;
@@ -3629,7 +3631,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
          }  
          WAITIram5K;                // stopbit
       temp = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
-      sei();   // resume interrupts
+      // sei();   // resume interrupts
+      ETS_INTR_UNLOCK(); // v63a enable as suggested by DeepSeek 
   
       Serial.print((String)"t_wait=" + (temp - l_start) + ")..\t" ) ;   // 407
 

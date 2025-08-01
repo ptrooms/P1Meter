@@ -77,7 +77,8 @@ extern "C" {
    #endif
    #ifdef USE_RXREAD60
       // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
-      #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
+      // #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
+      #define BITWAIT1 630       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
    #endif
 #else   
    #define USE_RXREAD58
@@ -827,7 +828,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 // waittime (digwrite/cli.....sei) = 594-640
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  digitalWrite(D4, m_d4_isr_state); // cycle down-up = 1.0µsec
- cli();         // v62a 30jul25 trial and error
+ // cli();         // v62a 30jul25 trial and error
+ ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
+                   //      (cannot do: uint32_t oldInterruptLevel = xt_rsil(3); // Blocks GPIO/timers, not WiFi)
+
     // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
@@ -912,7 +916,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    }
    m_buffer_bits[m_inPos] = start;  
    m_d4_isr_state = !m_d4_isr_state;             // v61 track ISR state
- sei();
+ // sei();
+ ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek 
+                    // (cannot do: xt_rsil(oldInterruptLevel); // Re-enable blocked interrupts 
  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
  digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
 }
