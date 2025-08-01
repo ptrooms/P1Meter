@@ -25,6 +25,94 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <inttypes.h>
 #include <Stream.h>
 
+/*
+   Timer control by experience
+*/
+
+// #define USE_RXREAD58 58          // use this gpio implementation        cop/dup=549, prod=419 else=469
+// #define USE_RXREAD59 59          // use this gpio implementation        cop/dup=549, prod=419 else=469
+// #define USE_RXREAD60 60          // PROD/419 TEST/519
+// #define USE_RXREAD61 61        // use this gpio implementation     61b 419
+// else USE_RXREAD2 2                  // w.i.p
+
+#if defined(COP_MODE) || defined(DUP_MODE)
+   #define USE_RXREAD58 58             // v63a enabled
+   // #define USE_RXREAD60 60          // v63a disabled
+   // -----------------------------------------------------------------vvvv conditional settings
+
+   #ifdef USE_RXREAD58
+      #define USE_RXREAD USE_RXREAD58
+      #ifndef BITWAIT1
+         #define BITWAIT1 469 // v63a rxread58 469
+      #endif
+   #endif
+   #ifdef USE_RXREAD59
+      #define USE_RXREAD USE_RXREAD59
+      #ifndef BITWAIT1
+         #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+      #endif
+   #endif
+   #ifdef USE_RXREAD60
+      #define USE_RXREAD USE_RXREAD60
+      #ifndef BITWAIT1
+         // #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+         #define BITWAIT1 594 // rx60=594 rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+      #endif
+   #endif
+
+#elif defined(PROD_MODE) 
+   #define USE_RXREAD58 58          // v63a enabled
+   // #define USE_RXREAD59
+   // #define USE_RXREAD60       // v63a disabled
+
+   // -----------------------------------------------------------------vvvv conditional settings
+   #ifdef USE_RXREAD58
+      #define USE_RXREAD USE_RXREAD58
+      #ifndef BITWAIT1
+         #define BITWAIT1 500       // v63a fixed 501
+      #endif
+   #endif
+   #ifdef USE_RXREAD59
+      #define USE_RXREAD USE_RXREAD59
+      #ifndef BITWAIT1
+         // #define BITWAIT1 509       // v59 rxread59 509
+         #define BITWAIT1 522       // v62a 524 v59 rxread59 509
+      #endif
+   #endif
+   #ifdef USE_RXREAD60
+      #define USE_RXREAD USE_RXREAD60
+      #ifndef BITWAIT1
+         // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
+         // #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
+         #define BITWAIT1 630       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
+         // 01aug25 : bitwait=630 mqtt=2902 faults:  Miss=323, Crc=299, Rcvr=815, Rp1=24, Yld=3, lT2=0
+      #endif
+   #endif
+
+#else   
+   #define USE_RXREAD58 58
+   #define USE_RXREAD USE_RXREAD58
+   #ifndef BITWAIT1
+      #define BITWAIT1 469       // else test, fixed wait = 500
+   #endif
+#endif
+
+//30jul25 COP_MODE RXREAD60 BITWAIT1 524
+
+// check test
+// #undef BITWAIT1
+// #define BITWAIT1 509
+// #define BITWAIT1 419    // v61b with rxread59 PROD
+   // v58: m_bitWait = 498;   rxread58
+   // v59: m_bitWait = 509;   rxRead59 59a/59b
+   // v60: m_bitWait = 519;   rxRead60
+   // v60: m_bitWait = 435;   rxRead61
+   // v61b --> 419
+
+/*
+   test diagnostics v61+ in rxRead60
+*/
+
 
 // This class is compatible with the corresponding AVR one,
 // the constructor however has an optional rx buffer size.
@@ -97,7 +185,8 @@ public:
    void rxRead60();		// BitBang routine v60
    void rxRead61();		// BitBang routine v61
    void rxTriggerBit(); // use bittiming every flank change allocates a time
-
+   int m_use_rxRead;      // holds the USE_RXREAD ISR number to be used
+   
    // AVR compatibility methods
    bool listen() { enableRx(true); return true; }
    void end() { stopListening(); }
@@ -116,13 +205,21 @@ private:
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
    bool m_invert;
-   volatile bool m_P1active;                 // Ptro 28mar21 to support P1 messageing, volatile v59b used in ISR
+   #ifdef RXREAD58
+      bool m_P1active;                 // Ptro 28mar21 to support P1 messageing 
+   #else
+      volatile bool m_P1active;        // Ptro 28mar21 to support P1 messageing, volatile v59b used in ISR
+   #endif
    bool m_port_state;               // v59 contains status of (in)activated ISR
    bool m_overflow;        // volatile v59b , used in ISR
    volatile unsigned long m_bitTime;  // volatile v60a, used in ISR
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
-   volatile unsigned int m_inPos, m_outPos;
+   #ifdef RXREAD58
+      unsigned int m_inPos, m_outPos;
+   #else
+      volatile unsigned int m_inPos, m_outPos;
+   #endif
    int m_buffSize;
    uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 

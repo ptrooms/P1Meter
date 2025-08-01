@@ -4,7 +4,6 @@
 
 #define VERSION_NUMBER "63a" // number this version
 
-
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
   #error canceled core_version.h not found
@@ -916,6 +915,7 @@ const char *mqttErrorTopic = "/error/"  P1_VERSION_TYPE;            // The error
 const char *mqttPower      = "/energy/" P1_VERSION_TYPE "power";    // 'p' on/off outputMqttPower2
 const int   mqttPort = 1883;
 const char *mqttLogTopic2  = "/log/wl"  P1_VERSION_TYPE;            // 'l' on/off outputMqttLog for RX2 data
+
 #ifdef P1_Override_Settings      // include our P1_Override_Settings
   #include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
   // #warning Using override settings
@@ -2681,7 +2681,7 @@ void readTelegramP1() {
     if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (myLen-1) + ']' );   // v52/test replaced \n into \r
 
     if (outputOnSerial && verboseLevel >= VERBOSE_P1) {     // do we want/need to print the Telegram for Debug
-      Serial.print((String)"\rlT=" + (myLen-1) + " \t[");   // v33 replaced \n into \r
+      Serial.print((String)"\r\nxlT=" + (myLen-1) + " \t[");   // v33 replaced \n into \r
       for (int cnt = 0; cnt < myLen; cnt++) {
           
         if (isprint(telegram[cnt])) {             // v45 revise to improve print debug 

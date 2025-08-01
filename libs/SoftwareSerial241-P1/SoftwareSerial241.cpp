@@ -46,73 +46,16 @@ extern "C" {
 
 #define GET_CYCLE_COUNT  ESP.getCycleCount()       // get the esp cycle counter
 
-/*
-   Timer control by experience
-*/
-
-// #define USE_RXREAD58          // use this gpio implementation        cop/dup=549, prod=419 else=469
-// #define USE_RXREAD59          // use this gpio implementation        cop/dup=549, prod=419 else=469
-// #define USE_RXREAD60             // PROD/419 TEST/519
-// #define USE_RXREAD61          // use this gpio implementation     61b 419
-// else RXREAD2                  // w.i.p
-
-#if defined(COP_MODE) || defined(DUP_MODE)
-   #define USE_RXREAD58             // v63a enabled
-   // #define USE_RXREAD60          // v63a disabled
-
-   #ifdef USE_RXREAD58
+#if !defined(USE_RXREAD) && !defined(USE_RXREAD2) && !defined(USE_RXREAD58) && !defined(USE_RXREAD59) && !defined(USE_RXREAD60) && !defined(USE_RXREAD61)
+   #define USE_RXREAD 0          // allocate default
+   #if !defined(BITWAIT1)        // allocate default
       #define BITWAIT1 469 // v63a rxread58 469
    #endif
-   #ifdef USE_RXREAD59
-      #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
-   #endif
-   #ifdef USE_RXREAD60
-      // #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
-      #define BITWAIT1 594 // rx60=594 rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
-   #endif
-
-#elif defined(PROD_MODE) 
-   #define USE_RXREAD58          // v63a enabled
-   // #define USE_RXREAD59
-   // #define USE_RXREAD60       // v63a disabled
-
-   #ifdef USE_RXREAD58
-      #define BITWAIT1 500       // v63a fixed 501
-   #endif
-   #ifdef USE_RXREAD59
-      // #define BITWAIT1 509       // v59 rxread59 509
-      #define BITWAIT1 522       // v62a 524 v59 rxread59 509
-   #endif
-   #ifdef USE_RXREAD60
-      // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
-      // #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
-      #define BITWAIT1 630       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
-      // 01aug25 : bitwait=630 mqtt=2902 faults:  Miss=323, Crc=299, Rcvr=815, Rp1=24, Yld=3, lT2=0
-   #endif
-
-#else   
-   #define USE_RXREAD58
-   #define BITWAIT1 469       // else test, fixed wait = 500
 #endif
 
-//30jul25 COP_MODE RXREAD60 BITWAIT1 524
-
-// check test
-// #undef BITWAIT1
-// #define BITWAIT1 509
-// #define BITWAIT1 419    // v61b with rxread59 PROD
-   // v58: m_bitWait = 498;   rxread58
-   // v59: m_bitWait = 509;   rxRead59 59a/59b
-   // v60: m_bitWait = 519;   rxRead60
-   // v60: m_bitWait = 435;   rxRead61
-   // v61b --> 419
-
-/*
-   test diagnostics v61+ in rxRead60
-*/
-// #define BITTEST_BLUE_SYNC     // activate Blueled on rythme of ISR
-// #define BITTEST_BLUE_MARK     // finisch cycle Blueled with short spike its for scope
-// #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
+// #define BITTEST_BLUE_SYNC     // RXREAD61+ activate Blueled on rythme of ISR
+// #define BITTEST_BLUE_MARK     // RXREAD61+ finisch cycle Blueled with short spike its for scope
+// #define BITTEST_BLUE_ACTIVE   // RXREAD61+ if ISR is active Blueled is on else off
 
 // As the Arduino attachInterrupt has no parameter, lists of objects
 // and callbacks corresponding to each possible GPIO pins have to be defined
@@ -134,10 +77,16 @@ void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead59(); };     // choose implementation of v59
 #elif defined (USE_RXREAD60)
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead60(); };     // choose implementation of v60
-#elif defined (USE_RXREAD60)
+#elif defined (USE_RXREAD61)
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead61(); };     // choose implementation of v61
 #elif defined (USE_RXREAD2)   
-   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead2(); };      // choose original
+   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead2(); };      // choose WL version
+#elif defined (USE_RXREAD)   
+   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };       // choose original
+#else
+   #defined USE_RXREAD 0
+   #warning "Using the default  rxRead version"
+   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };       // choose original
 #endif
 void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming
@@ -170,6 +119,7 @@ static void (*ISRList[MAX_PIN+3])() = {
    Serial 3 & 4 wip note: check bit waitimes
 */
 SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logic, unsigned int buffSize) {    // v58: method of CHANGE ISR
+   m_use_rxRead = USE_RXREAD;       /// set our ISR routine number
    m_rxValid = m_txValid = m_txEnableValid = false;
    // Serial.println((String) "\n\r >>>>>> Allocated overloaded inverse_logic=" +  inverse_logic);  // print does not work here
    // SoftwareSerial(receivePin,transmitPin, true, buffSize);  // will cause crash
@@ -182,7 +132,11 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
    // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
    // m_bitWait = 509;     // before we added cycletime table
    // m_bitWait = 511;     // v59a
-   m_bitWait = 515;        // after we set plain variables for ISR to volatile, 516 might also usable
+   #ifdef RXREAD58
+      m_bitWait = 498;
+   #else      
+      m_bitWait = 515;        // after we set plain variables for ISR to volatile, 516 might also usable
+   #endif      
 
    if (receivePin == 4 || receivePin == 14 ) {
       m_rxPin = receivePin;
