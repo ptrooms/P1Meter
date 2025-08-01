@@ -3652,7 +3652,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.print(rx2_function == true ? "ON" : "OFF");
       }
 
-    } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //v61a revise CRC->Off->Water->Hot
+    } else  if ((char)payload[0] == 'f') {  // control Blue_led2 assignment     //v61a revise CRC->Off->Water->Hot
       if ((char)payload[1] == '0'  ||(char)payload[1] == '1') {
           blue_led2_Water    = false;
           blue_led2_Crc      = false;
