@@ -195,6 +195,7 @@ public:
    bool stopListening() { enableRx(false); return true; }
    volatile unsigned long m_bitWait;         // introduced to control bittiming
    volatile int preset_bitWait;              // v58 to set m_bitwait up/down
+   volatile unsigned long m_start;     // v63b bitshift timing
    inline uint32_t getCycleCountIram();
 
    using Print::write;

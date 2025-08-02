@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "63a" // number this version
+#define VERSION_NUMBER "64" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -101,6 +101,19 @@
 */
 
 /* change history
+  - v64  (since v62) operational release
+  - v63b  - improve rsRead58: finally very stable after directly Interlock after ISR activates
+      adding recovery logic to stitch-recover record if this is 1 byte too short (indicated by < >)
+      Note:  the wait routine is fixed to 694 clock-window-cycles measured at/of start of ISR
+    - softserial: reorganise work RxRead58 to improve stability, DeepSeel: use register read/write/interlock()
+                  adding bitmiss logic if previous 100 < Byte time < 2300 (using m_start)
+    - testing direct GPIO control using GPIO_REG_WRITE(GPIO_OUT_W1Tc/s_ADDRESS, 1<< D4)
+  - v63a - 50/50 stable table InterUn/lock() usage iso cli()/sei(), improve data layou-
+    Timing diagnostics m_BItTime, small changes between COP and PROD as DSMR use other specs
+  - v63a  Back to RxRead58 which was  stablke in v58
+  - v63   use/work RXread60 , not very stable
+  - v62a  timing  change RxRead60, unstable BitWait unpredictable
+  - v62   production
   - v61a - changewd bitwait to make things stable
   - v60 - stabilised, using m_bitwaittime 521 for production to have bytecycle from 6940 to range of 6930-6935
   - v59b - testdata, preparing for alternative ISR (bittiming) routine, print time table serial_Print_PeekBits command t(1,2,3)
@@ -6294,7 +6307,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               j = i + 1;
           }
 
-          Serial.print((String) "\r\n dataR"+ j + ":\t");  
+          Serial.print((String) "\r\n dataR"+ (i+1) + ":\t");  // Use i as j = 0
         }
 
         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             

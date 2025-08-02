@@ -196,6 +196,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    // m_bitWait = 498;                       // 2021-04-30 14:07:35 initialise to control bittiming (not used)
    // m_bitWait = 515;                     // v58: production & copy , 498 is bottom, v59b changed from 498 to 515
    // m_bitWait = 519;                        // v60 changed from 515 to 521 (interbyte time 6931)
+   m_start   = getCycleCountIram() + (10 * m_bitTime) + 200;     // v63b bitshift timing
    m_bitWait = BITWAIT1;  // v61a                 // v60 changed from 515 to 521 to 539 (interbyte time 6931)
    
    m_d4_isr_state = false;              // v61b track ISR
@@ -532,10 +533,8 @@ unsigned long SoftwareSerial::peekBitPos() {
 // getCycleCountIram = cycle counter, which increments with each clock cycle  (doc: v55d)
 // BYTE_MAXWAIT_1 was 7000, changed in v59b to 7100 (actually unneeded safeguards byte olverflow)
 // using wait to prevent overrunning when Clocks are slower (7000 works ok, 2021-05-05 22:01:29: testing #BYTE_MAXWAIT_1)
-#define WAITIram4  { while (SoftwareSerial::getCycleCountIram()-start <   wait &&   wait<BYTE_MAXWAIT_1);   wait += m_bitTime; }
 // WAITIram4w is using m_wait for delay
-#define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
-#define WAITIram5  { while (wait<BYTE_MAXWAIT_1 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
+// not used v63b #define WAITIram5  { while (wait<BYTE_MAXWAIT_1 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
 // at 115k2 --> m_bittime = 694 cycles , total byte 910 bits) is between 6930 en 6932 cycles 
 //                                        whiuch can be viewd by queuring the m_buffer_bits[] table
 
@@ -557,8 +556,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 /*
   Do BitBang of v59, store Byte in m_buffer[m_inPos] and check for P1 and
 */
-
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
+#define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
    // Advance the starting point for the samples but compensate for the
@@ -620,6 +619,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
 /*
   Do BitBang serial port2, store Byte in m_buffer[m_inPos]
 */
+#define WAITIram4w2  { while (SoftwareSerial::getCycleCountIram()-start <   wait &&   wait<BYTE_MAXWAIT_1);   wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
@@ -634,7 +634,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // m_buffer_bits[m_inPos] = start;                    // v60 removed to end, v59_first try to get and store timnng
    uint8_t rec = 0;     /// 236:	01a0d2    	            movi	a13, 1  
    for (int i = 0; i < 8; i++) {    /// 233:	08a0f2     	movi	a15, 8  
-     WAITIram4; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+     WAITIram4w2; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;         ///  2bd:	41d1d0               	srli	a13, a13, 1   
      if (digitalRead(m_rxPin))
        rec |= 0x80;     /// 239:	81af52               	movi	a5, -127   
@@ -647,7 +647,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
       // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
       // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
       //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
-   WAITIram4; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+   WAITIram4w2; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
    // Store the received value in the buffer unless we have an overflow
    int next = (m_inPos+1) % m_buffSize;
@@ -673,33 +673,47 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 
 
 /*
-   below rxread taken from stable version 58
+   below rxread taken from stable version 58, tuned to register usage.
+   v63b: stabilized/. COP_MODE m_bitWait=579 ,  PROD_MODE m_bitWait=502
+      seq: LOCK, set varbls, startbit , bitwait/read7-8bit,  stopbit, set varbls, UNLOCK, REGset
 */
 #define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
-// Bitwait-P1=579, l_bitTime=694, l_wait=346..(t_wait=6265)
-// this will getCycleCountIram() until  we have reached the following Bit.
-// sometimes we expirience an in-between byte-bit failure, likely when getCycleCountIram exceeds 32bits
-//   time between periods is ok. We have a  start-bit trigger without data as we miss 2 bits (17µSec)
+#define DSMR_READ() (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin))   // v63b use register read to save cycles.
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
-   // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
-   // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS
+   // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIGH = 112nS
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
-   
+
+   /*
+      Hold / lock Interrupts
+   */
    ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS)
    // cli();
+   // uint32_t oldLevel = xt_rsil(3);  // v63b Minimal blocking (deepseek) , 10-15Cycles, does not work in PROD
 
+   unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)   
+   // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS
+   // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
 
-   // unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz , v63 totally not good
-   // unsigned long wait = m_bitTime + m_bitTime/3 - 469;		// v63a not good
    unsigned long wait = (m_bitTime + (m_bitTime/3)) - m_bitWait;	// v63a 445 try this
-   // unsigned long wait = m_bitTime + m_bitTime/3 - BITWAIT1;		// v62a fixing at 501
-   unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)
-   m_buffer_bits[m_inPos] = start;                    // v63a_first try to get timnng
+
+   /*
+      Compensate for missing bit which else would shift bits
+   */
+   uint8_t bit_shift = 8;                 // v63b assume missing bit
+   unsigned long bit_diff = start - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
+   // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
+   if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+   
+   /*
+      Read Data bits after StopBit
+   */
    uint8_t rec = 0;
-   for (int i = 0; i < 8; i++) {
+   // for (int i = 0; i < 8; i++) {
+   for (int i = 0; i < bit_shift ; i++) {
      WAITIram4w58; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
-     if (digitalRead(m_rxPin)) {
+     if (digitalRead(m_rxPin)) {    // old methode does work in PROD_MODE
+     // if DSMR_READ() {            // v63b use register read to save cycles, does not operate PROD_MODE
        rec |= 0x80;
       //  GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
      } else {                     // v52 balance isr rxread always doing or operation
@@ -707,44 +721,60 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       //  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
      }
    }
-   if (m_invert) rec = ~rec;
+   if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
-   // wait = wait + 75;
    WAITIram4w58; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
+
+   /*
+      Update databyte biffer
+   */
+   m_buffer_bits[m_inPos] = start;                    // v63a_v63b - ByteTiming table
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {  // this works best in production
-      if (rec == '/') m_P1active = true ;   // 26mar21 Ptro P1 messageing has started by header
-      if (rec == '!') m_P1active = false ; // 26mar21 Ptro P1 messageing has ended due valid trailer
+      if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header
+         m_P1active = true ; 
+      }   
+      if (rec == '!') {  // 26mar21 Ptro P1 messageing has ended due valid trailer
+         m_P1active = false ;
+      }
       m_buffer[m_inPos] = rec;
       m_inPos = next;
    } else {
       m_P1active = false;                   // 26mar21 Ptro P1 messageing has ended due overflow
       m_overflow = true;
    }
-// GPIO_REG_WRITE(GPIO_OUT_ADDRESS, 0xF0F0);   // would set GPIO 4-7 and 12-15 to high, and 0-3 and 8-11 to low
-// GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 0x1); // This will set GPIO0 high, and not affect any other bits.
-// GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 0x1); // This will set bit1  GPIO0 high, and not affect any other bits.
-// GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);     // set low
 
+   /*
+      unHold / unLock Interrupts
+   */
+   // xt_wsr_ps(oldLevel);	 // v63b Re-enable using shorter methode, does not work in PROD_MODE
+   ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek 
+   // sei();
 
-// D0/16 D1/5 D2/4   D3/0   D4/2 D5/14 D6/12 D7/13 D8/15 D9/3 D10/1
-
-// bit 31 --> 0   left shift (<<) and right shift (>>)
-//                                            43 2109 8765 4321
-// so 1 << m_rxPin   -->    1 << 14   -->   6543 2109 8765 4321 
-//                                          5432 1098 7654 3210 
-//     left shifts the bits of the first operand, and the second operand decides the number of places to shift.
-// GPIO_OUT_W1TS_ADDRESS - write 1 to  set GPIO (high)
-// GPIO_OUT_W1TC_ADDRESS - write 1 to clear GPIO (low)
-// GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
-
-// GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);             // set monitor LOW   total time = 290nS
-ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek 
-// sei();
-// GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);             // set monitor HIGH
-GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+   // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);             // set monitor HIGH
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 }
+/* Documentation: register write to control GPIO out
+      GPIO_REG_WRITE(GPIO_OUT_ADDRESS, 0xF0F0);   // would set GPIO 4-7 and 12-15 to high, and 0-3 and 8-11 to low
+      GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 0x1); // This will set GPIO0 high, and not affect any other bits.
+      GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);     // set low
 
+   Gpio/datapin:      
+      D0/16 D1/5 D2/4   D3/0   D4/2 D5/14 D6/12 D7/13 D8/15 D9/3 D10/1
+      bit 31 --> 0   left shift (<<) and right shift (>>)
+
+                                                 43 2109 8765 4321
+      so 1 << m_rxPin   -->    1 << 14   -->   6543 2109 8765 4321 
+                                               5432 1098 7654 3210 
+          left shifts the bits of the first operand, and the second operand decides the number of places to shift.
+
+      GPIO_OUT_W1TS_ADDRESS - write 1 to  set GPIO (high)
+      GPIO_OUT_W1TC_ADDRESS - write 1 to clear GPIO (low)
+      GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
+
+    GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);             // set monitor LOW   total time = 112nSec
+    GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);             // set monitor High  
+*/
 
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
@@ -820,7 +850,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 }
 
 
-#define WAITIram4t60 { \
+#define WAITIram4t60 {   \
   unsigned long cc = SoftwareSerial::getCycleCountIram(); \
   while (SoftwareSerial::getCycleCountIram()-start < m_wait) \
   { \
@@ -829,9 +859,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
       m_wait += m_bitTime; \
     } \
   } \
-  m_wait += m_bitTime; \
-}
-
+  m_wait += m_bitTime; }
 #define WAITIram4p60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 // waittime (digwrite/cli.....sei) = 594-640
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
@@ -930,8 +958,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
  digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
 }
-
-
 
 /*
   Do BitBang serial port1, store Byte in m_buffer[m_inPos] and check for P1 and
