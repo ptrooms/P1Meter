@@ -5379,15 +5379,15 @@ bool CheckData()        //
     // Serial.println((String)"Checkdata3.."+" new="+powerConsumptionLowTariff+" old="+OldPowerConsumptionLowTariff);   // problem returns and does not let publish
 
     OldPowerConsumptionLowTariff = powerConsumptionLowTariff ;
-    if (powerConsumptionLowTariff < 1) OldPowerConsumptionLowTariff = 0 ;
-    return false;
+    if (powerConsumptionLowTariff < 1) { OldPowerConsumptionLowTariff = 0 ;
+      return false; }
   }
 
   if ((powerConsumptionHighTariff - OldPowerConsumptionHighTariff > 70) || powerConsumptionHighTariff < 1)  // ignore zeroreads
   {
     OldPowerConsumptionHighTariff = powerConsumptionHighTariff ;
-    if (powerConsumptionHighTariff < 1) OldPowerConsumptionHighTariff = 0 ;
-    return false;
+    if (powerConsumptionHighTariff < 1) { OldPowerConsumptionHighTariff = 0 ;
+      return false; }
   }
 
   // following is totally not used at our place but can be used if/when we have solarpanels.
@@ -5395,15 +5395,15 @@ bool CheckData()        //
   if ((powerProductionLowTariff  - OldPowerProductionLowTariff    > 70) || powerProductionLowTariff < 0)   // production > 0
   {
     OldPowerProductionLowTariff  = powerProductionLowTariff ;
-    if (powerProductionLowTariff < 0) OldPowerProductionLowTariff = 0 ;
-    return false;
+    if (powerProductionLowTariff < 0) { OldPowerProductionLowTariff = 0 ;
+      return false; }
   }
 
   if ((powerProductionHighTariff - OldPowerProductionHighTariff > 70) || powerProductionHighTariff < 0)    // production > 0
   {
-    OldPowerProductionHighTariff = powerProductionHighTariff ;
-    if (powerProductionHighTariff < 0) OldPowerProductionHighTariff = 0 ;
-    return false;
+    OldPowerProductionHighTariff = powerProductionHighTariff ; 
+    if (powerProductionHighTariff < 0) { OldPowerProductionHighTariff = 0 ;
+      return false; }
   }
   if ((CurrentPowerConsumption > 18400) || (CurrentPowerProduction < 0)) return false;  // return if outside 80Amp load
 
