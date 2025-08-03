@@ -679,6 +679,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 */
 #define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
 #define DSMR_READ() (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin))   // v63b use register read to save cycles.
+// --58 //------------------------------------------------------------
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIGH = 112nS
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
@@ -691,8 +692,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // uint32_t oldLevel = xt_rsil(3);  // v63b Minimal blocking (deepseek) , 10-15Cycles, does not work in PROD
 
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)   
-   // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS
+   // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIGH = 112nS
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
+   
+   // int8_t currentRSSI = wifi_station_get_rssi();  // wifi_station_get_rssi not availabe in this scope
 
    unsigned long wait = (m_bitTime + (m_bitTime/3)) - m_bitWait;	// v63a 445 try this
 
@@ -706,7 +709,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    // ----------------------------------------------------------------------------------------------------------
 
-   if (bit_diff > 100 && bit_diff < 2776) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-4 bits
+   
+   if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation
+        (bit_diff > 100 && bit_diff < 2776) ) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-4 bits
 
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    
@@ -731,6 +736,23 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
        rec |= 0x00;
       //  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
      }
+    
+    // if (uint32_t intState = xt_get_interrupt_state() & (1 << 5))   // check if Wifi ISR is active, not valid in NONOS
+   
+
+   /*
+      Folllowing was suggested but not available in this (cpp) scope
+      --------------------------------------------------------------
+      static int8_t lastRSSI = 0;  note: wifi_station_get_rssi not decalred in this scope
+      int8_t currentRSSI = wifi_station_get_rssi();  
+      if (abs(wifi_station_get_rssi() - currentRSSI ) > 0) { // Significant RSSI change  
+            m_wifiActiveDuringRead = true;  
+            GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
+            // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);           // set monitor HIGH
+      }  
+      lastRSSI = currentRSSI; 
+   */
+
    }
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
@@ -880,7 +902,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  // cli();         // v62a 30jul25 trial and error
  ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
                    //      (cannot do: uint32_t oldInterruptLevel = xt_rsil(3); // Blocks GPIO/timers, not WiFi)
-
+uint32_t oldInterruptLevel = xt_rsil(3);
     // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:

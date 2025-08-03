@@ -71,7 +71,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
          // #define BITWAIT1 445       // v63a fixed (<-- wdt) 335-445-555 (--> errors) t=
          // #define BITWAIT1 525       // v63: 31jul25 14u07 v63a 01aug25 13u47 (without lockout)
          // #define BITWAIT1 511          // v63a:02aug25 14u07 v63a  using ETS_INTR_LOCK() / ETS_INTR_UNLOCK();
-         #define BITWAIT1 502          // v63a:02aug25 14u07 v63a  using ETS_INTR_LOCK() / ETS_INTR_UNLOCK(); & bittime
+         // #define BITWAIT1 502          // v63a:02aug25 14u07 v63a  using ETS_INTR_LOCK() / ETS_INTR_UNLOCK(); & bittime
+         #define BITWAIT1 497          // v64a:03aug25 22u14  ETS_INTR_LOCK() / ETS_INTR_UNLOCK(); & bittime, bitsplit
          // #define BITWAIT1 536       // v63a: 461-536 using cli() / sei()
       #endif
    #elif defined(USE_RXREAD59)

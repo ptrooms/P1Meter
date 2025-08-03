@@ -882,7 +882,13 @@ woes in Wifi/Lamx layer
 
 // hardware PIN settings, change accordingly , total esp8266 pins 17
 #define BLUE_LED         D0  // pin GPIO16 output to BLUE signal indcator
+// #ifdef COP_MODE           // set for Arduino to prevent default production compilation
+//   #define WATERSENSOR_READ D7  // rtemprarily use D7 iso D1 as  
+// #else
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
+// #endif
+
+                             // Note: water sensor is also used to monitor/debug Wifi !!!!
 #define SERIAL_RX2       D2  // pin GPIO4  input  for SoftwareSerial RX  GJ
 #define DS18B20_SENSOR   D3  // pin GPIO0 Pin where DS18B20 sensors are mounted (High@Boot)
 
@@ -1402,7 +1408,11 @@ void setup()
 {
     asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
-
+// used for debug diagnostics wifi but gpio5 does not monitor wifi in Arduino/NONOS
+//  #ifdef COP_MODE           // set for Arduino to prevent default production compilation
+//     pinMode(D1, INPUT);        // Declare Pin D1 GPIO5 as input for Wifi monitoring
+// #endif
+ 
   // struct rst_info *rtc_info = system_get_rst_info();
   // Serial.printf(("reset reason: %x\n", rtc_info->reason);
 
@@ -1414,6 +1424,10 @@ void setup()
   
   #ifdef NoTx2Function
     pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
+    // below is for diagnostics where wifi henadler will set a led
+    //   wifi_set_event_handler_cb([](System_Event_t *e) {
+    //   digitalWrite(BLUE_LED2, e->event != EVENT_STAMODE_DISCONNECTED); // HIGH = WiFi active
+    // });
   #endif
 
 
@@ -2090,7 +2104,7 @@ void setup()
     loopCnt = 0;              // set loopcount to 0
     Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
   //  WiFi.printDiag(Serial);   // print data
-  } // setup
+} // setup
 
 
 /* 
@@ -3941,7 +3955,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                  ( ( (char)payload[2] >= '1' && (char)payload[2] <= '6' ) ||
                      (char)payload[2] == 'b' ||  
                      (char)payload[2] == 'i' ||  
-                     (char)payload[2] == 'd' ||
+                     (char)payload[2] == 'd' || // t1d will display tbufferstimes, character  and masking table
                      (char)payload[2] == 'c' )
                ) {
 
@@ -4049,6 +4063,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           
           Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
           Serial.println((String)"J/j 12/+-/0-8|9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+                                                      // + "/" + (mySerial1.m_bitWait % 1) + "/"
+                                                      + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
                                                       + ", jserial2=" + mySerial2.m_bitWait);
           
           Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
@@ -4110,7 +4126,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // digitalWrite(BLUE_LED, LOW);   //Turn the ESPLED on
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
 
-  // Buffers
+    // Buffers
     // char msgpub[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360  04apr21 to #define 480
 
 
@@ -4228,9 +4244,9 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(", \"Version\":\"%s\"");                    // V57 prog_version %u to %s  version "Version":4157.2_7_1"
     msg.concat(" }"); // terminate JSON
     
-  // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
-  //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
-  //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
+   // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
+   //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
+   //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
     // snprintf(output, sizeof(output), msgpub ,
     char output[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480, moved to here
     memset(output, 0, sizeof(output));  // initialise , v55b tto initialise
@@ -4928,13 +4944,12 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
     powerProductionHighTariff = getValue(telegram, myLen);
 
   // 1-0:1.7.0(00.424*kW) Actueel verbruik
-  // 1-0:2.7.0(00.000*kW) Actuele teruglevering
   // 1-0:1.7.x = Electricity consumption actual usage (DSMR v4.0)
   if (strncmp(telegram, "1-0:1.7.0(", strlen("1-0:1.7.0(")) == 0)        // Watts usage
     // client.publish(mqttLogTopic, telegram );
     CurrentPowerConsumption = getValue(telegram, myLen);
 
-
+  //  data257:           1-0:2.7.0(00.000*kW)<|  
   if (strncmp(telegram, "1-0:2.7.0(", strlen("1-0:2.7.0(")) == 0)        // Watts produced
     CurrentPowerProduction = getValue(telegram, myLen);
 
@@ -5099,7 +5114,7 @@ void  getValues2FromP1Record(char buf[], int myLen) {  // 716
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", myLen, 9);        // Watts produced          (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:2.7.0(", myLen, 9);        // Watts produced          (v64a correction v56c: start at begin of buf)
     CurrentPowerProduction2   = getValue(buf+f, 21);
     CurrentPowerProduction    = CurrentPowerProduction2;        // v56c copyback1
   }
