@@ -554,7 +554,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 
 
 /*
-  Do BitBang of v59, store Byte in m_buffer[m_inPos] and check for P1 and
+  Do BitBang of "v59", store Byte in m_buffer[m_inPos] and check for P1 and
 */
 #define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
@@ -700,6 +700,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       Compensate for missing bit which else would shift bits
    */
    uint8_t bit_shift = 8;                 // v63b assume missing bit
+   // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    unsigned long bit_diff = start - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
    if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
@@ -728,7 +729,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    /*
       Update databyte biffer
    */
-   m_buffer_bits[m_inPos] = start;                    // v63a_v63b - ByteTiming table
+   // m_buffer_bits[m_inPos] = start;                    // v63a_v63b - ByteTiming table
+   // m_buffer_bits[m_inPos] = start % 1000000;  // limit range
+   m_buffer_bits[m_inPos] = start;  // limit range
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {  // this works best in production
       if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header
