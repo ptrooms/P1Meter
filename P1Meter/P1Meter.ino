@@ -101,12 +101,16 @@
 */
 
 /* change history
+  - v64a solved 2 data errors telegram field fault & no data transmit after checkdata() recovery.
+    beautify data diagnostics
   - v64  (since v62) operational release
+    - SS stabilised as we use ETS_INTR_LOCK() &7 ETS_INTR_UNLOCK() which allows Wifi during BitBang
   - v63b  - improve rsRead58: finally very stable after directly Interlock after ISR activates
       adding recovery logic to stitch-recover record if this is 1 byte too short (indicated by < >)
       Note:  the wait routine is fixed to 694 clock-window-cycles measured at/of start of ISR
     - softserial: reorganise work RxRead58 to improve stability, DeepSeel: use register read/write/interlock()
                   adding bitmiss logic if previous 100 < Byte time < 2300 (using m_start)
+                  v64: only when m_bitWait is odd..... 
     - testing direct GPIO control using GPIO_REG_WRITE(GPIO_OUT_W1Tc/s_ADDRESS, 1<< D4)
   - v63a - 50/50 stable table InterUn/lock() usage iso cli()/sei(), improve data layou-
     Timing diagnostics m_BItTime, small changes between COP and PROD as DSMR use other specs
@@ -2649,7 +2653,7 @@ void readTelegramP1() {
 
   // Cycle: 04.781228065
 
-  if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );
+  // if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );   // v64a deactivated, superfluous 
 
   int myLenTelegram = 0;
   memset(telegram, 0, sizeof(telegram));   // initialitelegram buffer-array to 0
@@ -4002,20 +4006,20 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                     + (new_ThermostatState == 3 ? " <--" : "" ) );
           Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
           Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
-          Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
           Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-          Serial.println((String)"B 12/+-/0-8|9 Baudrate25\t"
+          Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
                                     + " serial1=" +  serial1Baudrate
                                     + " serial2=" +  serial2Baudrate);
-          Serial.println((String)"l Stoplog "+ mqttLogTopic);
+          Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
+          Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
           Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
                                                                          + (blue_led2_Water ? "Y" : "N") 
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
-          Serial.println((String)"t 0-4 Print Bit table");        // v59
+          Serial.println((String)"t 1/2 0-6/i/c/d Print Byte Tables serial1/2 ");        // v59, v64a
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -4062,7 +4066,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                         );
           
           Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
-          Serial.println((String)"J/j 12/+-/0-8|9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+          Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
                                                       // + "/" + (mySerial1.m_bitWait % 1) + "/"
                                                       + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
                                                       + ", jserial2=" + mySerial2.m_bitWait);
