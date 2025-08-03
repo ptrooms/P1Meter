@@ -3941,6 +3941,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                  ( ( (char)payload[2] >= '1' && (char)payload[2] <= '6' ) ||
                      (char)payload[2] == 'b' ||  
                      (char)payload[2] == 'i' ||  
+                     (char)payload[2] == 'd' ||
                      (char)payload[2] == 'c' )
                ) {
 
@@ -3954,6 +3955,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                   else if ( (char)payload[2] == 'c') serial_Print_PeekBits(peekport, 2048);   // use text compare
                   else if ( (char)payload[2] == 'b') serial_Print_PeekBits(peekport,(-2 * MAXLINELENGTH));   // print bit compare
                   else if ( (char)payload[2] == 'i') serial_Print_PeekBits(peekport,(-1 * MAXLINELENGTH));   // binary compare CrcIn
+                  else if ( (char)payload[2] == 'd') {
+                                                     serial_Print_PeekBits(peekport, 1024);       // print time table  
+                                                     serial_Print_PeekBits(peekport, 2048);       // print diff table
+                                                     serial_Print_PeekBits(peekport,(-2 * MAXLINELENGTH)); // print mask compare
+                                                     }
+
                  } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
             else if ((char)payload[1] == 's') {
                       Serial.println((String)"\n\rT-imer Porstate: ");

@@ -703,7 +703,17 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    unsigned long bit_diff = start - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
-   if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+   // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+   // ----------------------------------------------------------------------------------------------------------
+
+   if (bit_diff > 100 && bit_diff < 2776) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-4 bits
+
+   // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+   
+   // if (bit_diff > 100 && bit_diff < 2776)) {    // 
+   //       bit_shift = bit_shift - ((bit_diff + bitTime) / m_bitTime);   // subtract number of missed bits
+   //       wait = wait + ((8 - bit_shift) * bitTime);                    // compensate expected wait
+   // }         
    
    /*
       Read Data bits after StopBit
