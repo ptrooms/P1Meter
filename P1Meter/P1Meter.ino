@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "64" // number this version
+#define VERSION_NUMBER "65" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -101,12 +101,20 @@
 */
 
 /* change history
+
+  - v64a solved 2 data errors telegram field fault & no data transmit after checkdata() recovery.
+    beautify data diagnostics
+    added ISR timing measurements PRODmode 497 --> 427 , COP-MODE is stable but PROD-MODE varries
+    PROD_MODE suffers WDT when bitwait 427 is changed to 432
+    Note: Before changes: fully stable
   - v64  (since v62) operational release
+    - SS stabilised as we use ETS_INTR_LOCK() &7 ETS_INTR_UNLOCK() which allows Wifi during BitBang
   - v63b  - improve rsRead58: finally very stable after directly Interlock after ISR activates
       adding recovery logic to stitch-recover record if this is 1 byte too short (indicated by < >)
       Note:  the wait routine is fixed to 694 clock-window-cycles measured at/of start of ISR
     - softserial: reorganise work RxRead58 to improve stability, DeepSeel: use register read/write/interlock()
                   adding bitmiss logic if previous 100 < Byte time < 2300 (using m_start)
+                  v64: only when m_bitWait is odd..... 
     - testing direct GPIO control using GPIO_REG_WRITE(GPIO_OUT_W1Tc/s_ADDRESS, 1<< D4)
   - v63a - 50/50 stable table InterUn/lock() usage iso cli()/sei(), improve data layou-
     Timing diagnostics m_BItTime, small changes between COP and PROD as DSMR use other specs
@@ -882,7 +890,13 @@ woes in Wifi/Lamx layer
 
 // hardware PIN settings, change accordingly , total esp8266 pins 17
 #define BLUE_LED         D0  // pin GPIO16 output to BLUE signal indcator
+// #ifdef COP_MODE           // set for Arduino to prevent default production compilation
+//   #define WATERSENSOR_READ D7  // rtemprarily use D7 iso D1 as  
+// #else
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
+// #endif
+
+                             // Note: water sensor is also used to monitor/debug Wifi !!!!
 #define SERIAL_RX2       D2  // pin GPIO4  input  for SoftwareSerial RX  GJ
 #define DS18B20_SENSOR   D3  // pin GPIO0 Pin where DS18B20 sensors are mounted (High@Boot)
 
@@ -1402,7 +1416,11 @@ void setup()
 {
     asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
-
+// used for debug diagnostics wifi but gpio5 does not monitor wifi in Arduino/NONOS
+//  #ifdef COP_MODE           // set for Arduino to prevent default production compilation
+//     pinMode(D1, INPUT);        // Declare Pin D1 GPIO5 as input for Wifi monitoring
+// #endif
+ 
   // struct rst_info *rtc_info = system_get_rst_info();
   // Serial.printf(("reset reason: %x\n", rtc_info->reason);
 
@@ -1414,6 +1432,10 @@ void setup()
   
   #ifdef NoTx2Function
     pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
+    // below is for diagnostics where wifi henadler will set a led
+    //   wifi_set_event_handler_cb([](System_Event_t *e) {
+    //   digitalWrite(BLUE_LED2, e->event != EVENT_STAMODE_DISCONNECTED); // HIGH = WiFi active
+    // });
   #endif
 
 
@@ -2090,7 +2112,7 @@ void setup()
     loopCnt = 0;              // set loopcount to 0
     Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
   //  WiFi.printDiag(Serial);   // print data
-  } // setup
+} // setup
 
 
 /* 
@@ -2635,7 +2657,7 @@ void readTelegramP1() {
 
   // Cycle: 04.781228065
 
-  if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );
+  // if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );   // v64a deactivated, superfluous 
 
   int myLenTelegram = 0;
   memset(telegram, 0, sizeof(telegram));   // initialitelegram buffer-array to 0
@@ -3941,6 +3963,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                  ( ( (char)payload[2] >= '1' && (char)payload[2] <= '6' ) ||
                      (char)payload[2] == 'b' ||  
                      (char)payload[2] == 'i' ||  
+                     (char)payload[2] == 'd' || // t1d will display tbufferstimes, character  and masking table
                      (char)payload[2] == 'c' )
                ) {
 
@@ -3954,13 +3977,19 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                   else if ( (char)payload[2] == 'c') serial_Print_PeekBits(peekport, 2048);   // use text compare
                   else if ( (char)payload[2] == 'b') serial_Print_PeekBits(peekport,(-2 * MAXLINELENGTH));   // print bit compare
                   else if ( (char)payload[2] == 'i') serial_Print_PeekBits(peekport,(-1 * MAXLINELENGTH));   // binary compare CrcIn
+                  else if ( (char)payload[2] == 'd') {
+                                                     serial_Print_PeekBits(peekport, 1024);       // print time table  
+                                                     serial_Print_PeekBits(peekport, 2048);       // print diff table
+                                                     serial_Print_PeekBits(peekport,(-2 * MAXLINELENGTH)); // print mask compare
+                                                     }
+
                  } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
             else if ((char)payload[1] == 's') {
                       Serial.println((String)"\n\rT-imer Porstate: ");
                       printf_port_state_isr();
                       Serial.println((String)"");
                  }
-            else if ((char)payload[1] == 't') {
+            else if ((char)payload[1] == 't') {   // print m_buffer_time[M_TIME_BIT_...] table entries
                       Serial.println((String)"\n\rT-imer Task: ");
                       serial_Print_PeekTime(1,M_TIME_ENTRIES);
                       serial_Print_PeekTime(2,M_TIME_ENTRIES);
@@ -3984,17 +4013,18 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
           Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-          Serial.println((String)"B 12/+-/0-8|9 Baudrate25\t"
+          Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
                                     + " serial1=" +  serial1Baudrate
                                     + " serial2=" +  serial2Baudrate);
-          Serial.println((String)"l Stoplog "+ mqttLogTopic);
+          Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
+          Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
           Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
                                                                          + (blue_led2_Water ? "Y" : "N") 
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
-          Serial.println((String)"t 0-4 Print Bit table");        // v59
+          Serial.println((String)"t 1/2 0-6/i/c/d Print Byte Tables serial1/2 ");        // v59, v64a
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -4041,7 +4071,9 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                         );
           
           Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
-          Serial.println((String)"J/j 12/+-/0-8|9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+          Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+                                                      // + "/" + (mySerial1.m_bitWait % 1) + "/"
+                                                      + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
                                                       + ", jserial2=" + mySerial2.m_bitWait);
           
           Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
@@ -4103,7 +4135,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // digitalWrite(BLUE_LED, LOW);   //Turn the ESPLED on
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
 
-  // Buffers
+    // Buffers
     // char msgpub[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360  04apr21 to #define 480
 
 
@@ -4221,9 +4253,9 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(", \"Version\":\"%s\"");                    // V57 prog_version %u to %s  version "Version":4157.2_7_1"
     msg.concat(" }"); // terminate JSON
     
-  // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
-  //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
-  //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
+   // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
+   //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
+   //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
     // snprintf(output, sizeof(output), msgpub ,
     char output[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480, moved to here
     memset(output, 0, sizeof(output));  // initialise , v55b tto initialise
@@ -4921,13 +4953,12 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
     powerProductionHighTariff = getValue(telegram, myLen);
 
   // 1-0:1.7.0(00.424*kW) Actueel verbruik
-  // 1-0:2.7.0(00.000*kW) Actuele teruglevering
   // 1-0:1.7.x = Electricity consumption actual usage (DSMR v4.0)
   if (strncmp(telegram, "1-0:1.7.0(", strlen("1-0:1.7.0(")) == 0)        // Watts usage
     // client.publish(mqttLogTopic, telegram );
     CurrentPowerConsumption = getValue(telegram, myLen);
 
-
+  //  data257:           1-0:2.7.0(00.000*kW)<|  
   if (strncmp(telegram, "1-0:2.7.0(", strlen("1-0:2.7.0(")) == 0)        // Watts produced
     CurrentPowerProduction = getValue(telegram, myLen);
 
@@ -5092,7 +5123,7 @@ void  getValues2FromP1Record(char buf[], int myLen) {  // 716
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", myLen, 9);        // Watts produced          (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:2.7.0(", myLen, 9);        // Watts produced          (v64a correction v56c: start at begin of buf)
     CurrentPowerProduction2   = getValue(buf+f, 21);
     CurrentPowerProduction    = CurrentPowerProduction2;        // v56c copyback1
   }
@@ -5357,15 +5388,15 @@ bool CheckData()        //
     // Serial.println((String)"Checkdata3.."+" new="+powerConsumptionLowTariff+" old="+OldPowerConsumptionLowTariff);   // problem returns and does not let publish
 
     OldPowerConsumptionLowTariff = powerConsumptionLowTariff ;
-    if (powerConsumptionLowTariff < 1) OldPowerConsumptionLowTariff = 0 ;
-    return false;
+    if (powerConsumptionLowTariff < 1) { OldPowerConsumptionLowTariff = 0 ;
+      return false; }
   }
 
   if ((powerConsumptionHighTariff - OldPowerConsumptionHighTariff > 70) || powerConsumptionHighTariff < 1)  // ignore zeroreads
   {
     OldPowerConsumptionHighTariff = powerConsumptionHighTariff ;
-    if (powerConsumptionHighTariff < 1) OldPowerConsumptionHighTariff = 0 ;
-    return false;
+    if (powerConsumptionHighTariff < 1) { OldPowerConsumptionHighTariff = 0 ;
+      return false; }
   }
 
   // following is totally not used at our place but can be used if/when we have solarpanels.
@@ -5373,15 +5404,15 @@ bool CheckData()        //
   if ((powerProductionLowTariff  - OldPowerProductionLowTariff    > 70) || powerProductionLowTariff < 0)   // production > 0
   {
     OldPowerProductionLowTariff  = powerProductionLowTariff ;
-    if (powerProductionLowTariff < 0) OldPowerProductionLowTariff = 0 ;
-    return false;
+    if (powerProductionLowTariff < 0) { OldPowerProductionLowTariff = 0 ;
+      return false; }
   }
 
   if ((powerProductionHighTariff - OldPowerProductionHighTariff > 70) || powerProductionHighTariff < 0)    // production > 0
   {
-    OldPowerProductionHighTariff = powerProductionHighTariff ;
-    if (powerProductionHighTariff < 0) OldPowerProductionHighTariff = 0 ;
-    return false;
+    OldPowerProductionHighTariff = powerProductionHighTariff ; 
+    if (powerProductionHighTariff < 0) { OldPowerProductionHighTariff = 0 ;
+      return false; }
   }
   if ((CurrentPowerConsumption > 18400) || (CurrentPowerProduction < 0)) return false;  // return if outside 80Amp load
 
