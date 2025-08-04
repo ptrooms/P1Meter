@@ -101,8 +101,12 @@
 */
 
 /* change history
+
   - v64a solved 2 data errors telegram field fault & no data transmit after checkdata() recovery.
     beautify data diagnostics
+    added ISR timing measurements PRODmode 497 --> 427 , COP-MODE is stable but PROD-MODE varries
+    PROD_MODE suffers WDT when bitwait 427 is changed to 432
+    Note: Before changes: fully stable
   - v64  (since v62) operational release
     - SS stabilised as we use ETS_INTR_LOCK() &7 ETS_INTR_UNLOCK() which allows Wifi during BitBang
   - v63b  - improve rsRead58: finally very stable after directly Interlock after ISR activates
