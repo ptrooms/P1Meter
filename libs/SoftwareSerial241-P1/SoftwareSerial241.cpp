@@ -676,12 +676,24 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    below rxread taken from stable version 58, tuned to register usage.
    v63b: stabilized/. COP_MODE m_bitWait=579 ,  PROD_MODE m_bitWait=502
       seq: LOCK, set varbls, startbit , bitwait/read7-8bit,  stopbit, set varbls, UNLOCK, REGset
-*/
-#define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
-#define DSMR_READ() (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin))   // v63b use register read to save cycles.
+
+      Two macros: one regular and the other monitor/follow input
+   */
+   #define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+   #define WAITIram4t58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000) { \
+               if (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin)) \
+                     GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4); \
+               else  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4); \
+                           } ; wait += m_bitTime; }
+   #define DSMR_READ() (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin))   // v63b use register read to save cycles.
+// --58 //------------------------------------------------------------
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIGH = 112nS
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
+
+   // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);     // clear to read/forward state HIGH line
+
+   // leadtime ISR until first read is about 7µSec ..... startbit
 
    /*
       Hold / lock Interrupts
@@ -693,6 +705,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)   
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
+   
+   // int8_t currentRSSI = wifi_station_get_rssi();  // wifi_station_get_rssi not availabe in this scope
 
    unsigned long wait = (m_bitTime + (m_bitTime/3)) - m_bitWait;	// v63a 445 try this
 
@@ -713,14 +727,35 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    for (int i = 0; i < bit_shift ; i++) {
      WAITIram4w58; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
-     if (digitalRead(m_rxPin)) {    // old methode does work in PROD_MODE
-     // if DSMR_READ() {            // v63b use register read to save cycles, does not operate PROD_MODE
+     if (digitalRead(m_rxPin)) {   // old methode does work in PROD_MODE require optimal bitwait 497
+                                     // uses ESP8266_REG(0x318) //GPIO_IN RO (Read Input Level)
+                                     // .. ESP8266_REG(addr) *((volatile uint32_t *)(0x60000000+(addr)))
+     // if (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin)) {    // PROD require bitwait 357-398-467
+     // if (GPIO_INPUT_GET(GPIO_ID_PIN(m_rxPin))) {  // ... might be faster: GPIO_INPUT_GET(GPIO_ID_PIN(m_rxPin)
+     // if DSMR_READ() {            // v63b use register read to save cycles, bitwait COP_MODE=579 , PROD_MODE=398,
        rec |= 0x80;
-      //  GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
+       //  GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
      } else {                     // v52 balance isr rxread always doing or operation
        rec |= 0x00;
-      //  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
+       //  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
      }
+    
+    // if (uint32_t intState = xt_get_interrupt_state() & (1 << 5))   // check if Wifi ISR is active, not valid in NONOS
+   
+
+   /*
+      Folllowing was suggested but not available in this (cpp) scope
+      --------------------------------------------------------------
+      static int8_t lastRSSI = 0;  note: wifi_station_get_rssi not decalred in this scope
+      int8_t currentRSSI = wifi_station_get_rssi();  
+      if (abs(wifi_station_get_rssi() - currentRSSI ) > 0) { // Significant RSSI change  
+            m_wifiActiveDuringRead = true;  
+            GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
+            // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);           // set monitor HIGH
+      }  
+      lastRSSI = currentRSSI; 
+   */
+
    }
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
@@ -756,6 +791,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);             // set monitor HIGH
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+   // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);     // clear to read/forward state LOW line
 }
 /* Documentation: register write to control GPIO out
       GPIO_REG_WRITE(GPIO_OUT_ADDRESS, 0xF0F0);   // would set GPIO 4-7 and 12-15 to high, and 0-3 and 8-11 to low
@@ -870,7 +906,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  // cli();         // v62a 30jul25 trial and error
  ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
                    //      (cannot do: uint32_t oldInterruptLevel = xt_rsil(3); // Blocks GPIO/timers, not WiFi)
-
+   // uint32_t oldInterruptLevel = xt_rsil(3);
     // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
