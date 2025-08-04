@@ -3985,7 +3985,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                       printf_port_state_isr();
                       Serial.println((String)"");
                  }
-            else if ((char)payload[1] == 't') {
+            else if ((char)payload[1] == 't') {   // print m_buffer_time[M_TIME_BIT_...] table entries
                       Serial.println((String)"\n\rT-imer Task: ");
                       serial_Print_PeekTime(1,M_TIME_ENTRIES);
                       serial_Print_PeekTime(2,M_TIME_ENTRIES);
@@ -6258,6 +6258,22 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + "="  +  mySerial1.peekTime(M_TIME_AVAIL_START)
         + " +" + (mySerial1.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
         + "="  +  mySerial1.peekTime(M_TIME_AVAIL_END)
+        + "\r\n"
+        + " ISR1st: "
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR_START) + ":"
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_START1) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR_START1))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_END))
+        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + "\r\n"
+        + " ISR2ls: "
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":"
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START1))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_END))
+        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
         + "\r\n"
         );  
   }                
