@@ -728,13 +728,17 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    for (int i = 0; i < bit_shift ; i++) {
      WAITIram4w58; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
-     if (digitalRead(m_rxPin)) {    // old methode does work in PROD_MODE
-     // if DSMR_READ() {            // v63b use register read to save cycles, does not operate PROD_MODE
+     if (digitalRead(m_rxPin)) {   // old methode does work in PROD_MODE require optimal bitwait 497
+                                     // uses ESP8266_REG(0x318) //GPIO_IN RO (Read Input Level)
+                                     // .. ESP8266_REG(addr) *((volatile uint32_t *)(0x60000000+(addr)))
+     // if (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin)) {    // PROD require bitwait 357-398-467
+     // if (GPIO_INPUT_GET(GPIO_ID_PIN(m_rxPin))) {  // ... might be faster: GPIO_INPUT_GET(GPIO_ID_PIN(m_rxPin)
+     // if DSMR_READ() {            // v63b use register read to save cycles, bitwait COP_MODE=579 , PROD_MODE=398,
        rec |= 0x80;
-      //  GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
+       //  GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
      } else {                     // v52 balance isr rxread always doing or operation
        rec |= 0x00;
-      //  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
+       //  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
      }
     
     // if (uint32_t intState = xt_get_interrupt_state() & (1 << 5))   // check if Wifi ISR is active, not valid in NONOS
@@ -902,7 +906,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  // cli();         // v62a 30jul25 trial and error
  ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
                    //      (cannot do: uint32_t oldInterruptLevel = xt_rsil(3); // Blocks GPIO/timers, not WiFi)
-uint32_t oldInterruptLevel = xt_rsil(3);
+   // uint32_t oldInterruptLevel = xt_rsil(3);
     // copy taken from v60
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
