@@ -5648,43 +5648,43 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interfe
 */
 void WaterTrigger0_ISR()
 {
-  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
+  // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
     if (waterISRActive) {    // set routine already active
         if (outputOnSerial) Serial.print( (String) ".W" );
     } else {
       waterISRActive = true;    // V47 - prevent calling while routine is active
 
-        // implement  secondary debounce routine to check ISR compliance
-        ISR_time = millis();
-        if ((ISR_time - last_ISR_time) > 500) {
-            last_ISR_time = ISR_time;
-            ISR_time_cnt++ ;          // increase our change counter      
-        }
+      // implement  secondary debounce routine to check ISR compliance
+      ISR_time = millis();
+      if ((ISR_time - last_ISR_time) > 500) {
+          last_ISR_time = ISR_time;
+          ISR_time_cnt++ ;          // increase our change counter      
+      }
 
-        if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) "i" );    
-        interval_delay(1); // V47 wait 1ms --> implemented by flat plain while loop, all other types forbidden in ISR
-        if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
-            waterTriggerState = !waterTriggerState; // revert to make the same
+      if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) "i" );    
+      interval_delay(1); // V47 wait 1ms --> implemented by flat plain while loop, all other types forbidden in ISR
+      if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
+          waterTriggerState = !waterTriggerState; // revert to make the same
 
-            waterTriggerCnt++ ;             // increase our call counter
-            // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-            // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
-            waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
+          waterTriggerCnt++ ;             // increase our call counter
+          // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+          // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+          waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
-            if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
-              detachWaterInterrupt();
-              Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
-              // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
-              // waterTriggerState = LOW;      // v41 v47 force to low to ease things
-            }
+          if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+            detachWaterInterrupt();
+            Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+            // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+            // waterTriggerState = LOW;      // v41 v47 force to low to ease things
+          }
           #ifdef NoTx2Function
             if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
           #endif
             if (outputOnSerial && verboseLevel >= VERBOSE_GPIO) Serial.print( (String) (waterTriggerState ? "tH " : "tL ") );    // V47 print ISR call counterwaterTriggerTime
-          }
-
+       }
       waterISRActive = false;    // alow next interrupt
   }
+  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // v65 at end , as per advice espressif
 }
 
 
@@ -6263,6 +6263,22 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + "="  +  mySerial1.peekTime(M_TIME_AVAIL_START)
         + " +" + (mySerial1.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
         + "="  +  mySerial1.peekTime(M_TIME_AVAIL_END)
+        + "\r\n"
+        + " ISR1st: "
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR_START) + ":"
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_START1) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR_START1))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_END))
+        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + "\r\n"
+        + " ISR2ls: "
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":"
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START1))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_END))
+        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
         + "\r\n"
         );  
   }                
