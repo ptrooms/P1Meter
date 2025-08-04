@@ -126,10 +126,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SERIAL_RECORDTYPE_WL_B 4    // and do bittiming for WL
 
 
-#ifndef M_TIME_NAMES
+#ifndef M_TIME_NAMES    // used by table: unsgined long m_buffer_time[M_TIME_ENTRIES]
    #define M_TIME_NAMES           // Indicate our name
-   #define M_TIME_ENTRIES    20  // Numbeer of entries in M_TIME table
-   #define M_TIME_START       0   // cyclenumber start of Ovject
+   #define M_TIME_ENTRIES    30  // Numbeer of entries in M_TIME table
+   #define M_TIME_START       0   // cyclenumber start of Object
    #define M_TIME_RX_START    1   // cyclenumber start of void SoftwareSerial::enableRx Attach
    #define M_TIME_RX_END      2   // cyclenumber end of void SoftwareSerial::enableRx Detach
    #define M_TIME_BEGIN_START 3   // cyclenumber start of  SoftwareSerial::begin
@@ -143,6 +143,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #define M_TIME_BIT_STOP1  10   // v60a Cycle ISR Nominal end
    #define M_TIME_BIT_END1   11   // v60a Cycle ISR END
    #define M_TIME_BIT_END2   12   // v60a Cycle ISR Nominal end
+   #define M_TIME_BIT_ISR_START    13   // v64a Cycle first ISR entered 
+   #define M_TIME_BIT_ISR_START1   14   // v64a Cycle first ISR for doing getCycleCountIram()
+   #define M_TIME_BIT_ISR_READ     15   // v64a Cycle first ISR start read
+   #define M_TIME_BIT_ISR_END      16   // v64a Cycle first ISR finish read
+   #define M_TIME_BIT_ISR_EXIT     17   // v64a Cycle first ISR exit
+   #define M_TIME_BIT_ISR2_START   18   // v64a Cycle last ISR entered 
+   #define M_TIME_BIT_ISR2_START1  19   // v64a Cycle last ISR for doing getCycleCountIram()
+   #define M_TIME_BIT_ISR2_READ    20   // v64a Cycle last ISR start read
+   #define M_TIME_BIT_ISR2_END     21   // v64a Cycle last ISR finish read
+   #define M_TIME_BIT_ISR2_EXIT    22   // v64a Cycle last ISR exit
 #endif
 
 #define M_BIT_CYCLE_VALUE (getCycleCountIram() % 4096);     // get distance
