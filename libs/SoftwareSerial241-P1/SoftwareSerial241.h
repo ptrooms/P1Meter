@@ -71,9 +71,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
          // #define BITWAIT1 445       // v63a fixed (<-- wdt) 335-445-555 (--> errors) t=
          // #define BITWAIT1 525       // v63: 31jul25 14u07 v63a 01aug25 13u47 (without lockout)
          // #define BITWAIT1 511          // v63a:02aug25 14u07 v63a  using ETS_INTR_LOCK() / ETS_INTR_UNLOCK();
-         #define BITWAIT1 502          // v63a:02aug25 14u07 v63a  using ETS_INTR_LOCK() / ETS_INTR_UNLOCK(); & bittime
          // #define BITWAIT1 536       // v63a: 461-536 using cli() / sei()
          // #define BITWAIT1 427          // v64a:04aug25 15u01 BITTIMING ISR measurements
+         #define BITWAIT1 502          // v63a:02aug25 14u07 v63a  using ETS_INTR_LOCK() / ETS_INTR_UNLOCK(); & bittime
 
 
       #endif
@@ -167,6 +167,8 @@ public:
       SoftwareSerial(int receivePin, int transmitPin, int  inverse_logic = 10   , unsigned int buffSize = 64);
    ~SoftwareSerial();   // called when destroy (reaching end of scope, or calling delete to a pointer to) the instance of the object.
 
+   // static int m_static;               // v65b test/check if and to what extend this is hared between class instances
+
    void begin(long speed);             // will call/do  SERIAL_RECORDTYPE_PORT
    void begin(long speed, int);        // elect type of port 0-physical/ 1-simulatedP1 / 2-simulatatedWL
    long baudRate();
@@ -210,6 +212,7 @@ public:
    volatile int preset_bitWait;              // v58 to set m_bitwait up/down
    volatile unsigned long m_start;     // v63b bitshift timing
    inline uint32_t getCycleCountIram();
+
 
    using Print::write;
 
@@ -257,7 +260,6 @@ private:
 };
 
 // ??  ESP.getCycleCount()
-
 uint32_t ICACHE_RAM_ATTR SoftwareSerial::getCycleCountIram()
 {
     uint32_t ccount;

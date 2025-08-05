@@ -102,6 +102,8 @@
 
 /* change history
 
+  - v65b - rxread58 only termination bittime registration
+    rxread2 supplied with  ETS_INTR_LOCK()/ETS_INTR_UNLOCK(), like rx58
   - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
     (PROD shorten bitwait 502 --> 427 due to tieming)
     improved watertrigger by resetting the recurrent ISR status at end of ISR
@@ -3958,6 +3960,16 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           if ( (char)payload[1] == '2') command_testH2();    // v52: check mqtt empty strings
           if ( (char)payload[1] == '3') command_testH3();    // v55 
           if ( (char)payload[1] == '4') command_testH4();    // v55a redudant delay()
+          if ( (char)payload[1] == '5') {
+              //  Serial.print((String) "\r\t H5: " 
+              //                               + ", get1a="  + mySerial1.m_static
+              //                               + ", get2a="  + mySerial2.m_static );
+              //  mySerial1.m_static = micros();
+              //  Serial.print((String) "\r\t"
+              //                               + ", set1="   + mySerial1.m_static 
+              //                               + ", get1b="  + mySerial1.m_static
+              //                               + ", get2b"   + mySerial2.m_static );
+            }
 
     } else  if ((char)payload[0] == 't') {    // v59b print bittime ttable
             // commands: 
@@ -6277,6 +6289,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_END))
         + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + " , ISRstart2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_START) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
         + "\r\n"
         + " ISR2ls: "
         + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":\t"
@@ -6285,6 +6298,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_END))
         + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + " , ISRexit2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT) - mySerial1.peekTime(M_TIME_BIT_ISR_EXIT))
         + "\r\n"
         );  
   }                
