@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "65" // number this version
+#define VERSION_NUMBER "65a" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -102,6 +102,12 @@
 
 /* change history
 
+  - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
+    (PROD shorten bitwait 502 --> 427 due to tieming)
+    improved watertrigger by resetting the recurrent ISR status at end of ISR
+  - v65  - rework v64a to prevent wdt (no timing registration in SS241 as developed in v64a)
+  - v64a - enahncwed with time diagnostics lead to wdt
+    improved watertrigger by resetting the recurrent ISR status at end of ISR
   - v64a solved 2 data errors telegram field fault & no data transmit after checkdata() recovery.
     beautify data diagnostics
     added ISR timing measurements PRODmode 497 --> 427 , COP-MODE is stable but PROD-MODE varries

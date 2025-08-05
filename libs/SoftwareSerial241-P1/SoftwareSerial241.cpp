@@ -699,6 +699,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       Hold / lock Interrupts
    */
    ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS)
+   unsigned long start = getCycleCountIram();         // 15-18cycles cycle counter, which increments with each clock cycle  (doc: v55d)      
+   
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START]  = start;      // v64a get timing
+   else              m_buffer_time[M_TIME_BIT_ISR2_START] = start;
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START1]  = getCycleCountIram();
+   else              m_buffer_time[M_TIME_BIT_ISR2_START1] = getCycleCountIram();
+
    // cli();
    // uint32_t oldLevel = xt_rsil(3);  // v63b Minimal blocking (deepseek) , 10-15Cycles, does not work in PROD
 
@@ -717,13 +724,27 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    unsigned long bit_diff = start - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
-   if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+   // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+   // ----------------------------------------------------------------------------------------------------------
+
+   
+   if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation
+        (bit_diff > 100 && bit_diff < 2776) ) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-4 bits
+
+   // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+   
+   // if (bit_diff > 100 && bit_diff < 2776)) {    // 
+   //       bit_shift = bit_shift - ((bit_diff + bitTime) / m_bitTime);   // subtract number of missed bits
+   //       wait = wait + ((8 - bit_shift) * bitTime);                    // compensate expected wait
+   // }         
    
    /*
       Read Data bits after StopBit
    */
    uint8_t rec = 0;
    // for (int i = 0; i < 8; i++) {
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_READ]  = getCycleCountIram();      // v64a get overhead timing
+   else              m_buffer_time[M_TIME_BIT_ISR2_READ] = getCycleCountIram();      
    for (int i = 0; i < bit_shift ; i++) {
      WAITIram4w58; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
@@ -757,6 +778,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
 
    }
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_END]  = getCycleCountIram();   // v64a get overhead timing
+   else              m_buffer_time[M_TIME_BIT_ISR2_END] = getCycleCountIram();
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
    WAITIram4w58; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
@@ -792,6 +815,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);             // set monitor HIGH
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);     // clear to read/forward state LOW line
+   if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v64a get overhead timing
+   else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
 }
 /* Documentation: register write to control GPIO out
       GPIO_REG_WRITE(GPIO_OUT_ADDRESS, 0xF0F0);   // would set GPIO 4-7 and 12-15 to high, and 0-3 and 8-11 to low
