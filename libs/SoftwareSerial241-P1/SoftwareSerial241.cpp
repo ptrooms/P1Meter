@@ -701,8 +701,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    /*
       Hold / lock Interrupts
    */
-   ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
    unsigned long start = getCycleCountIram();         // 15-18cycles cycle counter, which increments with each clock cycle  (doc: v55d)      
+   ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
+   // unsigned long start = getCycleCountIram();         // 15-18cycles cycle counter, which increments with each clock cycle  (doc: v55d)      
    
    // if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START]  = start;      // v64a get timing
    // else              m_buffer_time[M_TIME_BIT_ISR2_START] = start;
@@ -797,7 +798,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    if (next != m_outPos) {  // this works best in production
       if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header
          m_P1active = true ; 
-      } else if (rec == '!') {  // 26mar21 Ptro P1 messageing has ended due valid trailer, v65b as else
+      } 
+      if (rec == '!') {  // 26mar21 Ptro P1 messageing has ended due valid trailer, v65b as else
          m_P1active = false ;
       }
       m_buffer[m_inPos] = rec;
