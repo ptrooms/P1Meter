@@ -360,13 +360,26 @@ void SoftwareSerial::setTransmitEnablePin(int transmitEnablePin) {
 void SoftwareSerial::enableRx(bool on) {
    if (m_rxValid) {
       if (on) {
+         #if defined(BITTEST_BLUE_ACTIVE) || defined(BITTEST_BLUE_ACTIVE1)     // mark end of ISR
+            if (m_rxPin == 14) digitalWrite(D0, LOW);              //Turn the LED gpio16 ON  (active-low)
+         #endif         
          attachInterrupt(m_rxPin, ISRList[m_rxPin], m_invert ? RISING : FALLING);
+         #if defined(BITTEST_BLUE_ACTIVE2)     // mark end of ISR
+            if (m_rxPin == 14) digitalWrite(D0, LOW);              //Turn the LED gpio16 OFF  (active-low)
+         #endif         
          m_buffer_time[M_TIME_RX_START] = GET_CYCLE_COUNT;   // initialise
          m_port_state = true;    // v59
       } else {
+         #if defined(BITTEST_BLUE_ACTIVE3)     // mark end of ISR
+            if (m_rxPin == 14) digitalWrite(D0, HIGH);              //Turn the LED gpio16 OFF  (active-low)
+         #endif         
          detachInterrupt(m_rxPin);
          m_buffer_time[M_TIME_RX_END] = GET_CYCLE_COUNT;   // initialise
          m_port_state = false;    // v59
+         #if defined(BITTEST_BLUE_ACTIVE) || defined(BITTEST_BLUE_ACTIVE4)     // mark end of ISR
+            if (m_rxPin == 14) digitalWrite(D0, HIGH);              //Turn the LED gpio16 OFF  (active-low)
+         #endif         
+
       }         
       m_rxEnabled = on;
       /*

@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "65a" // number this version
+#define VERSION_NUMBER "65b" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -104,6 +104,7 @@
 
   - v65b - rxread58 only termination bittime registration
     rxread2 supplied with  ETS_INTR_LOCK()/ETS_INTR_UNLOCK(), like rx58
+      ss: diagnose DO/gpio16 on/off with BITTEST_BLUE_ACTIVE when m_rxPin == 14 has ISR active
   - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
     (PROD shorten bitwait 502 --> 427 due to tieming)
     improved watertrigger by resetting the recurrent ISR status at end of ISR
