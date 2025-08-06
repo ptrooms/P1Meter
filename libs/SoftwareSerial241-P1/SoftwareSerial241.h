@@ -25,6 +25,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <inttypes.h>
 #include <Stream.h>
 
+// #define BITTEST_BLUE_SYNC     // RXREAD61+ activate Blueled on rythme of ISR
+// #define BITTEST_BLUE_MARK     // RXREAD61+ finisch cycle Blueled with short spike its for scope
+// #define BITTEST_BLUE_ACTIVE      // Blueled P1 on before attach ISR,  off after detach ISR
+// #define BITTEST_BLUE_ACTIVE1    // Blueled P1 before attach ISR
+// #define BITTEST_BLUE_ACTIVE2    // Blueled P1 after  attach ISR
+// #define BITTEST_BLUE_ACTIVE3    // Blueled P1 before detach ISR
+// #define BITTEST_BLUE_ACTIVE4    // Blueled P1 after  detach ISR
+ 
+
+
 /*
    Timer control by experience
 */

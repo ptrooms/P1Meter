@@ -101,8 +101,12 @@
 */
 
 /* change history
+
   - v66  - reworked from v65  3952201: v65b: rxread2 ETS_INTR_UNLOCK() (which fixed wdt)
   - v65b - qworked for timing.... not stable in production
+  - v65b - rxread58 only termination bittime registration
+    rxread2 supplied with  ETS_INTR_LOCK()/ETS_INTR_UNLOCK(), like rx58
+      ss: diagnose DO/gpio16 on/off with BITTEST_BLUE_ACTIVE when m_rxPin == 14 has ISR active
   - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
     (PROD shorten bitwait 502 --> 427 due to tieming)
     improved watertrigger by resetting the recurrent ISR status at end of ISR
@@ -6278,6 +6282,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_END))
         + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + " , ISRstart2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_START) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
         + "\r\n"
         + " ISR2ls: "
         + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":\t"
@@ -6286,6 +6291,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_END))
         + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + " , ISRexit2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT) - mySerial1.peekTime(M_TIME_BIT_ISR_EXIT))
         + "\r\n"
         );  
   }                
