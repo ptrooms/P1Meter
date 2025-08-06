@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "65a" // number this version
+#define VERSION_NUMBER "66" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -101,7 +101,8 @@
 */
 
 /* change history
-
+  - v66  - reworked from v65  3952201: v65b: rxread2 ETS_INTR_UNLOCK() (which fixed wdt)
+  - v65b - qworked for timing.... not stable in production
   - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
     (PROD shorten bitwait 502 --> 427 due to tieming)
     improved watertrigger by resetting the recurrent ISR status at end of ISR
@@ -6271,7 +6272,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + "="  +  mySerial1.peekTime(M_TIME_AVAIL_END)
         + "\r\n"
         + " ISR1st: "
-        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR_START) + ":"
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR_START) + ":\t"
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_START1) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR_START1))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
@@ -6279,7 +6280,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
         + "\r\n"
         + " ISR2ls: "
-        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":"
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":\t"
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START1))
         + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))

@@ -621,7 +621,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
 */
 #define WAITIram4w2  { while (SoftwareSerial::getCycleCountIram()-start <   wait &&   wait<BYTE_MAXWAIT_1);   wait += m_bitTime; }
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
-   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
+   ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
+   // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
       // Advance the starting point for the samples but compensate for the
       // initial delay which occurs before the interrupt is delivered
@@ -669,6 +670,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    // it gets set even when interrupts are disabled
    // 26mar21 Ptro done at start: GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
    // Serial.print("-"); // this blocks and make the routine inoperable
+   ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek  (==> sei() )
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 }
 
 
@@ -698,18 +701,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    /*
       Hold / lock Interrupts
    */
-   ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS)
+   ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
    unsigned long start = getCycleCountIram();         // 15-18cycles cycle counter, which increments with each clock cycle  (doc: v55d)      
    
-   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START]  = start;      // v64a get timing
-   else              m_buffer_time[M_TIME_BIT_ISR2_START] = start;
-   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START1]  = getCycleCountIram();
-   else              m_buffer_time[M_TIME_BIT_ISR2_START1] = getCycleCountIram();
+   // if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START]  = start;      // v64a get timing
+   // else              m_buffer_time[M_TIME_BIT_ISR2_START] = start;
+   // if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START1]  = getCycleCountIram();  // 15-18cycles
+   // else              m_buffer_time[M_TIME_BIT_ISR2_START1] = getCycleCountIram();
 
    // cli();
    // uint32_t oldLevel = xt_rsil(3);  // v63b Minimal blocking (deepseek) , 10-15Cycles, does not work in PROD
 
-   unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)   
+   // unsigned long start = getCycleCountIram();         // cycle counter, which increments with each clock cycle  (doc: v55d)   
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
    
@@ -743,8 +746,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    uint8_t rec = 0;
    // for (int i = 0; i < 8; i++) {
-   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_READ]  = getCycleCountIram();      // v64a get overhead timing
-   else              m_buffer_time[M_TIME_BIT_ISR2_READ] = getCycleCountIram();      
+   // if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_READ]  = getCycleCountIram();      // v64a get overhead timing
+   // else              m_buffer_time[M_TIME_BIT_ISR2_READ] = getCycleCountIram();      
    for (int i = 0; i < bit_shift ; i++) {
      WAITIram4w58; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
@@ -778,8 +781,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
 
    }
-   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_END]  = getCycleCountIram();   // v64a get overhead timing
-   else              m_buffer_time[M_TIME_BIT_ISR2_END] = getCycleCountIram();
+   // if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_END]  = getCycleCountIram();   // v64a get overhead timing
+   // else              m_buffer_time[M_TIME_BIT_ISR2_END] = getCycleCountIram();
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
    WAITIram4w58; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
@@ -794,8 +797,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    if (next != m_outPos) {  // this works best in production
       if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header
          m_P1active = true ; 
-      }   
-      if (rec == '!') {  // 26mar21 Ptro P1 messageing has ended due valid trailer
+      } else if (rec == '!') {  // 26mar21 Ptro P1 messageing has ended due valid trailer, v65b as else
          m_P1active = false ;
       }
       m_buffer[m_inPos] = rec;
@@ -809,14 +811,17 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       unHold / unLock Interrupts
    */
    // xt_wsr_ps(oldLevel);	 // v63b Re-enable using shorter methode, does not work in PROD_MODE
-   ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek 
-   // sei();
 
+   if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v65b moved before ETS_INTR_UNLOCK()
+   else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
+
+   ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek  (==> sei() )
+   // sei();
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);             // set monitor HIGH
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);     // clear to read/forward state LOW line
-   if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v64a get overhead timing
-   else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
+   // if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v64a get overhead timing
+   // else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
 }
 /* Documentation: register write to control GPIO out
       GPIO_REG_WRITE(GPIO_OUT_ADDRESS, 0xF0F0);   // would set GPIO 4-7 and 12-15 to high, and 0-3 and 8-11 to low
