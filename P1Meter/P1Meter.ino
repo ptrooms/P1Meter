@@ -4064,7 +4064,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                         + "\tserial1P1-"
                         + (bSerial1State  ? "A" : "i")
                         +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
-                        + " , bittime=" + temp1
+                        + " , bitWait=" + temp1
                         + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
                         + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
                         + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
@@ -4076,7 +4076,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                         + "\tserial2P2-"
                         + (bSerial2State  ? "A" : "i")
                         +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
-                        + " , bittime=" + temp2
+                        + " , bitWait=" + temp2
                         + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
                         + ", interval:"+ rx2ReadInterval  
                         );
@@ -6322,10 +6322,11 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
   Diagnose, print a series of Bit Times as collected by softserial
 */
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
-  
-  unsigned long temp = 0UL;               // check duplicates
+
   if (bit_port == 1) {
-    Serial.print((String) "\r\n\r\n Print bit time sequences"+ 
+    unsigned long temp = 0UL;               // check duplicates          
+    unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial2Baudrate;
+    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial1.peekBitPos()
                   + "\t-------------time:" + micros()
@@ -6336,13 +6337,13 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
           temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1);
-          if (temp == 0UL) {
-              Serial.print((String) "\t---- " ); // same data
-          } else {
-              Serial.print((String) "\t" + temp + " " );
-          }
+          if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&
+                 temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+               Serial.print((String) "\t" + temp + "~" );
+          else Serial.print((String) "\t" + temp + " " );
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
-        }
+       }
       if ( (i % 8) == 0) {
           temp = mySerial1.peekBit(i);
           // Serial.print((String) "\r\n" + i + "="); 
@@ -6360,8 +6361,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                                     Serial.printf("%3d", (temp));
           Serial.print("> ");
           // mySerial1.peekBit(i) + "> " );  // next line time
-      }
-
+       }
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
     // if (bit_sequence >=0 ) Serial.print((String) "\r\n dataR0:\t");  // v63 tbc, wip preven data cluttereing
@@ -6448,23 +6448,23 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   }
 
   if (bit_port == 2) {
-    Serial.print((String) "\r\n Print bit time sequences"+ 
+    unsigned long temp = 0UL;    
+    unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial2Baudrate;
+    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial2.peekBitPos()
                   + "-------------time:" + micros()
                   + " \r\n");
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
-      unsigned long temp = 0UL;
       // Serial.print((String) "\t" + mySerial2.peekBit(i));
       if (i > 0) {
-          if (temp == (mySerial2.peekBit(i)-mySerial2.peekBit(i-1))) {
-              Serial.print((String) "\t---- " ); // same data
-          } else {
-              temp = mySerial2.peekBit(i)-mySerial2.peekBit(i-1);
-              Serial.print((String) "\t" + temp + " " );
-          }
-         Serial.print((char) convert_p1_print( mySerial2.peekByte(i-1)) );
-        }
+          if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&
+                 temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+               Serial.print((String) "\t" + temp + "~" );
+          else Serial.print((String) "\t" + temp + " " );
+          Serial.print((char) convert_p1_print( mySerial2.peekByte(i-1)) );
+       }
       if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial2.peekBit(i) + "> " );  // next line time
       if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
