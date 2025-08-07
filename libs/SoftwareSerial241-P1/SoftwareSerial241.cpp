@@ -1,4 +1,4 @@
-/* v66
+/* v66a
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 adapted to P1 messageing with activates P1active between '/' and '!' readed data
@@ -726,14 +726,14 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    uint8_t bit_shift = 8;                 // v63b assume missing bit
    // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
-   unsigned long bit_diff = start - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
+   // unsigned long bit_diff = start - m_buffer_bits[m_inPos];           // v66a        // v63a_first try to get timnng
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    // ----------------------------------------------------------------------------------------------------------
 
    
-   if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation
-        (bit_diff > 100 && bit_diff < 2776) ) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-4 bits
+   // if ( ((m_bitWait % 2)) &&            // v66a use m_bitWait as switch to control bit compensation
+   //      (bit_diff > 100 && bit_diff < 2776) ) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-4 bits
 
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    
@@ -793,7 +793,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    // m_buffer_bits[m_inPos] = start;                    // v63a_v63b - ByteTiming table
    // m_buffer_bits[m_inPos] = start % 1000000;  // limit range
-   m_buffer_bits[m_inPos] = start;  // limit range
+   // m_buffer_bits[m_inPos] = start;  // v66a
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {  // this works best in production
       if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header
@@ -814,8 +814,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    // xt_wsr_ps(oldLevel);	 // v63b Re-enable using shorter methode, does not work in PROD_MODE
 
-   if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v65b moved before ETS_INTR_UNLOCK()
-   else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
+   // if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v66a moved before ETS_INTR_UNLOCK()
+   // else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
 
    ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek  (==> sei() )
    // sei();
