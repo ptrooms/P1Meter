@@ -1,4 +1,4 @@
-/* v66
+/* v66b
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 adapted to P1 messageing with activates P1active between '/' and '!' readed data
@@ -46,7 +46,10 @@ extern "C" {
 
 #define GET_CYCLE_COUNT  ESP.getCycleCount()       // get the esp cycle counter
 
-#if !defined(USE_RXREAD) && !defined(USE_RXREAD2) && !defined(USE_RXREAD58) && !defined(USE_RXREAD59) && !defined(USE_RXREAD60) && !defined(USE_RXREAD61)
+#if !defined(USE_RXREAD)   && !defined(USE_RXREAD2)   && \
+    !defined(USE_RXREAD58) && !defined(USE_RXREAD59)  && \
+    !defined(USE_RXREAD60) && !defined(USE_RXREAD61)  && \
+    !defined(USE_RXREAD66)
    #define USE_RXREAD 0          // allocate default
    #if !defined(BITWAIT1)        // allocate default
       #define BITWAIT1 469 // v63a rxread58 469
@@ -71,8 +74,10 @@ void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
 void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 // void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
-#if defined (USE_RXREAD58)
-   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead58(); };     // choose implementation of v58
+#if defined (USE_RXREAD66)
+   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead66(); };     // v66b choose implementation of v58
+#elif defined (USE_RXREAD58)
+   void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead58(); };     // v66 choose implementation of timed v58
 #elif defined (USE_RXREAD59)
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead59(); };     // choose implementation of v59
 #elif defined (USE_RXREAD60)
@@ -557,6 +562,33 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
    }
 }
 
+#define WAITIram66 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead66() {
+   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);
+   unsigned long wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz
+   unsigned long start = getCycleCountIram();
+   uint8_t rec = 0;
+   for (int i = 0; i < 8; i++) {
+     WAITIram66;
+     rec >>= 1;
+     if (digitalRead(m_rxPin))
+       rec |= 0x80;
+     else
+       rec |= 0x00;
+   }
+   if (m_invert) rec = ~rec;
+   WAITIram66; 
+   int next = (m_inPos+1) % m_buffSize;
+   if (next != m_outPos) {  // this works best in production
+      if (rec == '/') m_P1active = true  ;
+      if (rec == '!') m_P1active = false ;
+      m_buffer[m_inPos] = rec;
+      m_inPos = next;
+   } else {
+      m_P1active = false;
+      m_overflow = true;
+   }
+}
 
 
 /*

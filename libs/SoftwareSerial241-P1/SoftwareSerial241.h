@@ -1,5 +1,5 @@
 /*
-SoftwareSerial.h v66
+SoftwareSerial.h v66b
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
@@ -69,9 +69,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #endif
 
 #elif defined(PROD_MODE) 
-   #define USE_RXREAD58 58          // v63a enabled
-   // #define USE_RXREAD59
-   // #define USE_RXREAD60       // v63a disabled
+   // #define USE_RXREAD66 66       // straight copy v58 which was very stable but no longer due to segmented records
+   #define USE_RXREAD58 58          // v66b v63a enabled
+   // #define USE_RXREAD59 59       // looks reasonable 
+   // #define USE_RXREAD60          // v63a disabled
 
    // -----------------------------------------------------------------vvvv conditional settings
    #ifdef USE_RXREAD58
@@ -85,6 +86,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
          // #define BITWAIT1 497          // v64a:03aug25 22u14  ETS_INTR_LOCK() / ETS_INTR_UNLOCK(); & bittime, bitsplit
          #define BITWAIT1 427          // v64a:04aug25 15u01 BITTIMING ISR measurements
          // #define BITWAIT1 536       // v63a: 461-536 using cli() / sei()
+      #endif
+   #elif defined(USE_RXREAD66)
+      #define USE_RXREAD USE_RXREAD66
+      #ifndef BITWAIT1
+         #define BITWAIT1 500       // v66b v62a 524 v59 rxread58 509 no longer usable due segmented records
       #endif
    #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
@@ -207,6 +213,7 @@ public:
    void rxRead59();		// BitBang routine v59 
    void rxRead60();		// BitBang routine v60
    void rxRead61();		// BitBang routine v61
+   void rxRead66();		// BitBang routine v66
    void rxTriggerBit(); // use bittiming every flank change allocates a time
    int m_use_rxRead;      // holds the USE_RXREAD ISR number to be used
    
