@@ -1,5 +1,5 @@
 /*
-SoftwareSerial.h v66b
+SoftwareSerial.h v6
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
@@ -43,22 +43,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // #define USE_RXREAD59 59          // use this gpio implementation        cop/dup=549, prod=419 else=469
 // #define USE_RXREAD60 60          // PROD/419 TEST/519
 // #define USE_RXREAD61 61        // use this gpio implementation     61b 419
+// #define USE_RXREAD68 68        // use this gpio implementation for checking out rxread58
 // else USE_RXREAD2 2                  // w.i.p
 
 #if defined(COP_MODE) || defined(DUP_MODE)
-   #define USE_RXREAD58 58             // v63a enabled
+   #define USE_RXREAD68 68           // v66b based on rxread58
+   // #define USE_RXREAD58 58          // v63a enabled
    // #define USE_RXREAD60 60          // v63a disabled
    // -----------------------------------------------------------------vvvv conditional settings
 
-   #ifdef USE_RXREAD58
-      #define USE_RXREAD USE_RXREAD58
+   #if   defined(USE_RXREAD68)
+      #define USE_RXREAD USE_RXREAD68
       #ifndef BITWAIT1
-         #define BITWAIT1 579 // v63a rxread58  479-579-769 
-      #endif
-   #elif defined(USE_RXREAD59)
-      #define USE_RXREAD USE_RXREAD59
-      #ifndef BITWAIT1
-         #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+         #define BITWAIT1 579 // based on 58
       #endif
    #elif defined(USE_RXREAD60)
       #define USE_RXREAD USE_RXREAD60
@@ -66,16 +63,50 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
          // #define BITWAIT1 504 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
          #define BITWAIT1 594 // rx60=594 rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
       #endif
+   #elif defined(USE_RXREAD59)
+      #define USE_RXREAD USE_RXREAD59
+      #ifndef BITWAIT1
+         #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+      #endif
+   #elif defined(USE_RXREAD58)
+      #define USE_RXREAD USE_RXREAD58
+      #ifndef BITWAIT1
+         #define BITWAIT1 579 // v63a rxread58  479-579-769 
+      #endif
    #endif
 
 #elif defined(PROD_MODE) 
-   // #define USE_RXREAD66 66       // straight copy v58 which was very stable but no longer due to segmented records
-   #define USE_RXREAD58 58          // v66b v63a enabled
+   #define USE_RXREAD68 68          // wip test verion to checkout meter adapted rxread58 (30% failures, production)
+   // #define USE_RXREAD66 66       // straight copy original v58 which was very stable but no longer due to segmented records
+   // #define USE_RXREAD60          // v63a disabled   
+   // #define USE_RXREAD58 58       // v66b v63a enabled this works
    // #define USE_RXREAD59 59       // looks reasonable 
-   // #define USE_RXREAD60          // v63a disabled
-
    // -----------------------------------------------------------------vvvv conditional settings
-   #ifdef USE_RXREAD58
+   #if defined(USE_RXREAD68)
+      #define USE_RXREAD USE_RXREAD68
+      #ifndef BITWAIT1
+         #define BITWAIT1 427          // v66b using rxread value that worked here
+      #endif
+   #elif defined(USE_RXREAD66)
+      #define USE_RXREAD USE_RXREAD66
+      #ifndef BITWAIT1
+         #define BITWAIT1 500       // v66b v62a 524 v59 rxread58 509 no longer usable due segmented records
+      #endif
+   #elif defined(USE_RXREAD60)
+      #define USE_RXREAD USE_RXREAD60
+      #ifndef BITWAIT1
+         // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
+         // #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
+         #define BITWAIT1 630       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
+         // 01aug25 : bitwait=630 mqtt=2902 faults:  Miss=323, Crc=299, Rcvr=815, Rp1=24, Yld=3, lT2=0
+      #endif
+   #elif defined(USE_RXREAD59)
+      #define USE_RXREAD USE_RXREAD59
+      #ifndef BITWAIT1
+         // #define BITWAIT1 509       // v59 rxread59 509
+         #define BITWAIT1 522       // v62a 524 v59 rxread59 509
+      #endif
+   #elif defined(USE_RXREAD58)
       #define USE_RXREAD USE_RXREAD58
       #ifndef BITWAIT1
          // #define BITWAIT1 500    // v58 original
@@ -87,27 +118,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
          #define BITWAIT1 427          // v64a:04aug25 15u01 BITTIMING ISR measurements
          // #define BITWAIT1 536       // v63a: 461-536 using cli() / sei()
       #endif
-   #elif defined(USE_RXREAD66)
-      #define USE_RXREAD USE_RXREAD66
-      #ifndef BITWAIT1
-         #define BITWAIT1 500       // v66b v62a 524 v59 rxread58 509 no longer usable due segmented records
-      #endif
-   #elif defined(USE_RXREAD59)
-      #define USE_RXREAD USE_RXREAD59
-      #ifndef BITWAIT1
-         // #define BITWAIT1 509       // v59 rxread59 509
-         #define BITWAIT1 522       // v62a 524 v59 rxread59 509
-      #endif
-   #elif defined(USE_RXREAD60)
-      #define USE_RXREAD USE_RXREAD60
-      #ifndef BITWAIT1
-         // #define BITWAIT1 419       // v61b rxread59 418 t_wait=6074
-         // #define BITWAIT1 625       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
-         #define BITWAIT1 630       // v63 rxrea60 625 t_wait=5872 70,474µSec for 8 bits. t16 table: 6937=83,2µSec + lead=4,2=
-         // 01aug25 : bitwait=630 mqtt=2902 faults:  Miss=323, Crc=299, Rcvr=815, Rp1=24, Yld=3, lT2=0
-      #endif
    #endif
-
 #else   
    #define USE_RXREAD58 58
    #define USE_RXREAD USE_RXREAD58
@@ -214,6 +225,7 @@ public:
    void rxRead60();		// BitBang routine v60
    void rxRead61();		// BitBang routine v61
    void rxRead66();		// BitBang routine v66
+   void rxRead68();		// BitBang workroutine based on rxread58
    void rxTriggerBit(); // use bittiming every flank change allocates a time
    int m_use_rxRead;      // holds the USE_RXREAD ISR number to be used
    

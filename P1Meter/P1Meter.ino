@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "66b" // number this version
+#define VERSION_NUMBER "68" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -419,7 +419,7 @@ woes in Wifi/Lamx layer
 */
 #ifdef PROD_MODE
   #ifdef TEST_MODE
-    #warning "This PROD_MODE is set by platformio to override inline TEST_MODE version."
+    #warning "This PROD_MODE is set by platformio to override the default inline TEST_MODE version."
     #undef TEST_MODE
   #endif
 #endif
@@ -437,7 +437,7 @@ woes in Wifi/Lamx layer
 
 // ARDUINO_ESP8266_RELEASE
 #ifdef TEST_MODE
-  #warning This is the TEST version, be informed
+  #warning This is the TEST version on e1, be informed
   #ifdef DUP_MODE   // test is same as test with different i/o & id settings
     #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
     #define DEF_PROG_VERSION "31" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
@@ -451,14 +451,16 @@ woes in Wifi/Lamx layer
   #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
   #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
-  #warning "This is the PRODUCTION version be warned !!!!!."
   #ifdef DUP_MODE   // prod is same as prod with different i/o & id settings
+    #warning This is the DUP duplicate PROD version on d1, be informed
     #define P1_VERSION_TYPE "d1"      // "p1" production
     #define DEF_PROG_VERSION "41" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
   #elif defined(COP_MODE)
-    #define P1_VERSION_TYPE "x1"      // "x1" production
+    #warning This is the COP duplicate PROD version on x1, be informed
+    #define P1_VERSION_TYPE "x1"      // "" production
     #define DEF_PROG_VERSION "61" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
   #else
+    #warning "This is the PRODUCTION version be warned on p1 !!!!!."
     #define P1_VERSION_TYPE "p1"      // "p1" production
     #define DEF_PROG_VERSION "21" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
   #endif
@@ -479,7 +481,7 @@ woes in Wifi/Lamx layer
 // 28feb23 03u29: v38 BLueLed re-assignment via command 'f' cycle: Waterpulse, HotWaterState, Off & P1-CrcFault
 //    Sketch uses 303740 bytes (29%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 41500 bytes (50%) of dynamic memory, leaving 40420 bytes for local variables. Maximum is 81920 bytes
-// 28feb23 02u45: v38 Reandomlty added slack bytes (dummyxx) to check if this stabilize RX1/Crc (not sure)
+// 28feb23 02u45: v38 Reandomlty added slack bytes (dummyxx) to check if this stabilize R/Crc (not sure)
 // 28feb23 01u55: v38 Added 3mS during loop to allow for  yield time delay if RX2 is used
 // 27feb23 22u45: v38 Implement reading RX2 Warmelink using gpio4 attached to mySerial2/115K2-8N1
 // 26feb23 22u19: v37 Disable TX2 serial function, , add loop-limit vor WatertriggerISR and defined BLUE_LED2 for Waterpuls
@@ -1016,13 +1018,13 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 #include <PubSubClient.h>   // mqtt doc: https://github.com/knolleary/pubsubclient
 #include <eagle_soc.h>     // required as we use GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS to preven re-interrupt
 
-#ifndef UseP1SoftSerialLIB   // if not yet included, include standard defined softserial library
-#include <SoftwareSerial.h>           // "standard" version , the newer ones  after 2.4.1 are not very reliable.
+#if !defined(UseP1SoftSerialLIB)   // if not yet included, include standard defined softserial library
+  #include <SoftwareSerial.h>           // "standard" version , the newer ones  after 2.4.1 are not very reliable.
 #else
-#include <SoftwareSerial241.h>        // Version 2.4.1. adapted for and to P1 communication which set P1Active() method
-#undef UseNewSoftSerialLIB            // softwareserial class format made equal to hardware version
-// #include </home/pafoxp/code-P1meter/SoftwareSerial_2.4.0/SoftwareSerial.h>
-// #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/libraries/SoftwareSerial_2.4.0/SoftwareSerial240.h>
+  #include <SoftwareSerial241.h>        // Version 2.4.1. adapted for and to P1 communication which set P1Active() method
+  #undef UseNewSoftSerialLIB            // softwareserial class format made equal to hardware version
+  // #include </home/pafoxp/code-P1meter/SoftwareSerial_2.4.0/SoftwareSerial.h>
+  // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/libraries/SoftwareSerial_2.4.0/SoftwareSerial240.h>
 #endif
 
 /* leave to check test developement
@@ -1159,8 +1161,8 @@ bool serial2Stop    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
 long rx2ReadInterval  = 7;       // 's' decreases also de readinterval
 bool doReadAnalog     = true;    // 'a' yes/no read analog port for value
 bool doForceFaultP1   = false;   // 'E' yes/no force fault in Read telegram
-int serial1PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 1 - use internal for test
-int serial2PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 2 - use internal for test
+int serial1PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 1 P1 dummy only for test/dup/cop only
+int serial2PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 2 WL dummy only for test/dup/cop only
 char serial1terminator = '\x0a';  // v58c termination telegrams serial1 (test/dup = \x0d)
 char serial2terminator = '\x00';  // v58c termination telegrams serial1 (test/dup = \x0d)
 
@@ -6189,7 +6191,13 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
             mySerial1.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
             // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
           #else
-            mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
+            #if defined(TEST_MODE)  || (defined(PROD_MODE) && (defined(COP_MODE) || defined(COP_MODE))) // v68 check mode
+              mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
+            #else
+              #warning# 'Production will always read physical P1 serial port'
+              mySerial1.begin(serial1Baudrate, 0);    // in produmode we always  use the physical port
+            #endif
+
             // mySerial1.begin(serial1Baudrate);  // < v58a ss241 P1 meter port   115k2    // required during test without P1
           #endif
             bSerial1State = true; // v57 indicate state
@@ -6203,8 +6211,16 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
           if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
           if (mySerial4.portActive()) openCloseSerial(SERIALPORT_WL_TIME,SERIALPORT_CLOSE );
           #ifdef UseNewSoftSerialLIB
-            mySerial2.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+            mySerial2.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
           #else
+            #if defined(TEST_MODE)  || (defined(PROD_MODE) && (defined(COP_MODE) || defined(COP_MODE))) // check mode
+              mySerial2.begin(serial2Baudrate, serial2PortMode);    // v58a, V58b Use simulated data P1
+            #else
+              #warning# 'Production will always read physical WL serial port'
+              mySerial2.begin(serial2Baudrate, 0);    // in produmode we always  use the physical port
+            #endif
+
+          
             mySerial2.begin(serial1Baudrate, serial2PortMode);    // v58a, V58b Use simulated data P1
           #endif
             bSerial2State = true; // v57 indicate state
