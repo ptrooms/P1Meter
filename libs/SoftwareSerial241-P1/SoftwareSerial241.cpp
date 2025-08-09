@@ -552,7 +552,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 }
 
 
-
 /*
   Do BitBang of "v59", store Byte in m_buffer[m_inPos] and check for P1 and
 */
