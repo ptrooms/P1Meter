@@ -1,4 +1,4 @@
-/* v69
+/* v69a
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 adapted to P1 messageing with activates P1active between '/' and '!' readed data
@@ -732,7 +732,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 
    
    if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation
-        (bit_diff > 100 && bit_diff < 4858) ) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-7 bits
+        (bit_diff > 100 && bit_diff < 4858) )   bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
+   
+   // tbd:
+      // if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation        
+      //       (bit_diff > 7974 && bit_diff < 8329) ) bit_shift = bit_shift - (((bit_diff-7974)/694) + 1)   // compensate long
 
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    
@@ -742,7 +746,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // }         
    
    /*
-      Read Data bits after StopBit
+      Read Data bits after StartBit
    */
    uint8_t rec = 0;
    // for (int i = 0; i < 8; i++) {
@@ -764,26 +768,28 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
        //  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
      }
     
-    // if (uint32_t intState = xt_get_interrupt_state() & (1 << 5))   // check if Wifi ISR is active, not valid in NONOS
+      // if (uint32_t intState = xt_get_interrupt_state() & (1 << 5))   // check if Wifi ISR is active, not valid in NONOS
    
-
-   /*
-      Folllowing was suggested but not available in this (cpp) scope
-      --------------------------------------------------------------
-      static int8_t lastRSSI = 0;  note: wifi_station_get_rssi not decalred in this scope
-      int8_t currentRSSI = wifi_station_get_rssi();  
-      if (abs(wifi_station_get_rssi() - currentRSSI ) > 0) { // Significant RSSI change  
-            m_wifiActiveDuringRead = true;  
-            GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
-            // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);           // set monitor HIGH
-      }  
-      lastRSSI = currentRSSI; 
-   */
+      /*
+         Folllowing was suggested but not available in this (cpp) scope
+         --------------------------------------------------------------
+         static int8_t lastRSSI = 0;  note: wifi_station_get_rssi not decalred in this scope
+         int8_t currentRSSI = wifi_station_get_rssi();  
+         if (abs(wifi_station_get_rssi() - currentRSSI ) > 0) { // Significant RSSI change  
+               m_wifiActiveDuringRead = true;  
+               GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW
+               // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);           // set monitor HIGH
+         }  
+         lastRSSI = currentRSSI; 
+      */
 
    }
+   
    // if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_END]  = getCycleCountIram();   // v64a get overhead timing
    // else              m_buffer_time[M_TIME_BIT_ISR2_END] = getCycleCountIram();
+   
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
+   
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
 
    // WAITIram4w58; // stopbit: moved to end of logic that account all intermediate timeing
@@ -797,12 +803,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    //          GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH                OFF
    //          // rec = 'F';
    // }            
+   
    /* Signal short times */
    if (bit_diff != 8) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS  ON
    else               GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH                OFF
   
    /*
-      Update databyte biffer
+      Update databyte buffer
    */
    // m_buffer_bits[m_inPos] = start;                    // v63a_v63b - ByteTiming table
    // m_buffer_bits[m_inPos] = start % 1000000;  // limit range
@@ -822,16 +829,15 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       m_overflow = true;
    }
 
-   /*
-      unHold / unLock Interrupts
-   */
-   // xt_wsr_ps(oldLevel);	 // v63b Re-enable using shorter methode, does not work in PROD_MODE
-
    WAITIram4w58; // stopbit:  finisch remaining byte-time
 
    if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v65b moved before ETS_INTR_UNLOCK()
    else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
 
+   /*
+      unHold / unLock Interrupts
+   */
+   // xt_wsr_ps(oldLevel);	 // v63b Re-enable using shorter methode, does not work in PROD_MODE
    ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek  (==> sei() )
    // sei();
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);             // set monitor HIGH
