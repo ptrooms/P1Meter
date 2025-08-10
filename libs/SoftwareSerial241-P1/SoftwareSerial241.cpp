@@ -732,7 +732,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 
    
    if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation
-        (bit_diff > 100 && bit_diff < 2776) ) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-4 bits
+        (bit_diff > 100 && bit_diff < 4858) ) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate 1-7 bits
 
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    
@@ -785,12 +785,22 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // else              m_buffer_time[M_TIME_BIT_ISR2_END] = getCycleCountIram();
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
-   if (rec == '\x0d') GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);     // v66 clear to read/forward state LOW line
-   if (rec == '\x0a') GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);     // v66 clear to read/forward state HIGH line
-   
-   
-   WAITIram4w58; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
 
+   // WAITIram4w58; // stopbit: moved to end of logic that account all intermediate timeing
+
+   // if (rec == '\x0d') GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);     // v66 clear to read/forward state LOW line
+   // if (rec == '\x0a') GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);     // v66 clear to read/forward state HIGH line
+
+   /* Signal overruns */
+   // if (rec >=  127  ) {
+   //          GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS  ON
+   //          GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH                OFF
+   //          // rec = 'F';
+   // }            
+   /* Signal short times */
+   if (bit_diff != 8) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS  ON
+   else               GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH                OFF
+  
    /*
       Update databyte biffer
    */
@@ -816,6 +826,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       unHold / unLock Interrupts
    */
    // xt_wsr_ps(oldLevel);	 // v63b Re-enable using shorter methode, does not work in PROD_MODE
+
+   WAITIram4w58; // stopbit:  finisch remaining byte-time
 
    if (m_inPos == 1) m_buffer_time[M_TIME_BIT_ISR_EXIT]  = getCycleCountIram();      // v65b moved before ETS_INTR_UNLOCK()
    else              m_buffer_time[M_TIME_BIT_ISR2_EXIT] = getCycleCountIram();      
