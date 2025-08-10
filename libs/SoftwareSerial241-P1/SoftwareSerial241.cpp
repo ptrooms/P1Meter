@@ -725,19 +725,16 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    uint8_t bit_shift = 8;                 // v63b assume missing bit
    // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
-   unsigned long bit_diff = start - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
+   unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1];                    // v63a_first try to get timnng
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    // ----------------------------------------------------------------------------------------------------------
 
    
-   if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation
-        (bit_diff > 100 && bit_diff < 4858) )   bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
-   
-   // tbd:
-      // if ( ((m_bitWait % 2)) &&            // use m_bitWait as switch to control bit compensation        
-      //       (bit_diff > 7974 && bit_diff < 8329) ) bit_shift = bit_shift - (((bit_diff-7974)/694) + 1)   // compensate long
-
+   if (m_bitWait % 2 & m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
+      if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
+      if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
+   }
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    
    // if (bit_diff > 100 && bit_diff < 2776)) {    // 
@@ -805,8 +802,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // }            
    
    /* Signal short times */
-   if (bit_diff != 8) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIG = 112nS  ON
-   else               GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH                OFF
+   if (bit_shift != 8) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  OFF
+   else                GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor LOW               ON
   
    /*
       Update databyte buffer
