@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "66" // number this version
+#define VERSION_NUMBER "69" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -101,7 +101,10 @@
 */
 
 /* change history
-
+  - v69 - based on v66, using RXREAD58 stable, 
+    work between interrupt waittiming
+    added correct 12.5nS time calculation
+  - v68, v66a/v66b abandoned as unstable
   - v66  - reworked from v65  3952201: v65b: rxread2 ETS_INTR_UNLOCK() (which fixed wdt)
   - v65b - qworked for timing.... not stable in production
   - v65b - rxread58 only termination bittime registration
@@ -6335,9 +6338,9 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     // print timer table, when in request > then buffer, skip this
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
-      if (i > 0) {
-          temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1);
-          if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&
+      if (i > 0) {    
+          temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
+          if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
                  temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
                  temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
                Serial.print((String) "\t" + temp + "~" );
@@ -6365,26 +6368,34 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
 
-
-
-    // if (bit_sequence >=0 ) Serial.print((String) "\r\n dataR0:\t");  // v63 tbc, wip preven data cluttereing
+   
+    /*
+      Print data In <> Mask   :C line1  :m Line2  :d Line3
+    */
     int temp0 = mySerial1.peekBit(0);  // get zero reference
-    if (bit_sequence >=0 )    Serial.printf("\r\n data%3d - %6.4f:C\t", 0, (float) 0.0000);
+    if (bit_sequence >=0 )  {
+        Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
+        Serial.printf("\r\n data%3d - %9.4f:C\t", 0, (float) 0.0000);
+    }
     int j = 0;    // v61a: to print CRC character
+
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
-        if (convert_p1_print( mySerial1.peekByte(i)) == '|')  {   // check if we are going to new P1 record
 
+        if (convert_p1_print( mySerial1.peekByte(i)) == '|')  {   // check if we are going to new P1 record
+          int m_len = 0;                          //  count masked line length
           if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare ?
 
               // Serial.print((String) "\r\n dataM"+ j + ":\t");  
-              Serial.printf("\r\n data%3d:m\t\t", j);
-
+              Serial.printf("\r\n data%3d:m\t\t", j);                  // print masked line 
+              
               for (int m = j; m <= i; m++ )  {
                   Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
+                  m_len++;     // account this masked line length
               }
+
               // Serial.print((String) "\r\n dataC"+ j + ":\t");  
-              Serial.printf("\r\n data%3d:d\t\t", j);              
+              Serial.printf("\r\n data%3d:d (%3d)\t\t", j, m_len);                  // print differnce pointer lines
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
                 if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
                     telegram_crcOut[m] == 'X') 
@@ -6394,24 +6405,27 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               j = i + 1;
           }
           // Serial.print((String) "\r\n dataR"+ (i+1) + ":\t");  // Use i as j = 0
-          Serial.printf("\r\n data%3d - %6.4f:C\t", (i+1), (float)(((mySerial1.peekBit(i+1) - temp0)*12)/1000000.0000) );
+          Serial.printf("\r\n data%3d - %9.4f:C\t", (i+1), (float)(((mySerial1.peekBit(i+1) - temp0)*12.5)/1000000.0000) );
         }
         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
     }     
 
 
 
-
-
+    /*
+      Print Timed Read <> Mask 
+    */
     if (bit_sequence < 0) {   // print only bitchanges in Binary with/when range is negative
       if (((bit_sequence*-1) / MAXLINELENGTH) == 1 ) {
         Serial.print((String) "\t <M> Check binary Mask: 0  to " +  (bit_sequence * -1) );
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
         for (int m = 0; m <= ( (bit_sequence % MAXLINELENGTH) * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
-          if ( ! (telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
+          if ( m == 0 ||
+              mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
+              !(telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
             // Serial.print((String) "\r\n Data:" + m +  "\t");
-            Serial.printf("\r\n Data:%3d t=%6.4f\t", m, (float)(((mySerial1.peekBit(m) - temp0)*12)/1000000.000));
+            Serial.printf("\r\n Data:%3d t=%6.4f\t", m, (float)(((mySerial1.peekBit(m) - temp0)*12.5)/1000000.0000));
             Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
             print_binary(mySerial1.peekByte(m));
             Serial.print((String)+  " <i-M> " );
@@ -6431,32 +6445,39 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
        } 
       else {
 
-
-
+        /*
+          Print binary read timed
+        */
         Serial.print((String) "\t <I> Check binary Read: 0  to " +  (bit_sequence * -1) );
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
         int temp1 = mySerial1.peekBit(0);  // get zero previous
         for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
-          if ( ! (telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
-            // Serial.print((String) "\r\n Data:" + m +  "\t");
-            Serial.printf("\r\n Data:%3d Bt=%6.4f dx=%6.4f\t", m, 
-                            (float)(((mySerial1.peekBit(m) - temp0)*12)/1000000.0000),
-                            (float) (  ((mySerial1.peekBit(m) - temp1)*12)/1000000.0000)
-                          );
-            Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
-            print_binary(mySerial1.peekByte(m));
-            Serial.print((String)+  " <i-M> " );
-            print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
-            Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
-            cnt++; // maximize
-          }
-          if (  telegram_crcOut[m]    == '!'    ||
-                mySerial1.peekByte(m) == '!'    || 
-                cnt > 15) {
-            Serial.println((String) "\r\n break diff cnt=" + cnt  + " at=" + m);
-            break; // terminate at end
-          }
+          if ( m == 0 ||
+              mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
+              !(telegram_crcOut[m+1]  == mySerial1.peekByte(m+1)  || telegram_crcOut[m+1] == 'X') ||   // triple detect
+              !(telegram_crcOut[m]    == mySerial1.peekByte(m)    || telegram_crcOut[m]   == 'X') ||
+              !(telegram_crcOut[m-1]  == mySerial1.peekByte(m-1)  || telegram_crcOut[m-1] == 'X')) {
+                // Serial.print((String) "\r\n Data:" + m +  "\t");
+              if (cnt <= 16 || mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ) {
+                Serial.printf("\r\n Data:%3d Bt=%8.4f dx=%6.4f\t", m, 
+                                (float) ( ((mySerial1.peekBit(m) - temp0)*12.5)/1000000.0000 ),
+                                (float) ( ((mySerial1.peekBit(m) - temp1)*12.5)/1000000.0000 )
+                              );
+                Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+                print_binary(mySerial1.peekByte(m));
+                Serial.print((String)+  " <i-M> " );
+                print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
+                Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
+                cnt++; // maximize
+              }
+           }
+          // if (  telegram_crcOut[m]    == '!'    ||
+          //       mySerial1.peekByte(m) == '!'    || 
+          //       cnt > 15) {
+          //   Serial.println((String) "\r\n break diff cnt+=" + cnt  + " at=" + m);
+          //   break; // terminate at end
+          // }
           temp1 = mySerial1.peekBit(m);  // save previous
         }   
       } // ((bit_sequence*1) % MAXLINELENGTH) 

@@ -1,4 +1,4 @@
-/* v66
+/* v69
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 adapted to P1 messageing with activates P1active between '/' and '!' readed data
@@ -785,6 +785,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // else              m_buffer_time[M_TIME_BIT_ISR2_END] = getCycleCountIram();
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH
+   if (rec == '\x0d') GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);     // v66 clear to read/forward state LOW line
+   if (rec == '\x0a') GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);     // v66 clear to read/forward state HIGH line
+   
+   
    WAITIram4w58; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
 
    /*
