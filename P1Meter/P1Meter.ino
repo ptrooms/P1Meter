@@ -4703,14 +4703,14 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                             + " ");
                   }
                   if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
-                    if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len < telegram_crcIn_len) ); // indicate number shifted
-                    for (int l = 0; l < (telegram_crcOut_len - telegram_crcIn_len) && l < 3; l++) {
+                    if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len - telegram_crcIn_len) ); // indicate number shifted
+                    for (int l = 0; telegram_crcIn_len < telegram_crcOut_len && l < 3; l++) {
                       if (!outputOnSerial) Serial.print(">"); // indicate we have shifted
-                      int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
-                      for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
+                      int k = telegram_crcOut[j+l];         // get first masked position to be inserted into one-byte short Crcin
+                      for (int i=(j+l); i < telegram_crcOut_len; i++) {   // search for 2byte error}
                           j = telegram_crcIn[i];  // save this current one to do next insert
                           telegram_crcIn[i] = k;  // insert saved 
-                          k = j;                  // ready for next
+                          k = j+l;                  // ready for next
                       } // when ready the array Crc-In has shifte one byte to right
                       telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
                     }
