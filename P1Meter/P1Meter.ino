@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "69" // number this version
+#define VERSION_NUMBER "69b" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -101,6 +101,8 @@
 */
 
 /* change history
+  - v69a - refine byt-insertion when short < 4  is active at bitwait%2
+      indicate D4 line when we have an bit-time error
   - v69 - based on v66, using RXREAD58 stable, 
     work between interrupt waittiming
     added correct 12.5nS time calculation
@@ -4682,13 +4684,16 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
       else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask
            /* This will size recover when lengths differ one byte by insertion 
             */ 
-              if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
-                  /* find position with 2 or more successive faults */
+              if  ( (telegram_crcOut_len < telegram_crcIn_len) < 4 &&
+                    (mySerial1.m_bitWait % 2) == 1 &&                 // when we are in odd mode
+                    !doForceFaultP1) {    // if myLength of error is missing try to unmask by shift number of differences ?
+                  /* find position with 1 or more successive faults */
                   int j = 0;
                   for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error
                       if ( telegram_crcOut[i]   != 'X' && telegram_crcIn[i]   != telegram_crcOut[i] &&
                            telegram_crcOut[i+1] != 'X' && telegram_crcIn[i+1] != telegram_crcOut[i+1] ) j = i;
                   }
+                  /* here we have the difference position  */
                   if (verboseLevel == VERBOSE_ON) {
                       Serial.print((String) " CRCio-delta: "
                             +  " crcI=" + telegram_crcIn_len
@@ -4697,14 +4702,17 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                             + " ");
                   }
                   if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
-                    if (!outputOnSerial) Serial.print(">"); else Serial.printf(", insert=%d:", j); // indicate we have shifted
-                    int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
-                    for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
-                        j = telegram_crcIn[i];  // save this current one to do next insert
-                        telegram_crcIn[i] = k;  // insert saved 
-                        k = j;                  // ready for next
-                    } // when ready the array Crc-In has shifte one byte to right
-                    telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
+                    if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len < telegram_crcIn_len) ); // indicate number shifted
+                    for (int l = 0; l < (telegram_crcOut_len < telegram_crcIn_len) && l < 3; l++) {
+                      if (!outputOnSerial) Serial.print(">"); // indicate we have shifted
+                      int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
+                      for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
+                          j = telegram_crcIn[i];  // save this current one to do next insert
+                          telegram_crcIn[i] = k;  // insert saved 
+                          k = j;                  // ready for next
+                      } // when ready the array Crc-In has shifte one byte to right
+                      telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
+                    }
                   } else {
                     if (!outputOnSerial) Serial.print("<0");  // too short cannot recover, indicate
                     else Serial.print((String) "shortJ=" + j + "/lenDiff=" + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted
@@ -6470,6 +6478,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                 print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
                 Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
                 cnt++; // maximize
+                if  (m > 3  && mySerial1.peekByte(m-4)  == '!') break;   // exit to prevent beyond telegram print
               }
            }
           // if (  telegram_crcOut[m]    == '!'    ||

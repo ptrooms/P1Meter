@@ -1,4 +1,4 @@
-/* v69a
+/* v69b
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 adapted to P1 messageing with activates P1active between '/' and '!' readed data
@@ -802,7 +802,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // }            
    
    /* Signal short times */
-   if (bit_shift != 8) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  OFF
+   if (bit_shift != 8 ||  (rec & (1 << 8)) )    // bit high is set ?
+                       GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  OFF
    else                GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor LOW               ON
   
    /*
