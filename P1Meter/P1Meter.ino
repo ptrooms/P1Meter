@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "69b" // number this version
+#define VERSION_NUMBER "69c" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -4684,11 +4684,8 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
       else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask
            /* This will size recover when lengths differ one byte by insertion 
             */ 
-              if  ( (telegram_crcOut_len - telegram_crcIn_len) > 0 &&
-                    (telegram_crcOut_len - telegram_crcIn_len) < 4 &&
-                    (mySerial1.m_bitWait % 2) == 1 &&                 // when we are in odd mode
-                    !doForceFaultP1) {    // if myLength of error is missing try to unmask by shift number of differences ?
-                  /* find position with 1 or more successive faults */
+              if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
+                  /* find position with 2 or more successive faults */
                   int j = 0;
                   for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error on don't care positions
                       if ( telegram_crcOut[i]   != 'X' && telegram_crcIn[i]   != telegram_crcOut[i] &&
@@ -4703,17 +4700,14 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                             + " ");
                   }
                   if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
-                    if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len - telegram_crcIn_len) ); // indicate number shifted
-                    for (int l = 0; telegram_crcIn_len < telegram_crcOut_len && l < 3; l++) {
-                      if (!outputOnSerial) Serial.print(">"); // indicate we have shifted
-                      int k = telegram_crcOut[j+l];         // get first masked position to be inserted into one-byte short Crcin
-                      for (int i=(j+l); i < telegram_crcOut_len; i++) {   // search for 2byte error}
-                          j = telegram_crcIn[i];  // save this current one to do next insert
-                          telegram_crcIn[i] = k;  // insert saved 
-                          k = j+l;                  // ready for next
-                      } // when ready the array Crc-In has shifte one byte to right
-                      telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
-                    }
+                    if (!outputOnSerial) Serial.print(">"); else Serial.printf(", insert=%d:", j); // indicate we have shifted
+                    int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
+                    for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
+                        j = telegram_crcIn[i];  // save this current one to do next insert
+                        telegram_crcIn[i] = k;  // insert saved 
+                        k = j;                  // ready for next
+                    } // when ready the array Crc-In has shifte one byte to right
+                    telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
                   } else {
                     if (!outputOnSerial) Serial.print("<0");  // too short cannot recover, indicate
                     else Serial.print((String) "shortJ=" + j + "/lenDiff=" + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted
@@ -6094,10 +6088,10 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability   // v58c 267 + asm 10
-
+#ifdef TEST_MODE    // v56c
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability  // v58c 10
-#ifdef TEST_MODE
+// #ifdef TEST_MODE    // v56c
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability   // v58c 3
                     delay(0);     // v57 add to check for stability
