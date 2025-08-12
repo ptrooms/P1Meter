@@ -4684,12 +4684,13 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
       else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask
            /* This will size recover when lengths differ one byte by insertion 
             */ 
-              if  ( (telegram_crcOut_len < telegram_crcIn_len) < 4 &&
+              if  ( (telegram_crcOut_len - telegram_crcIn_len) > 0 &&
+                    (telegram_crcOut_len - telegram_crcIn_len) < 4 &&
                     (mySerial1.m_bitWait % 2) == 1 &&                 // when we are in odd mode
                     !doForceFaultP1) {    // if myLength of error is missing try to unmask by shift number of differences ?
                   /* find position with 1 or more successive faults */
                   int j = 0;
-                  for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error
+                  for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error on don't care positions
                       if ( telegram_crcOut[i]   != 'X' && telegram_crcIn[i]   != telegram_crcOut[i] &&
                            telegram_crcOut[i+1] != 'X' && telegram_crcIn[i+1] != telegram_crcOut[i+1] ) j = i;
                   }
@@ -4703,7 +4704,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                   }
                   if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
                     if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len < telegram_crcIn_len) ); // indicate number shifted
-                    for (int l = 0; l < (telegram_crcOut_len < telegram_crcIn_len) && l < 3; l++) {
+                    for (int l = 0; l < (telegram_crcOut_len - telegram_crcIn_len) && l < 3; l++) {
                       if (!outputOnSerial) Serial.print(">"); // indicate we have shifted
                       int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
                       for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
@@ -4718,7 +4719,9 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                     else Serial.print((String) "shortJ=" + j + "/lenDiff=" + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted
                   }
              }
-           /* This will recover CRC by UnMasking
+           
+           /* 
+            This will recover CRC by UnMasking
             */  
             if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if myLength of error is equal , try to unmask differences  ?
                   for (int i=0; i < telegram_crcIn_len; i++) {
