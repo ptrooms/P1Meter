@@ -1244,6 +1244,7 @@ int filteredValueAdc = 0; // average between previous and and published
 
 
 //Infrastructure stuff
+#define recovery_INSERTION_LENTGH 1   // insert bytes if readed records does not validate and less then recovered earlier
 #define MQTTCOMMANDLENGTH 80          // define our receiving buffer
 #define MQTTBUFFERLENGTH 480          // define our sending mqtt buffer
 #define MAXLINELENGTH 1024           // full P1 serial message: the 589 byte message takes about 0.440 Seconds
@@ -4682,9 +4683,14 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
           // ----------------------------------------------------------------------------------------------
        } 
       else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask
-           /* This will size recover when lengths differ one byte by insertion 
+           /* 
+            This will insert byteswhen lengths difference is less or to recovery_INSERTION_LENTGH setting
             */ 
-              if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
+              // if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
+              if  ( (telegram_crcOut_len - telegram_crcIn_len) > 0 &&
+                    (telegram_crcOut_len - telegram_crcIn_len) <= recovery_INSERTION_LENTGH &&
+                    (mySerial1.m_bitWait % 2) == 1 &&                 // when we are in odd mode
+                    !doForceFaultP1) {
                   /* find position with 2 or more successive faults */
                   int j = 0;
                   for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error on don't care positions
@@ -4700,6 +4706,18 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                             + " ");
                   }
                   if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
+                    if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len - telegram_crcIn_len) ); // indicate number shifted
+                    for (int l = 0; telegram_crcIn_len < telegram_crcOut_len && l < recovery_INSERTION_LENTGH; l++) {
+                      if (!outputOnSerial) Serial.print(">"); // indicate we have shifted
+                      int k = telegram_crcOut[j+l];         // get first masked position to be inserted into one-byte short Crcin
+                      for (int i=(j+l); i < telegram_crcOut_len; i++) {   // search for 2byte error}
+                          j = telegram_crcIn[i];  // save this current one to do next insert
+                          telegram_crcIn[i] = k;  // insert saved 
+                          k = j+l;                  // ready for next
+                      } // when ready the array Crc-In has shifte one byte to right
+                      telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
+                    }
+                    /*
                     if (!outputOnSerial) Serial.print(">"); else Serial.printf(", insert=%d:", j); // indicate we have shifted
                     int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
                     for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
@@ -4708,6 +4726,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                         k = j;                  // ready for next
                     } // when ready the array Crc-In has shifte one byte to right
                     telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
+                    */
                   } else {
                     if (!outputOnSerial) Serial.print("<0");  // too short cannot recover, indicate
                     else Serial.print((String) "shortJ=" + j + "/lenDiff=" + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted

@@ -732,8 +732,29 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 
    
    if (m_bitWait % 2 & m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
-      if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
-      if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
+      // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
+      // if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
+
+      // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
+      // if (bit_diff > 7287 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-6940)/694)  + 1); // compensate long 2 bits
+
+      // bit_shift -= (bit_diff > m_bitTime/2  && bit_diff < m_bitTime*21/2) ? (bit_diff / m_bitTime + 1)
+      //             : (bit_diff > m_bitTime*8  && bit_diff < m_bitTime*17)   ? ((bit_diff - 10*m_bitTime) / m_bitTime + 1)
+      //             : 0;
+      // bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift;
+
+      if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
+      else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
+      bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
+
+
+      // if ( !((bit_diff > 6700 && bit_diff < 7171) || bit_diff > 10410) )   //  vaid only (6700 < diff < 7171 && > 10411
+      //      bit_shift = 8 - ((((bit_diff % 6940) / 694)) % 8); // compensate long  2-7 bits
+
+      // if (!(bit_diff > 10411 && (bit_diff > 6700 || bit_diff < 7171))      // < (15*m_bitTime),  
+      //                                                                   // < (8*m_bitTime)+(m_bitTime/3) = (25*((m_bitTime/3)))
+      //                                                                   // > (8*m_bitTime)+(m_bitTime/3) = (31*((m_bitTime/3)))
+      //          bit-shift = 8 - ((bit_diff % 6940) / 694));
    }
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    
@@ -802,9 +823,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // }            
    
    /* Signal short times */
-   if (bit_shift != 8 ||  (rec & (1 << 8)) )    // bit high is set ?
-                       GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  OFF
-   else                GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor LOW               ON
+   if (bit_shift != 8 ||  (rec & (1 << 8)) )  {   // bit high is set ?
+                       GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  BLUE ON/high
+                       rec = '\x60' + bit_shift;   // indicate abcd efghi  lowercase as checksum can be UPPERCASE HEX
+   } else              GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor LOW               BLUE OFF/low
   
    /*
       Update databyte buffer
