@@ -4671,7 +4671,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                   if (outputOnSerial) Serial.printf(", msLo#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
   
             }
-          } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
+         } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
 
             Serial.printf(", crE:%04x!=%04x",currentCRC,messageCRC);
             telegram_crcOut[0] = 0x00;     // reset mask myLength and counters
@@ -4679,7 +4679,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
             telegram_crcOut_cnt = 0;
             if (outputOnSerial) Serial.printf(", msk0=%d ",telegram_crcOut_cnt);
 
-          }
+         }
           // ----------------------------------------------------------------------------------------------
        } 
       else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask

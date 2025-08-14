@@ -823,7 +823,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // }            
    
    /* Signal short times */
-   if (bit_shift != 8 ||  (rec & (1 << 8)) )  {   // bit high is set ?
+   if (bit_shift != 8 ||  (rec & (1 << 7)) )  {   // bit high is set ?
                        GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  BLUE ON/high
                        rec = '\x60' + bit_shift;   // indicate abcd efghi  lowercase as checksum can be UPPERCASE HEX
    } else              GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor LOW               BLUE OFF/low
