@@ -6353,7 +6353,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   if (bit_port == 1) {
     unsigned long temp = 0UL;               // check duplicates          
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
-    unsigned long compensate_bitTime = l_bitTime*9;    // compensate lagging  approx 75µSec
+    unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
+    // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
     Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial1.peekBitPos()
@@ -6511,7 +6512,10 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           // }
 
           temp1 = mySerial1.peekBit(m);  // save previous
-          if (m > 0) temp1 = temp1 - compensate_bitTime;
+          if (m == 0) temp0 = temp0 + compensate_bitTime;     // single = causes somewhere wdt
+          // if (m > 0) temp1 = temp1 - compensate_bitTime;   // will double the difference time
+          // if (m = 0) temp0 = temp0 - compensate_bitTime;     // single = causes somewhere wdt
+
         }   
       } // ((bit_sequence*1) % MAXLINELENGTH) 
     } // else bit_sequence < 0
