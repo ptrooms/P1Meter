@@ -4574,15 +4574,15 @@ bool processLightRead(bool notkeep_HoldState) {
   #ifdef NoTx2Function                      
     if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
   #endif  
+
   if (!notkeep_HoldState) {                   // LOW (normally once per P1 loop)
-      lightReadState = local_lightReadState;
+      // lightReadState = local_lightReadState;   // send current state
       lightReadState_hold = false;            // reset until the loop() reads a led_high
   } else 
-      if ( local_lightReadState &&            // HIGH at every loop() , save LED state
-           lightReadState_hold ) {
+      if (!lightReadState_hold ) {
         lightReadState = local_lightReadState;
-        lightReadState_hold = true;
-      }
+        if (!local_lightReadState) lightReadState_hold = true;
+      }           
 
   if (outputOnSerial && !notkeep_HoldState) {  // regular debug once per P1 interval LOW
              Serial.print((String) "\r\n"    // v70 debug cuyrret, active and sent state of HotWater led
@@ -4590,7 +4590,7 @@ bool processLightRead(bool notkeep_HoldState) {
               + (local_lightReadState ? "High" : "Low")   // active state
               + " hold=" 
               + (lightReadState_hold ? "Yes" : "No")      // hold status was high
-              + " senty.    " );  // debug
+              + "." );  // debug
   }   
 
   return local_lightReadState;  // return active status
