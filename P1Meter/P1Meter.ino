@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "70" // number this version
+#define VERSION_NUMBER "70a" // number this version
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -1218,6 +1218,7 @@ long OldGasConsumption = 0;
 bool thermostatReadState  = LOW;      // assume Input is active THERMOSTAT_READ
 bool thermostatWriteState = LOW;      // Set initial command output THERMOSTAT_WRITE
 bool lightReadState       = LOW;      // assume Input is active HEATING Light read
+bool lightReadState_hold  = LOW;      // v70a assume Ledstate was not activew during P1 interval
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
@@ -2423,6 +2424,12 @@ void loop()
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
     if (loopTelegram2cnt < MAXTELEGRAM2CNT) readTelegramWL();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if-else allow other activities
+  
+  /*
+    Do state activities v70a
+  */
+  processLightRead(HIGH);   // v70a do frequent check of Ledlight
+  
   //  ---------------------------------------------------------------------------------------------- END of allowOtherActivities
 
   // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
@@ -2669,7 +2676,8 @@ void readTelegramP1() {
         RX_yieldcount,    // v52: check countlevel
           ((float)ESP.getCycleCount()/80000000),
           (int) new_ThermostatState, (thermostatReadState ? "d" : "T"),  (thermostatWriteState ? "A" : "i"),
-          (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
+          (digitalRead(WATERSENSOR_READ) ? "h" : "l"), 
+          (!lightReadState_hold ? (digitalRead(LIGHT_READ) ? "c" : "w") : (!lightReadState ? "C" : "W") ),  // v70a
         (mqttCnt + 1), ((float) startMicros / 1000000));
 
   // Cycle: 04.781228065
@@ -4131,7 +4139,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 {
   // int publishP1ToMqttCrc = 0;           // defining here leads tot memory corruption & stalls ??
   publishP1ToMqttCrc = 0;                  // reset
-  if (validTelegramCRCFound) publishP1ToMqttCrc = 1; else if (validCrcInFound) publishP1ToMqttCrc = 2; 
+  if (validTelegramCRCFound) publishP1ToMqttCrc = 1;    // was read OK
+  else if (validCrcInFound)  publishP1ToMqttCrc = 2;    // recovered
   else p1MissingCnt++;    // v52 count missing Crc (likeley records was not read at all)
   
   mqttCnt++ ;             // update counter
@@ -4538,19 +4547,53 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
 
 }
 
-// process Ledlightstatus indicating if Hotwater is tapped, return state
-bool processLightRead(bool myOperation)
-{
-  lightReadState   = digitalRead(LIGHT_READ); // read D6
+
+/*
+  bool processLightRead_v70(bool myOperation)
+  {
+    lightReadState   = digitalRead(LIGHT_READ); // read D6
+    #ifdef NoTx2Function                      
+      if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
+    #endif  
+    
+    if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
+    // Process this one-to-one directly to output
+    if (outputOnSerial and lightReadState)  Serial.print("\r\nLightReadState D6 LOW...");  // debug
+    if (outputOnSerial and !lightReadState) Serial.print("\r\nLightReadState D6 HIGH..");  // debug
+    return lightReadState;  // return status
+  }
+*/
+/*
+  process / hold Ledlightstatus indicating if Hotwater was tapped during this P1 interval
+    LOW  = read (hold) state
+    HIGH = reset/renew until LOW
+*/
+bool processLightRead(bool notkeep_HoldState) {
+  bool local_lightReadState   = digitalRead(LIGHT_READ); // read D6 and keep until mqtt
+  if (mqttCnt == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
-    if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
+    if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
   #endif  
-  
-  if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
-  // Process this one-to-one directly to output
-  if (outputOnSerial and lightReadState)  Serial.print("\r\nLightReadState D6 LOW...");  // debug
-  if (outputOnSerial and !lightReadState) Serial.print("\r\nLightReadState D6 HIGH..");  // debug
-  return lightReadState;  // return status
+  if (!notkeep_HoldState) {                   // LOW (normally once per P1 loop)
+      lightReadState = local_lightReadState;
+      lightReadState_hold = false;            // reset until the loop() reads a led_high
+  } else 
+      if ( local_lightReadState &&            // HIGH at every loop() , save LED state
+           lightReadState_hold ) {
+        lightReadState = local_lightReadState;
+        lightReadState_hold = true;
+      }
+
+  if (outputOnSerial && !notkeep_HoldState) {  // regular debug once per P1 interval LOW
+             Serial.print((String) "\r\n"    // v70 debug cuyrret, active and sent state of HotWater led
+              + "LightReadState D6 now "
+              + (local_lightReadState ? "High" : "Low")   // active state
+              + " hold=" 
+              + (lightReadState_hold ? "Yes" : "No")      // hold status was high
+              + " senty.    " );  // debug
+  }   
+
+  return local_lightReadState;  // return active status
 }
 
 
