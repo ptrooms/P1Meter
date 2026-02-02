@@ -2,7 +2,20 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "70a" // number this version
+#define VERSION_NUMBER "71" // number this version
+
+/* Procedure Guide for changes:
+  1. Commit running changes
+  2. update VERSION_NUMBER
+  3. Update changelog
+  4. Create new Branch
+  5. compile check (PlatformIO build V)
+  6. Commit changes to Git
+  7. Check PlatformIO  "env:p1meter-production_241(code-P1Meter)""
+  8. Check/ping NodeMCU upload IP address: /home/pafoxp/code-P1Meter/platformio_p1meter_env.ini
+  9. Do not udaloed at the whole hour, this for openHAB proces
+  10. Upload to NodeMCU (--> PlatformIO Upload) , monitor progress
+*/
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -101,6 +114,9 @@
 */
 
 /* change history
+  - v71  - protect coalescing change of new_ThermostatState by old_ThermostatState
+          when we have changed the thermostat mode, we report the state in Json as Xeatmode
+  - v70a - running stable
   - v69a - refine byt-insertion when short < 4  is active at bitwait%2
       indicate D4 line when we have an bit-time error
   - v69 - based on v66, using RXREAD58 stable, 
@@ -416,7 +432,7 @@ woes in Wifi/Lamx layer
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP       // if define we use Fixed-IP, else (undefined) we use dhcp
 #define NoTx2Function         // Do no serial out on D4/Gpio2/Blueled2
-#define REQUIRED_DSB18B20_SENSORS 6 // v49 miniomal required DS18B20 sensors
+#define REQUIRED_DSB18B20_SENSORS 6 // v49 minimal required DS18B20 sensors
 #define REQUIRED_ANALOG_ADC 10 // v49 minimal required lightlevel for LDR sensor
 
 /*
@@ -441,6 +457,21 @@ woes in Wifi/Lamx layer
 
 
 // ARDUINO_ESP8266_RELEASE
+/* ----------------------------------------------------------------------------------------------------------
+
+  ident-  id  no Mode/settings wifi Pafo SSIDx ipaddress-device
+  t... - "t1" 11 TEST_MODE test live at SSID5 192.168.1.125
+  e... - "t1" 31 TEST_MODE DUP_MODE at  SSID5 192.168.1.185
+  y... - "y1" 71 TEST_MODE COP_MODE at SSID5 192.168.1.185
+  p... - "p1" 21 PROD_MODE production LIVE at SSID4 192.168.1.35
+  d... - "d1" 41 PROD_MODE DUP_MODE production at  SSID4 192.168.1.185
+  x... - "x1" 61 PROD_MODE COP_MODE production at SSID4 192.168.1.185
+    TEST_MODE does do timings and execute enhanced debugs
+    DUP_MODE replicates and use normal serial polarity and character termination (for using real rs232 device)
+    COP_MODE use P1/inverted serial polarity and differentiate on IP address and Mqtt prefix (alternate IP)
+    DUP/COP_MODE : TEST_MODE local_IP(192, 168, 1, 185) SSID5; PROD_MODE local_IP(192, 168, 1, 35) SSID4;
+  
+ ---------------------------------------------------------------------------------------------------------- */
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #ifdef DUP_MODE   // test is same as test with different i/o & id settings
@@ -1360,6 +1391,7 @@ long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
 char mqttServer1[64] ;               // v45 used to hold the currrently active mqttserver
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
 int new_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
+int old_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip, uses to compare changes
 void callbackMqtt(char* topic, byte* payload, unsigned int myLength);   // pubsubscribe
 char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format time, will be overriden by Telegrams
 
@@ -4204,7 +4236,12 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     } 
 
     msg.concat(",\"Heating\":%u");                     // Heating valve (out)
-    msg.concat(",\"HeatMode\":%u");                    // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
+    if (new_ThermostatState == old_ThermostatState) {  // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
+      msg.concat(",\"HeatMode\":%u");                  // current state
+    } else {
+      msg.concat(",\"XeatMode\":%u");                  // v71 execute mode, next run reported as HeatMode
+      old_ThermostatState == new_ThermostatState;      // v71 this to prevent we nullify an openHAB request
+    }
     /*
       if (outputOnSerial) {
         Serial.print( "Sending Mqtt temp5of5: " );
@@ -4420,8 +4457,7 @@ bool processThermostat(bool myOperation)    // my operation is currently readed 
     if (outputOnSerial) Serial.print(" set ") ;
     if ( thermostatWriteState) {
       digitalWrite(THERMOSTAT_WRITE, HIGH ); // leave to high, switch off relay that issues voltage to Valve
-    }
-    if (!thermostatWriteState) {
+    } else {
       digitalWrite(THERMOSTAT_WRITE, LOW );  // pull to ground switch on relay that issues voltage to Valve
     }
   } else {
