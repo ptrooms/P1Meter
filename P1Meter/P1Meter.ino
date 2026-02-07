@@ -116,6 +116,7 @@
 /* change history
   - v71  - protect coalescing change of new_ThermostatState by old_ThermostatState
           when we have changed the thermostat mode, we report the state in Json as Xeatmode
+          03feb26: fault old_ThermostatState == new_ThermostatState; should be "="
   - v70a - running stable
   - v69a - refine byt-insertion when short < 4  is active at bitwait%2
       indicate D4 line when we have an bit-time error
@@ -4240,7 +4241,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       msg.concat(",\"HeatMode\":%u");                  // current state
     } else {
       msg.concat(",\"XeatMode\":%u");                  // v71 execute mode, next run reported as HeatMode
-      old_ThermostatState == new_ThermostatState;      // v71 this to prevent we nullify an openHAB request
+      old_ThermostatState = new_ThermostatState;       // v71 this to prevent we nullify an openHAB request
     }
     /*
       if (outputOnSerial) {
