@@ -6,6 +6,21 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.72] - reworked and improve restart capabilities (apr26)
+	- Mqtt commands received are (also) reported to mqtt "/log/p1 ESP P1 command: , (in/out)"
+	- removed platform dependency in library DallasTemperature.json for OneWire 
+	- - to prevent VSCode loop-update PlatformIO when updating IntelliSense
+	- - (which by design; removes ".pio" output subdir that in turn results in missing errors).
+	- Ignore first mqtt command for reained message R-estart, e-rror and 3-skipheat
+	- refactored mqttCnt_Out (publications) and add mqttCnt_in (commands)
+	- this to prevent Heating On at any restart and lass reained was "3" ignore
+	- - This caused cotinuous heatspilling until next day thermostate command.
+## [v21.71] - Report via Json that we have had a mode change
+	- Change of field  _HeatMode_  results into _XeatMode_
+	- Change of field  _Heating_  results into _Ceating_
+## [v21.70] - Improve stability and fix memory bugs
+	- versions 58-69 had problems with IDE environment, merge faults and state issues.
+	- Fix Bittime and its registration to fix instailities of ISR interrupts
 ## [v21.56] - reworked to make it stable again (july2025)
 	- platformio extended with local script that disassembles
 	- improved coding after inspect

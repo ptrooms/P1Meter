@@ -1,7 +1,22 @@
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
-#define VERSION_NUMBER "57" // number this version
+//Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
+#define VERSION_NUMBER "72" // number this version 29apr26
+
+/* Procedure Guide for changes:
+  0. set VSC/IDE to PlaformIO mode 
+  1. Commit running changes
+  2. update VERSION_NUMBER
+  3. Update changelog
+  4. Create new Branch
+  5. compile check (PlatformIO build V)
+  6. Commit changes to Git
+  7. Check PlatformIO  "env:p1meter-production_241(code-P1Meter)""
+  8. Check/ping NodeMCU upload IP address: /home/pafoxp/code-P1Meter/platformio_p1meter_env.ini
+  9. Do not udaloed at the whole hour, this for openHAB proces
+  10. Upload to NodeMCU (--> PlatformIO Upload) , monitor progress
+*/
 
 #include <core_version.h>       // v57 ensure we have the Arduino build version here (main.cpp --> )
 #ifndef ARDUINO_ESP8266_RELEASE
@@ -10,8 +25,35 @@
   // should have #define ARDUINO_ESP8266_RELEASE "2_7_1" // ~/.platformio/packages/framework-arduinoespressif8266@3.20701.0/cores/esp8266/core_version.h
 #endif
 
+/* dev 1153 epc1=0x401022c5 PROD_MODE v58c P1Meter.ino version 2158.2_4_1, compiled Jul 23 2025 18:12:52
+
+   dev 1153 epc1=0x401025dd, COP_MODE V58c P1Meter.ino version 6158.2_4_1, compiled Jul 23 2025 18:13:16 wdt1153
+    assemble file: file://home/pafoxp/code-P1Meter/.pio/build/p1meter-production_241_copy/firmware.asm
+        401025ce:	fe6421               	l32r	a2, 40101f60 <trc_NeedRTS+0x238>
+        401025d1:	fe6431               	l32r	a3, 40101f64 <trc_NeedRTS+0x23c>
+        401025d4:	81a442               	movi	a4, 0x481
+        401025d7:	f99a01               	l32r	a0, 40100c40 <ppTxqUpdateBitmap+0x28>
+        401025da:	0000c0               	callx0	a0
+        401025dd:	ffff06               	j	401025dd <wDev_ProcessFiq+0x341>
+        401025e0:	000000               	ill
+        401025e3:	c0                      	.byte 0xc0
+*/
 
 /*  documentation   
+  feeding data test_mode: while sleep 8; do ./sendp1_cr.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
+  feeding data  cop_mode: while sleep 8; do ./sendp1_crlf.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
+
+  21jul25: debug serial2.4.1. library debug : 
+  1. search SoftwareSerial241.cpp.o in /home/pafoxp/code-P1Meter/.pio/build
+    /home/pafoxp/code-P1Meter/.pio/build/p1meter-production_271/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o:
+     file format elf32-xtensa-le
+  2. Note: we use Xobjdump which is locally linked by:
+      ln /home/pafoxp/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-objdump /home/pafoxp/.local/bin/Xobjdump 
+  3. Disassembl;e      
+      Xobjdump -C -d /home/pafoxp/code-P1Meter/.pio/build/p1meter-production_241_copy/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o
+      Note add this to conserve out: > /home/pafoxp/code-P1Meter/debug/SoftwareSerial241`date +%Y%M%d-%H%m`.asm
+
+
     https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
     api reference: https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf
     sdk: https://github.com/espressif/ESP8266_NONOS_SDK/tree/release/v2.2.x
@@ -20,18 +62,18 @@
     def RX2TX2LOOPBACK false -->  def NoTx2Function  <> loopbackRx2Tx2 will light led
 
   Locations:
-    commands: void ProcessMqttCommand(char* payload, unsigned int length)
+    commands: void ProcessMqttCommand(char* payload, unsigned int myLength)
     Setup ()
     P1 processing: void readTelegramP1()
     P2 processing: void readTelegramWL()
 
-  Summarised loop() sequence (approx 5000/sec): 
+  Summarised loop( ) sequence (approx 5000/sec): 
       set timings & check P1 not active
       else swap start Serial P1 <--> P2
       Check if/do water trigger
       If P2 Do WL process 
       If P1 Do P1 process, when data processGpio() functions, publishP1ToMqtt();  
-      set timings, trace line and "loopcnt % 10"
+      set timings, trace line and "loopCnt % 10"
       If no data: do forced processGpio() functions, publishP1ToMqtt();  
       OTA handle
 
@@ -41,8 +83,8 @@
   change record/idś to definitions like "/KFM5KAIFA-METER"
   change \r\n to \r\n to 
   sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
-      -- strange as wifi proces during setup() before was OK
-  change verboselevel == 1 to ==2 that will print lenbgths of P1 records print
+      -- strange as wifi proces during setup( ) before was OK
+  change verboselevel == 1 to ==2 that will print myLenbgths of P1 records print
   documentation for mqtt commands
   cleanout no longer needed code
     error: 06jul25 13u00 (using faulty esp, port0 > 3.6volts) 
@@ -73,6 +115,119 @@
 */
 
 /* change history
+  - v72  - implement restart followup decisions due to reained message(s).  
+          If restarted , ignore (retained) command R-estart, e-rror and 3-ignore state
+            this to prevent any loop due to last retained mqtt command and
+            prevent dwfault heatingstate is on when retained mode was '3' ignore.
+         - refactor "mqttCnt" to "mqttCnt_Out"
+            count number of input commands via "mqttCnt_In" and display this with as cmd= on '?' command
+  - v71  - protect coalescing change of new_ThermostatState by old_ThermostatState
+          when we have changed the thermostat mode, we report the state in Json as Xeatmode
+          03feb26: fault old_ThermostatState == new_ThermostatState; should be "="
+  - v70a - running stable
+  - v69a - refine byt-insertion when short < 4  is active at bitwait%2
+      indicate D4 line when we have an bit-time error
+  - v69 - based on v66, using RXREAD58 stable, 
+    work between interrupt waittiming
+    added correct 12.5nS time calculation
+  - v68, v66a/v66b abandoned as unstable
+  - v66  - reworked from v65  3952201: v65b: rxread2 ETS_INTR_UNLOCK() (which fixed wdt)
+  - v65b - qworked for timing.... not stable in production
+  - v65b - rxread58 only termination bittime registration
+    rxread2 supplied with  ETS_INTR_LOCK()/ETS_INTR_UNLOCK(), like rx58
+      ss: diagnose DO/gpio16 on/off with BITTEST_BLUE_ACTIVE when m_rxPin == 14 has ISR active
+  - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
+    (PROD shorten bitwait 502 --> 427 due to tieming)
+    improved watertrigger by resetting the recurrent ISR status at end of ISR
+  - v65  - rework v64a to prevent wdt (no timing registration in SS241 as developed in v64a)
+  - v64a - enahncwed with time diagnostics lead to wdt
+    improved watertrigger by resetting the recurrent ISR status at end of ISR
+  - v64a solved 2 data errors telegram field fault & no data transmit after checkdata() recovery.
+    beautify data diagnostics
+    added ISR timing measurements PRODmode 497 --> 427 , COP-MODE is stable but PROD-MODE varries
+    PROD_MODE suffers WDT when bitwait 427 is changed to 432
+    Note: Before changes: fully stable
+  - v64  (since v62) operational release
+    - SS stabilised as we use ETS_INTR_LOCK() &7 ETS_INTR_UNLOCK() which allows Wifi during BitBang
+  - v63b  - improve rsRead58: finally very stable after directly Interlock after ISR activates
+      adding recovery logic to stitch-recover record if this is 1 byte too short (indicated by < >)
+      Note:  the wait routine is fixed to 694 clock-window-cycles measured at/of start of ISR
+    - softserial: reorganise work RxRead58 to improve stability, DeepSeel: use register read/write/interlock()
+                  adding bitmiss logic if previous 100 < Byte time < 2300 (using m_start)
+                  v64: only when m_bitWait is odd..... 
+    - testing direct GPIO control using GPIO_REG_WRITE(GPIO_OUT_W1Tc/s_ADDRESS, 1<< D4)
+  - v63a - 50/50 stable table InterUn/lock() usage iso cli()/sei(), improve data layou-
+    Timing diagnostics m_BItTime, small changes between COP and PROD as DSMR use other specs
+  - v63a  Back to RxRead58 which was  stablke in v58
+  - v63   use/work RXread60 , not very stable
+  - v62a  timing  change RxRead60, unstable BitWait unpredictable
+  - v62   production
+  - v61a - changewd bitwait to make things stable
+  - v60 - stabilised, using m_bitwaittime 521 for production to have bytecycle from 6940 to range of 6930-6935
+  - v59b - testdata, preparing for alternative ISR (bittiming) routine, print time table serial_Print_PeekBits command t(1,2,3)
+    - introduced #define BYTE_MAXWAIT_1 7100 @ SoftwareSerial241.cpp  // maximum cycles per byte which floats between 6930-7012 cycles
+  - v59a - diagfnostics and prepare multiport threading, all serial combinaed in a single routine
+  - v59  - added extra telegram bash scripts to feed test data
+  - 58d2 - moved to production
+  - v58d, v58e error; reworked to v58d1 and v58d2 to new v59 
+    - added overloaded for SoftwareSerial to prepare for serial bittiming
+    - we played around with calloc. Woirks great as test (*activate D-dip;lay to) show timers
+      using peekTime(int i) thar interrogates the timer array pf serial1 and serial2
+                  M_TIME_START  RX_START     RX_END          BEGIN             END                   AVAIL_         END   
+      x1 serial1 time  4318330 1973965602.  1973918650 +754= 1973919404 +46922=1973966326 +395253309=2369219635 +10=2369219645,  
+                    START  START              RX_END
+                  4318330. 4318330+2390910242=2395228572
+  - v58c refactor len to myLen, debugging options
+    - testing for (int i = 14; i < 11; i--) {asm NOP}
+    - adding 4 delay()s to check if this stabilizes the COP_MODE version
+  - v58b refactor myserial1/2 names, enhanced bittime, stop and baudrate control
+    - we added serial read mode 0/1/2: 0-physical port, 1-P1 record, 2=WL-record
+  - v58a  --> moved to production
+    - likely cause that serial processing stays tool long in ISR, with wifi debug , we see dev:1153
+          https://github.com/espressif/ESP8266_NONOS_SDK/issues/90
+  v58 based on corrected master
+    - we extended platformio to generate Disassemble after compile, this to interrogate result
+      which could als be doen by executing the Extensa "objdump" that reads the ELF file to disassemble output.
+      This is done via Python post_build.py (for Arduino 2.4.1) and post_build_271.py (2.7.x)
+      Activated is adding & activating the  .ini options per project environment
+          ;extra_scripts = post_build.py
+          ;targets = disasm
+    - during testing we exprience frequent WDT crashes as related to Wifi, why is a mystery
+      Only the Live production  seems more stable. Perhaps this interelates with actual telegram data.
+    - inroduced COP_MODE to differentiate TEST/PROD_MODE only by IP_Address and Mqtt-prefix:x1 & versionid: 61 
+      
+      internally TEST_MODE & PROD_MODE are different code lines to check and test
+        During TESTing we use real usb serial while PRODduction uses negative polaritye
+          DUP_MODE replicates and revert the active serial polarity and character termination
+          COP_MODE does not change any serial behavior and only differentiate on IP address and Mqtt prefix
+      
+      We now have (summarised) the following 6 code paths with platformio (Arduino framework 2.4.1):
+        PROD_MODE   : prefix p1 and versionid 21  - [env:p1meter-production_241]      LGTM 
+          DUP_MODE  : prefix d1 and versionid 41  - [env:p1meter-dup-production_241]  erratic ??
+          COP_MODE  : prefix x1 and versionid 61  - [env:p1meter-production_241_copy] limited
+        TEST_MODE   : prefix t1 and versionid 11  - [env:t1meter-test-OTA_241] 
+          DUP_MODE  : prefix e1 and versionid 31  - n.i.u.
+          COP_MODE  : prefix x1 and versionid 71  - n.i.u.
+    in addition we have (optional) flag:
+        DUP_MODE_NOINVERT which reverses serial polarity but keeps the end-data character
+
+    Note: Platformio is also used to differentiate Arduino on platform or framework:
+    All are using the SDK framework to generate/ompile code via the "toolchain-xtensa"
+      - Arduino 2.4.1 has it platform  espressif8266@1.7.0 as package framework-arduinoespressif8266@1.20401.3
+      - Arduino 2.7.1 has it platform  espressif8266@2.5.3 as package framework-arduinoespressif8266@3.20701.0
+        Note we have also others (2.4.0, 2.6.2, 2.7.4, 2.7.8, 3.1.2) but these are merely to check support issues 
+      
+    - copy PROD contents to testdevice, the thing collaapses as test data is temrinated with CR (\r = 0x0d)
+    - created 3 data options
+      --> sendp1_nl.sh = termnated solely by NewLine  (\n = 0x0A) (works on PROD_MODE)
+      --- sendp1_crlf.sh = termnated solely by Carriage Return & NewLine  (\r = 0x0D & \n = 0x0A)
+      --- sendp1_cr.sh = termnated solely by Carriage Return (\r = 0x0D)
+      Test op PROD_MOPDE 
+  v57 troubles  as master
+    - One way or the other the DUP_MODE of PROD_MODE behaves differently and crashes after approx 10-80 cycles
+      Possible while the routine collapses on unexpexted serialised input terminated by CR (0x0D)
+    - furthermore, we've had quite some problems to gfet the version numbers right.
+      Now on master, we created v58 as new syncrpoint
   v57 improve state line diagnostics, updated Read.me, ensure P1/RX swapping
       - 2.7.1 not stable on duptest goes after 20-100 mqtt  into wdt_reset @ 401031f1
 woes in Wifi/Lamx layer
@@ -130,7 +285,7 @@ woes in Wifi/Lamx layer
           loopbackRx2Mode  0-9 , no data: swap/switch
           loopbackRx2Mode == 1 --> switch off debug (outputOnSerial), activate RX2 read evey second (rx2ReadInterval = 1)
           If set > 0: we produce diagnostic data when RX2 is read  {_   _}
-            length/telegram2 record
+            myLength/telegram2 record
           If set > 5: when CRC is valid, we output the hexbytes and reset back to 0
           If set = 3: we print crc and record
           If set = 2: we print crc and first 20 bytes of header in hex
@@ -155,15 +310,15 @@ woes in Wifi/Lamx layer
         git log                 // check log status
   V52 13jul25 02u35 renamed to master
   V52 13jul25: restart information display
-     protection "suspend @getValues2FromP1Record while mqttCnt < 5" unneeded, now commented
+     protection "suspend @getValues2FromP1Record while mqttCnt_Out < 5" unneeded, now commented
     'e0'  = divide error
     'e1'  = infinite loop fault
     'E'   = Enforce read fault in Reading P1 data
     testing serial processing on stable 2.4.1 and less stable 2.7.1
   V52 06jul25: restart information display
-    command 'S'/'s' serialStopP1 serialStopRX2 (prohibit serial data)
+    command 'S'/'s' serial1Stop serial2Stop (prohibit serial data)
     RX_yieldcount ignore serial if too many failures
-    print & save restart reason information en report this at first mqttCnt into mqtt Errortopic
+    print & save restart reason information en report this at first mqttCnt_Out into mqtt Errortopic
     format localIp() address to string for display 'D', can also IPAddress just as an array of 4 ints.
     diagnose state display using @-signal loop , &-got rx2 record
     DEBUG_PRINTxx macros
@@ -252,15 +407,15 @@ woes in Wifi/Lamx layer
 
 /* Water sensor logic: (doc v51)
   ------------------------------------------------------------------------------------------------------------------------------
-    WaterTrigger0/1_ISR() attach/detachWaterInterrupt is activated in loop() during peiodes not reading serial1/2 data.
+    WaterTrigger0/1_ISR() attach/detachWaterInterrupt is activated in loop( ) during peiodes not reading serial1/2 data.
       With command 'W' we can test/switch between WaterTrigger0/1_ISR (used for development reasons)
       (tbd: With command 'w' we could change/force next pullup behavior, now active/low/high automatically)
 
     Using a wheel that senses mirrored Infrared: 1 pulse (going in --> going out) = 1 Liter
         We use active GPIO5 Interrupt Service Routine for the cycle below, where a segmented turn = liter
         An UP or Down is only valid if this continues to be the case for at least 50mS (v51, waterReadDebounce=50)
-           (debounce measuremnt starts/resets in ISR and is monitored in in loop())
-    then: in loop() If -->
+           (debounce measuremnt starts/resets in ISR and is monitored in in loop( ))
+    then: in loop( ) If -->
       A) GPIO5=activeHigh to low, wheel sensor has as entered blink zone and shorts ActiveHigh to GND
             GPIO5 now goes goes L and we disable the pull resistor waiting for active-low  (mode Input)
       B) GPIO5=atciveLow to high, waited until wheelsensor left by pulling activeLow to VCC
@@ -285,7 +440,7 @@ woes in Wifi/Lamx layer
 #define RX2TX2LOOPBACK false  // OFF , ON:return Rx2Tx2 (loopback test) & TX2 = WaterTriggerread
 #define P1_STATIC_IP       // if define we use Fixed-IP, else (undefined) we use dhcp
 #define NoTx2Function         // Do no serial out on D4/Gpio2/Blueled2
-#define REQUIRED_DSB18B20_SENSORS 6 // v49 miniomal required DS18B20 sensors
+#define REQUIRED_DSB18B20_SENSORS 6 // v49 minimal required DS18B20 sensors
 #define REQUIRED_ANALOG_ADC 10 // v49 minimal required lightlevel for LDR sensor
 
 /*
@@ -299,8 +454,9 @@ woes in Wifi/Lamx layer
 #endif
 
 #ifdef TEST_MODE
-  #define P1_BAUDRATE  115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
-  #define P1_BAUDRATE2 115100       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+  // note 115100 with physical ionverted device is not reliable.
+  #define P1_BAUDRATE  115200       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
+  #define P1_BAUDRATE2 115200       // use this baudrate for the Test p1 serial connection, usb require e bit lower speed
 #else
   // note: 115250 < baudrate < 115150 will increase errors and misreads
   #define P1_BAUDRATE  115200       // use this baudrate for the p1 serial connection, 115200 is de sweepspot
@@ -309,11 +465,29 @@ woes in Wifi/Lamx layer
 
 
 // ARDUINO_ESP8266_RELEASE
+/* ----------------------------------------------------------------------------------------------------------
+
+  ident-  id  no Mode/settings wifi Pafo SSIDx ipaddress-device
+  t... - "t1" 11 TEST_MODE test live at SSID5 192.168.1.125
+  e... - "t1" 31 TEST_MODE DUP_MODE at  SSID5 192.168.1.185
+  y... - "y1" 71 TEST_MODE COP_MODE at SSID5 192.168.1.185
+  p... - "p1" 21 PROD_MODE production LIVE at SSID4 192.168.1.35
+  d... - "d1" 41 PROD_MODE DUP_MODE production at  SSID4 192.168.1.185
+  x... - "x1" 61 PROD_MODE COP_MODE production at SSID4 192.168.1.185
+    TEST_MODE does do timings and execute enhanced debugs
+    DUP_MODE replicates and use normal serial polarity and character termination (for using real rs232 device)
+    COP_MODE use P1/inverted serial polarity and differentiate on IP address and Mqtt prefix (alternate IP)
+    DUP/COP_MODE : TEST_MODE local_IP(192, 168, 1, 185) SSID5; PROD_MODE local_IP(192, 168, 1, 35) SSID4;
+  
+ ---------------------------------------------------------------------------------------------------------- */
 #ifdef TEST_MODE
   #warning This is the TEST version, be informed
   #ifdef DUP_MODE   // test is same as test with different i/o & id settings
     #define P1_VERSION_TYPE "e1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
     #define DEF_PROG_VERSION "31" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
+  #elif defined(COP_MODE)
+    #define P1_VERSION_TYPE "y1"      // "y1" test
+    #define DEF_PROG_VERSION "71" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
   #else
     #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
     #define DEF_PROG_VERSION "11" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
@@ -321,10 +495,13 @@ woes in Wifi/Lamx layer
   #define TEST_CALCULATE_TIMINGS    // experiment calculate in setup-() ome instruction sequences for cycle/uSec timing.
   #define TEST_PRINTF_FLOAT       // Test and verify vcorrectness of printing (and support) of prinf("num= %4.f.5 ", floa 
 #else
-  #warning This is the PRODUCTION version, be warned
+  #warning "This is the PRODUCTION version be warned !!!!!."
   #ifdef DUP_MODE   // prod is same as prod with different i/o & id settings
     #define P1_VERSION_TYPE "d1"      // "p1" production
     #define DEF_PROG_VERSION "41" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
+  #elif defined(COP_MODE)
+    #define P1_VERSION_TYPE "x1"      // "x1" production
+    #define DEF_PROG_VERSION "61" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)    
   #else
     #define P1_VERSION_TYPE "p1"      // "p1" production
     #define DEF_PROG_VERSION "21" VERSION_NUMBER "." ARDUINO_ESP8266_RELEASE // current version (displayed in mqtt record)
@@ -354,7 +531,7 @@ woes in Wifi/Lamx layer
 //    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
 //    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
 // 03okt22 23u11: v35 serial2 inverted slightly better
-// 30sep22 22u26: v35 p1Baudrate2 115k2 for "warmtelink" 
+// 30sep22 22u26: v35 serial2Baudrate 115k2 for "warmtelink" 
 // 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
 // 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
 //  Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
@@ -380,12 +557,12 @@ woes in Wifi/Lamx layer
 // - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
 // - 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
 // 	--- (+9sec after last mqtt)
-// - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop() during speific yields,
+// - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop( ) during speific yields,
 // 	-- normal yield does support Wifi but NOT the (disconnected) Pubsubclient
 // 	-- Beautified
 // ## [V21.20]
 // - 11apr21 16u29 V20: added JSON error message to topic /error/.. if P1 serial is not (properly) connected
-// 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt":28}
+// 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt_Out":28}
 // - 11apr21 15u16 mqtt timeout (override) set from 15 to 60 seconds #define MQTT_KEEPALIVE = 60
 // 	-- sometimes the mqtt server is very busy and we do not want a preliminary reboot
 // - 11apr21 15u15 Added mqtt server address  in serial debug at startup
@@ -724,7 +901,7 @@ woes in Wifi/Lamx layer
     DEBUG_PRINTLN("ESPConn - Looks not connected.");
     DEBUG_PRINT("Sending: ");
     str = esp.readStringUntil(':'); DEBUG_PRINT(str);
-    DEBUG_WRITE_BYTES(data, length); DEBUG_PRINTLN();
+    DEBUG_WRITE_BYTES(data, myLength); DEBUG_PRINTLN();
 */
 #define DEBUG
 #ifdef DEBUG
@@ -768,7 +945,13 @@ woes in Wifi/Lamx layer
 
 // hardware PIN settings, change accordingly , total esp8266 pins 17
 #define BLUE_LED         D0  // pin GPIO16 output to BLUE signal indcator
+// #ifdef COP_MODE           // set for Arduino to prevent default production compilation
+//   #define WATERSENSOR_READ D7  // rtemprarily use D7 iso D1 as  
+// #else
 #define WATERSENSOR_READ D1  // pin GPIO5  input  for watermeter input (require 330mS debouncing)
+// #endif
+
+                             // Note: water sensor is also used to monitor/debug Wifi !!!!
 #define SERIAL_RX2       D2  // pin GPIO4  input  for SoftwareSerial RX  GJ
 #define DS18B20_SENSOR   D3  // pin GPIO0 Pin where DS18B20 sensors are mounted (High@Boot)
 
@@ -793,7 +976,7 @@ const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 
   /*
    2.4.1: file /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_version.h
      main file:   [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_esp8266_main.cpp]
-        static void loop_wrapper() --> setup() else loop(); run_scheduled_functions(); esp_schedule()
+        static void loop_wrapper() --> setup( ) else loop( ); run_scheduled_functions(); esp_schedule()
         post_mortem at crash: [/home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_esp8266_postmortem.c]
 
 
@@ -814,6 +997,7 @@ const char *mqttErrorTopic = "/error/"  P1_VERSION_TYPE;            // The error
 const char *mqttPower      = "/energy/" P1_VERSION_TYPE "power";    // 'p' on/off outputMqttPower2
 const int   mqttPort = 1883;
 const char *mqttLogTopic2  = "/log/wl"  P1_VERSION_TYPE;            // 'l' on/off outputMqttLog for RX2 data
+
 #ifdef P1_Override_Settings      // include our P1_Override_Settings
   #include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
   // #warning Using override settings
@@ -856,10 +1040,11 @@ unsigned long currentMillis  = 0; // millis() mainloop set at start
 unsigned long currentMicros  = 0; // micros() mainloop set at start
 unsigned long previousMicros = 0; // micros() mainloop set at finish V47
 unsigned long startMicros    = 0; // micros() time readTelegram()
+unsigned long startMicrosP1  = 0; // micros() when P1 went active (reading header '/')
 
 // used to research and find position of wdt resets
 unsigned long test_WdtTime = 0;   // time the mainloop
-unsigned long loopcnt = 0;        // count the loop
+unsigned long loopCnt = 0;        // count the loop
 
 // control the informative led within the loop
 unsigned long previousBlinkMillis = 0; // used to shortblink the BLUELED, at serialinput this is set to high value
@@ -960,18 +1145,24 @@ unsigned long previousLoop_Millis = 0; // this tracks the main loop-() < 1080mSe
 //for debugging, outputs info to serial port and mqtt function 'f' will cycle
 bool blue_led2_Water = false;    // Use blue_led2 to indicate Watertrigger
 bool blue_led2_HotWater = false; // Use blue_led2 to indicate Hotstate
-bool blue_led2_Crc = true;       // Use blue_led2 to indicate valid Crc
+#if defined(BITTEST_BLUE_SYNC) || defined(BITTEST_BLUE_MARK) || defined(BITTEST_BLUE_ACTIVE) // Monitor SoftwareSerial241.cpp
+  bool blue_led2_Crc = true;       // Use blue_led2 to indicate valid Crc
+#else
+  bool blue_led2_Crc = false;       // Use blue_led2 to indicate valid Crc
+#endif
 
 bool allowOtherActivities = true; // allow other activities if not reading serial P1 port
 bool p1SerialActive   = false;    // start program with inactive P1 port
 bool p1SerialFinish   = false;    // transaction finished (at end of !xxxx )
 
-bool bSerialP1State = false; // v57 indicate state
-bool bSerialP2State = false; // v57 indicate state
+bool bSerial1State = false; // v57 indicate state
+bool bSerial2State = false; // v57 indicate state
+bool bSerial3State = false; // v59a indicate state
+bool bSerial4State = false; // v59b indicate state
 
 
-long p1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
-long p1Baudrate2 = P1_BAUDRATE2;   //  V35 2022-09-30 22:25:25: set programmatic speed which can be influenced by teh bB command.
+long serial1Baudrate  = P1_BAUDRATE;   //  V31 2021-05-05 22:13:25: set programmatic speed which can be influenced by teh bB command.
+long serial2Baudrate = P1_BAUDRATE2;   //  V35 2022-09-30 22:25:25: set programmatic speed which can be influenced by teh bB command.
 long p1TriggerDebounce = 1000;   //  1000 mSeconds between yields while tapping water, which may bounce
 long p1TriggerTime    = 0;       // initialise for Timestamp when P1 is active with serial communication
 
@@ -1007,15 +1198,20 @@ bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
 bool rx2_function     = true;    // "F" true  -> false , use v38 RX2 processing (27feb23 tested, LGTM)
 bool outputMqttLog2   = false;   // "L" false -> true , output RX2 data mqttLogRX2 /log/wl2
-bool serialStopP1     = false;   // 'S' stop read/inputting serial1 P1 data  (v52)
-bool serialStopRX2    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
+bool serial1Stop     = false;   // 'S' stop read/inputting serial1 P1 data  (v52)
+bool serial2Stop    = false;   // 's' stop read/inputting serial2 RX2 data (v52)
 long rx2ReadInterval  = 7;       // 's' decreases also de readinterval
 bool doReadAnalog     = true;    // 'a' yes/no read analog port for value
 bool doForceFaultP1   = false;   // 'E' yes/no force fault in Read telegram
+int serial1PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 1 - use internal for test
+int serial2PortMode   = 0;       // v58b instruct SS241 to read 0=GPIO, 2 - use internal for test
+char serial1terminator = '\x0a';  // v58c termination telegrams serial1 (test/dup = \x0d)
+char serial2terminator = '\x00';  // v58c termination telegrams serial1 (test/dup = \x0d)
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
-long mqttCnt = 0;                    // updated with each publish as of 19nov19
+long mqttCnt_Out  = 0;         // updated with each publish as of 19nov19, v72 renamed mqttCnt_Out
+long mqttCnt_In   = 0;         // v72 Udate at each input command, retains means, will be 1
 long p1MissingCnt = 0;         // v52 updated when we failed to read any P1
 long p1CrcFailCnt = 0;         // v52 updated when we Crc failed
 long p1RecoverCnt = 0;         // v52 updated when we successfully recovered P1
@@ -1062,6 +1258,7 @@ long OldGasConsumption = 0;
 bool thermostatReadState  = LOW;      // assume Input is active THERMOSTAT_READ
 bool thermostatWriteState = LOW;      // Set initial command output THERMOSTAT_WRITE
 bool lightReadState       = LOW;      // assume Input is active HEATING Light read
+bool preserve_lightReadState_for_mqtt  = LOW;      // v70a preserve Highest Ledlight1 status unbtil it has published.
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
@@ -1088,6 +1285,7 @@ int filteredValueAdc = 0; // average between previous and and published
 
 
 //Infrastructure stuff
+#define recovery_INSERTION_LENTGH 1   // insert bytes if readed records does not validate and less then recovered earlier
 #define MQTTCOMMANDLENGTH 80          // define our receiving buffer
 #define MQTTBUFFERLENGTH 480          // define our sending mqtt buffer
 #define MAXLINELENGTH 1024           // full P1 serial message: the 589 byte message takes about 0.440 Seconds
@@ -1128,12 +1326,12 @@ bool validCrcInFound = false;         // Set by Decode when Full (recovered) dat
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
 char telegram_crcIn[MAXLINELENGTH+32];   // active telegram that is checked for crc
-int  telegram_crcIn_len = 0;          // length of this record
+int  telegram_crcIn_len = 0;          // myLength of this record
 int  telegram_crcOut_cnt = 0;         // number of times masking was positioned
 char telegram_crcOut[MAXLINELENGTH+32];  // processed telegram with changed positions to X
 // const char dummy2b[] = {0x0000};      // prevent save overwrite, v55b remove
 // int  telegram_crcIn_cnt1 = 0;      // number of times CrcIn was called
-int  telegram_crcOut_len = 0;         // length of this record
+int  telegram_crcOut_len = 0;         // myLength of this record
 // int  telegram_crcIn_cnt2 = 0;      // number of times CrcIn was called
 
 /* At header: initialise telegram_crcin
@@ -1142,7 +1340,7 @@ int  telegram_crcOut_len = 0;         // length of this record
     if telegram_crcIn_len = telegram_crcOut_len and crcValidCounter > 0
       if CRC=OK
         // Mark telegram_crcOut with X changes comparing same telegram_crcin
-        for i=0 to len
+        for i=0 to myLen
           if telegram_crcOut(i) != X and telegram_crcOut(i) != telegram_crcIn(i)
           then telegram_crcOut(i) = X
                crcMaskCounter++      // count masked positions
@@ -1151,7 +1349,7 @@ int  telegram_crcOut_len = 0;         // length of this record
       
       else:   // CRC failure on input, try to recover
         // try recover characters position: 
-        for i=0 to len
+        for i=0 to myLen
           if telegram_crcOut(i) != X and telegram_crcOut(i) != telegram_crcIn(i)
           then  telegram_crcIn(i) = telegram_crcOut(i)
                 crcRecoverCounter++
@@ -1168,7 +1366,7 @@ int  telegram_crcOut_len = 0;         // length of this record
       if CRC=OK
         Copy telegram_crcin to telegram_crcout
         telegram_crcOut_len = telegram_crcIn_len
-        for i=0 to len
+        for i=0 to myLen
           telegram_crcOut(i) = telegram_crcIn(i)
         loop
         crcValidCounter = 1   // start validity all over
@@ -1193,7 +1391,7 @@ char telegram2Record[MAXLINELENGTH2+32];  // telegram extracted data maxsize for
 bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
 long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records before loop
 long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
-long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
+long Got_Telegram2Record_last = 0;    // mqttCnt_Out last Telegram2Record received
 // const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak, v55b remove
 // const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak, v55b remove
 
@@ -1202,14 +1400,15 @@ long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
 char mqttServer1[64] ;               // v45 used to hold the currrently active mqttserver
 const char* submqtt_topic = "nodemcu-" P1_VERSION_TYPE "/switch/port1";  // to control Port D8, heating relay
 int new_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
-void callbackMqtt(char* topic, byte* payload, unsigned int length);   // pubsubscribe
+int old_ThermostatState = 2;       // 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip, uses to compare changes
+void callbackMqtt(char* topic, byte* payload, unsigned int myLength);   // pubsubscribe
 char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format time, will be overriden by Telegrams
 
 // Note Software serial uses "attachinterrupt" FALLING on pin to calculate BAUD timing
 // class: SoftwareSerial(int receivePin, int transmitPin, bool inverse_logic = false, unsigned int buffSize = 64);
 #ifdef UseNewSoftSerialLIB
   //  2.5.2+ (untstable): swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-  SoftwareSerial mySerial;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
+  SoftwareSerial mySerial1;      // declare our classes for serial1 (P1 115200 8N1 inverted baud
   SoftwareSerial mySerial2;     // declare our classes for serial2 (GJ 1200 8N1 baud)
 #else
   /// @param baud the TX/RX bitrate
@@ -1219,9 +1418,18 @@ char mqttReceivedCommand[MQTTCOMMANDLENGTH] = "";      // same in String format 
   /// @param invert true: uses invert line level logic
   /// @param bufCapacity the capacity for the received bytes buffer
   /// @param isrBufCapacity 0: derived from bufCapacity (used for/with asynchronous)
-  // 274 rubbish // SoftwareSerial mySerial(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-  SoftwareSerial mySerial( SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH); // (RX, TX. inverted, buffer)
-  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  // 274 rubbish // SoftwareSerial mySerial1(SERIAL_RX, -1, true, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial1(SERIAL_RX, -1          , bSERIAL_INVERT  , MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2 , bSERIAL2_INVERT , MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+  SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 3, 100);   // wip. (RX, bittiming)
+  SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 3, 100);   // wip. (RX, TX2. bittiming)
+  // SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 3, 100);   // (RX, TX, bittiming)
+  // next causes a problem
+  // SoftwareSerial mySerial3(SERIAL_RX, -1          , (int) 10, MAXLINELENGTH); // (RX, TX. inverted, buffer)
+  // SoftwareSerial mySerial4(SERIAL_RX2, SERIAL_TX2 , (int) 10, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
+
+  
+  // SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, (int) 10, MAXLINELENGTH2); // (RX, TX, noninverted, buffer)
 #endif
 
 // Wifi https://docs.arduino.cc/language-reference/en/functions/wifi/client/
@@ -1267,7 +1475,11 @@ void setup()
 {
     asm(".global _printf_float");            // include floating point support
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
-
+// used for debug diagnostics wifi but gpio5 does not monitor wifi in Arduino/NONOS
+//  #ifdef COP_MODE           // set for Arduino to prevent default production compilation
+//     pinMode(D1, INPUT);        // Declare Pin D1 GPIO5 as input for Wifi monitoring
+// #endif
+ 
   // struct rst_info *rtc_info = system_get_rst_info();
   // Serial.printf(("reset reason: %x\n", rtc_info->reason);
 
@@ -1279,6 +1491,10 @@ void setup()
   
   #ifdef NoTx2Function
     pinMode(BLUE_LED2, OUTPUT);             // v37 Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO2)
+    // below is for diagnostics where wifi henadler will set a led
+    //   wifi_set_event_handler_cb([](System_Event_t *e) {
+    //   digitalWrite(BLUE_LED2, e->event != EVENT_STAMODE_DISCONNECTED); // HIGH = WiFi active
+    // });
   #endif
 
 
@@ -1302,7 +1518,7 @@ void setup()
   digitalWrite(THERMOSTAT_WRITE, thermostatWriteState); // ThermostatWriteout valve (TBD: only when required)
 
   // Lightread initialisation
-  lightReadState   = digitalRead(LIGHT_READ); // read Hotwater valve state
+  lightReadState   = digitalRead(LIGHT_READ); // read Hotwater valve state , activated when it goes off
 
   #ifdef NoTx2Function
     if (blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState);  // debug readstate1
@@ -1315,7 +1531,119 @@ void setup()
   // ESP.wdtEnable(33000); // allow three passses missing, v55b disabled
 
   Serial.begin(115200);
-  Serial.println("Booting");              // message to serial log
+  Serial.println("Booting debug");              // message to serial log
+
+  #ifdef DISABLE_MDNS_OTA_PTRO_INACTIVE           // check if we have disabled MDNS in ArduinoOTA.cpp
+    Serial.println("MDNS is disabled. ");         // to snsure MDNS will not cause wdt bu excessive data
+  #elif(defined DISABLE_MDNS_OTA_PTRO)         // Do we want by option to disable MDNS ?
+    Serial.println("Please check DISABLE_MDNS_OTA_PTRO option in ArduinoOTA.cpp ");              // message to serial log
+  #endif
+
+  // v58c check if ArduinoOTA.cpp is answering this......
+  #ifdef DISABLE_MDNS_OTA_PTRO_INACTIVE
+    #warning "DISABLE_MDNS_OTA_PTRO_INACTIVE ArduinoOTA.cpp"
+  #endif
+  #ifdef DISABLE_MDNS_OTA_PTRO_ACTIVE
+    #warning "DISABLE_MDNS_OTA_PTRO_ACTIVE ArduinoOTA.cpp"
+  #endif
+  #if(defined DISABLE_MDNS_OTA_PTRO)
+    #ifndef DISABLE_MDNS_OTA_PTRO_INACTIVE
+      #warning "DISABLE_MDNS_OTA_PTRO requested but not replied back by ArduinoOTA.cpp."
+    #else 
+      #warning "DISABLE_MDNS_OTA_PTRO requested and honoured by ArduinoOTA.cpp."
+    #endif
+  #endif
+    
+  Serial.setDebugOutput(true); 
+  // dev1153
+
+  /*  /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ESP8266WiFi/src/
+
+      wdt reset
+      load 0x4010f000, myLen 1384, room 16
+      tail 8
+      chksum 0x2d
+      csum 0x2d
+      v614f7c32
+      ~ld
+   (Booting debug)
+   [!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)]
+      STUB: dhcp_stop   (>-- ?? ESP8266WiFiSTA.cpp)
+   [WiFi.mode(WIFI_STA);            // Client mode]      
+   [WiFi.persistent(true)]
+   (STA Using fixed address: 192.168.1.185)
+      scandone      (<-- ?? ESP8266WiFiScan.cpp)
+      state: 0 -> 2 (b0)
+      state: 2 -> 0 (2)
+      reconnect     (<-- ESP8266WiFiSTA.cpp)
+      scandone
+      state: 0 -> 2 (b0)
+      state: 2 -> 3 (0)
+      state: 3 -> 5 (10)
+      add 0
+      aid 11 .. 3   (<--  ESP8266WiFiType.h ,  WiFiEventSoftAPModeStation/Disconnected)
+      cnt
+      connected with Pafo SSID4, channel 6
+      ip:192.168.1.185,mask:255.255.255.0,gw:192.168.1.1
+      ip:192.168.1.181
+   [WiFi.setSleepMode(WIFI_MODEM_SLEEP)]
+      sleep disable
+   (Connecting to Pafo SSID4)
+   (Wifi Password sent)
+      scandone      (<-- ESP8266WiFiScan.cpp)
+   (Connected and booted nodemcux1, using IP Address:192.168.1.185
+   (ArduinoOTA.setHostname set)
+   (ArduinoOTA.begin() activated.)
+   (Reset reason code: 1)
+    ....
+    pm open,type:0 0    (?? open authentication and/or open network)
+    ....
+    dev 1153    (?? .../tools/sdk/lib/libpp.a)
+    --> wdtreset
+
+    MDNS:
+      Reading answers RX: REQ, ID:0, Q:0, A:1, NS:0, ADD:0
+      Not expecting any answers right now, returning
+
+
+  22jul25 17u30 we saw wifi tery to reconnect
+      bcn_timout,ap_probe_send_start
+   
+  22jul25 17u35
+        bcn_timout,ap_probe_send_start
+    -8-9
+
+    ap_probe_send over, rest wifi status to disassoc
+    state: 5 -> 0 (1)
+    rm 0
+    pm close 7
+      Attempt MQTT connection to nodemcu-x1 ...failed to 192.168.1.8^scandone
+
+    state: 0 -> 2 (b0)
+    st
+    ate: 2 -> 3 (0)
+    state: 3 -> 5 (10)
+    add 0
+    aid 6
+    cnt
+      connected with Pafo SSID4, channel 1
+
+      ip:192.168.1.185,mask:255.255.255.0,gw:192.168.1.1
+      ip:192.168.1.185,mask:255.255.255.0,gw:192.168.1.1
+
+      ^... try again in 5 seconds...
+    , connect-rc=-1
+
+    Attempt MQTT connection to nodemcu-x1 ...(re)connected to 192.168.1.8, connect-rc=0
+    ; subscribed to >nodemcu-x1/switch/port1< .
+
+   At OTA termination, we migt see:
+    state: 5 -> 0 (0)
+    rm 0
+    pm close 7
+    del if0
+    usl
+  */
 
   /*//DebugCRC print a test mesaage tov erify if CRC is functional, Yes it is
     // check display CRC ode to determine the type to use
@@ -1377,6 +1705,7 @@ void setup()
     ESP.restart();
     // delay(1000);             // ToTest 2021-04-26 22:30:51 (read https://github.com/espressif/arduino-esp32/issues/400)
   }
+  WiFi.setSleepMode(WIFI_NONE_SLEEP); // 22jul25 perhaps redo after WiFi.waitForConnectResult()
   // print your WiFi shield's IP address:
   Serial.print((String)"Connected and booted " + hostName + ", using IP Address:") ;    // v45 fyi
   Serial.println(WiFi.localIP());
@@ -1384,13 +1713,13 @@ void setup()
   /*
     #ifdef UseNewSoftSerialLIB
       // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-      mySerial.begin  (115200,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
+      mySerial1.begin  (115200,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
       mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-      // newserial: mySerial.begin(115200, SWSERIAL_8N1, SERIAL_RX, -1, true , MAXLINELENGTH,0);  // define softserial  GPIO14
+      // newserial: mySerial1.begin(115200, SWSERIAL_8N1, SERIAL_RX, -1, true , MAXLINELENGTH,0);  // define softserial  GPIO14
       // Serial.swap();       // use the alternative serial pins
       // Serial.begin(115200);   // use use UART0 (TX = GPIO1, RX = GPIO3) hardware
     #else
-      mySerial.begin(115200);    // P1 meter port 115200 baud
+      mySerial1.begin(115200);    // P1 meter port 115200 baud
       mySerial2.begin( 1200);   // GJ meter port   1200 baud
     #endif
   */
@@ -1427,7 +1756,8 @@ void setup()
   
   //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   // #define DEF_PROG_VERSION 1123.240
-  ArduinoOTA.begin();
+  ;                       // https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html
+  ArduinoOTA.begin();     // ArduinoOTA.begin(false) = disable mdns
 
   Serial.printf("Reset reason code: %x\n", resetInfo->reason);     // v52: print restart reason
   Serial.println((String) "\r\nRestart time " + micros() + " for " + __FILE__ + " cause:" +  resetInfo->reason); // same but nicer
@@ -1441,9 +1771,10 @@ void setup()
   save_excvaddr = resetInfo->excvaddr;
   save_depc     = resetInfo->depc;
 
-  Serial.println("Firmware version: "+ (String)P1_VERSION_TYPE + "-" + (String)DEF_PROG_VERSION+ "." );
-  Serial.println ("ESP getFullVersion:" + ESP.getFullVersion());   
-  Serial.println ((String)"\nArduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
+  Serial.println("Firmware version: "+ (String)P1_VERSION_TYPE + "-" 
+                  + "(" + __DATE__ + " " + __TIME__ + ")." );
+  Serial.println   ("ESP getFullVersion:" + ESP.getFullVersion());
+  Serial.println ((String)"Arduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);
   Serial.println ("IP address: " + String(WiFi.localIP().toString().c_str()) );  // v52: convert,  WiFi.localIP() is a reverse value
   Serial.println ("ESP8266-ResetReason: "+  String(ESP.getResetReason()));
@@ -1484,11 +1815,11 @@ void setup()
 
   #ifdef TEST_PRINTF_FLOAT
     // Test float functions
-    Serial.printf ("Test FloatingPoint support\n", mqttCnt);
+    Serial.printf ("Test FloatingPoint support\n", mqttCnt_Out);
     // asm(".global _printf_float"); // setin in Setup()
     // read: https://en.cppreference.com/w/c/io/fprintf
-    Serial.printf ("\r\tmqttCnt ValueD = %05d\n", mqttCnt);   // strange lont number 2681....8192.0
-    Serial.printf ("\r\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);   // strange lont number 2681....8192.0
+    Serial.printf ("\r\tmqttCnt ValueD = %05d\n", mqttCnt_Out);   // strange lont number 2681....8192.0
+    Serial.printf ("\r\tmqttCnt Value4.1f = %4.1f\n", mqttCnt_Out);   // strange lont number 2681....8192.0
     Serial.printf ("\r\t12.345 ValeUu2 = %3u_\n", 12.345);        // strange 3607772529_
     Serial.printf ("\r\t9.0453 Value4.2f = %4.2f\n", 9.0453);     // 9.05
     Serial.printf ("\r\t9.1 Value4.1f = %4.1f\n", 9.1);           //  9.1
@@ -1678,7 +2009,8 @@ void setup()
     // #define WAIT { while (ESP.getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; }
     // Checktiming for test only
     unsigned long m_bitTime = ESP.getCpuFreqMHz() * 1000000 / 115200;
-    unsigned long wait = m_bitTime + m_bitTime / 3 - 500;  // 425 115k2@80MHz
+    unsigned long m_bitWait = 539;      
+    unsigned long wait = m_bitTime + m_bitTime/3 -  m_bitWait;  // =  m_bitTime + m_bitTime / 3 - 500;  // 425 115k2@80MHz
     unsigned long start = ESP.getCycleCount();
 
     unsigned long startMicro1 = micros();
@@ -1836,10 +2168,10 @@ void setup()
 
     waterTriggerTime = 0;  // ensure and assum no trigger yet
     test_WdtTime = 0;  // set first loop timer
-    loopcnt = 0;              // set loopcount to 0
+    loopCnt = 0;              // set loopcount to 0
     Serial.print("\r\nfinish Setup()."); // exit loop to check if we have entered the the buulding
   //  WiFi.printDiag(Serial);   // print data
-  } // setup
+} // setup
 
 
 /* 
@@ -1856,10 +2188,17 @@ void setup()
   // Serial.printDiag(Wifi);
   // WiFi.printDiag(Serial);
 */
+#define SERIALPORT_P1_DATA 1 
+#define SERIALPORT_WL_DATA 2 
+#define SERIALPORT_P1_TIME 3 
+#define SERIALPORT_WL_TIME 4 
+#define SERIALPORT_OPEN   0 
+#define SERIALPORT_CLOSE  1 
+
 void loop()
 { 
-  if (verboseLevel == 1) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
-  // note this loop() routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
+  if (verboseLevel == VERBOSE_ON) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
+  // note this loop( ) routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
   // millis() and micros() return the number of milliseconds and microseconds elapsed after reset, respectively.
@@ -1867,6 +2206,33 @@ void loop()
   currentMillis = millis(); // Get snapshot of runtime
   previousMicros = currentMicros; // get V47 previous loop time
   currentMicros = micros(); // get current cycle time
+
+    // v58c: check if this stabilizes
+    for (int i = 14; i < 11; i--) {
+      asm(
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+        "NOP;"
+      );
+    }
+
+  /*
+    time how long the P1 record took
+  */
+  if (mySerial1.P1active()  && startMicrosP1 == 0UL) {
+    startMicrosP1 = micros();
+  } else if (!mySerial1.P1active() && startMicrosP1 > 0UL)  {
+    if (outputOnSerial) Serial.print ((String) "\tP1time=" + (micros() - startMicrosP1) + " " );
+    startMicrosP1 = 0;
+  }    
+
   if (previousMicros >= currentMicros) {  // V47 cycle started where micros transitioned to 0
     waterTriggerTime = currentMicros;     // let/reset to Fuzzy waterTriggerTime
   }
@@ -1880,28 +2246,40 @@ void loop()
   
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
-    loopcnt++ ;
+    loopCnt++ ;
     /* 
         here we display the number of line loops -0-1-2-3-4-5-6-7-8-9    
     */
-    // Serial.print((String)"-" +(loopcnt%10)+" \b");
+    // Serial.print((String)"-" +(loopCnt%10)+" \b");
     
     // Serial.print((String) (
-    //   (waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopcnt % 10)+" \b"); // v47 test water tapping 
+    //   (waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopCnt % 10)+" \b"); // v47 test water tapping 
+    
     Serial.print((String) (                             // display diagnostic second loopcounter
           (waterReadCounter != waterReadCounterPrevious) ?   // v47 check test water tapping active
-              (bSerialP1State ? 
-                  (bSerialP2State ? "*"  : "\'")         // water &  and P1:  P2 -->  On* Off"
-                 :(bSerialP2State ? "\"" : "_") )       // water &   no P1:  P2 -->  On' Off_
+              (bSerial1State ? 
+                  (bSerial2State ? "*"  : "\'")         // water &  and P1:  P2 -->  On* Off"
+                 :(bSerial2State ? "\"" : "_") )       // water &   no P1:  P2 -->  On' Off_
               :   
-              (bSerialP1State ? 
-                  (bSerialP2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
-                 :(bSerialP2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
-          )
-          +   (loopcnt % 10)+" \b");
+              (bSerial1State ? 
+                  (bSerial2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
+                 :(bSerial2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
+          ) );
+    // -Ee -->  serial1state active while port is inactive, serial2state inactive and port2 is active, 
+
+    if (mySerial1.portActive() !=  bSerial1State) Serial.print((String) "E");   // v59 check if driver matches the portstate
+    if (mySerial2.portActive() !=  bSerial2State) Serial.print((String) "e");   // v59 check if driver matches the portstate
+
+    Serial.print((String) +   (loopCnt % 10)+" \b");                          // display diagnostic second loopcounter
+
+    test_WdtTime = currentMillis - test_WdtTime;          
+    if (verboseLevel == VERBOSE_ON && test_WdtTime != 1UL )  {      // v58 print long looptimes to diagnose excessive delays
+        Serial.printf(" looptime=%lu ",  test_WdtTime);
+    }
     bP1Active_signalled = false; // v57 reset his inteval of signalled situation
     waterReadCounterPrevious = waterReadCounter; 
     test_WdtTime = currentMillis + 1000;  // next interval
+
   }
 
 
@@ -1912,9 +2290,10 @@ void loop()
     if (RX_yieldcount < 1)  RX_yieldcount = 3;   // v56c 8 --> 3 when < 1, pause P1 serial reads ubtuk yield is again < 4
     mqtt_local_yield();  // do a local yield with 50mS delay that also feeds Pubsubclient to prevent wdt
     if (outputOnSerial) {
-          Serial.printf("\r\nLoop %6.3f exceeded#%d at prev %6.3f !!yield1080\n", 
+          Serial.printf("\r\nLoop %d exceeded# %6.3f at prev %6.3f !!yield1080\n", 
           RX_yieldcount ,     // v52: print yield value
-          ((float) currentMicros / 1000000), ((float) previousLoop_Millis / 1000));
+          ((float) currentMicros / 1000000), 
+          ((float) previousLoop_Millis / 1000));
     } else {
       if (RX_yieldcount > 3)  {
           Serial.print("@");  // signal a yieldloop '@'
@@ -1935,7 +2314,7 @@ void loop()
     // WiFi.printDiag(Serial);   // print data ESP8266WiFiClass::printDiag(Print& p)
   }
 
-  mqtt_local_yield();      //   client.loop(); // handle mqtt
+  // mqtt_local_yield();      //   client.loop( ); // handle mqtt, v61 30jul25 disbale this here
 
   //  --------------------------------------------------------------------------------------------- START allowOtherActivities
   if (!allowOtherActivities) {     // are we outside P1 Telegram processing (require serial-timeing)
@@ -1960,24 +2339,19 @@ void loop()
       if (outputOnSerial) Serial.println((String) P1_VERSION_TYPE + " serial started at " + currentMillis);
       p1SerialActive = !p1SerialActive ; // indicate we have started
       p1SerialFinish = false; // and let transaction finish
-      mySerial2.end();          // Stop- if any - GJ communication
-      mySerial2.flush();        // Clear GJ buffer
-      bSerialP2State = false; // v57 indicate state
+
+    /* #define SERIALPORT_P1/WL_DATA/TIME  SERIALPORT_OPEN/CLOSE */
+      openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_CLOSE);
       if (loopbackRx2Mode > 0) Serial.print((String) "_}" ); // v54 print incoming
       
       telegramError = 0;        // start with no errors
-      // Start secondary serial connection if not yet active
-      if (!serialStopP1) {
-        #ifdef UseNewSoftSerialLIB
-          // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-          mySerial.begin  (p1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
-          // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
-        #else
-          // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-          mySerial.begin(p1Baudrate);    // P1 meter port 115200 baud, v52 stop/start
-          // mySerial2.begin(p1Baudrate2);  // GJ meter port   1200 baud     // required during test without P1
-        #endif
-          bSerialP1State = true; // v57 indicate state
+      // Start first serial connection if not yet active
+      if (!serial1Stop) {
+          openCloseSerial(SERIALPORT_P1_DATA, SERIALPORT_OPEN);
+          if (bSerial1State != mySerial1.portActive()) Serial.print((String) "?" +
+                                                        + (bSerial1State ? "A" : "a")
+                                                        + (mySerial1.portActive() ? "I" : "i")
+                                                        +  "?");
       }        
 
     } else {    // if (!p1SerialActive)
@@ -1999,30 +2373,20 @@ void loop()
 
         p1SerialFinish = !p1SerialFinish;   // reverse this
         p1SerialActive = true;  // ensure next loop sertial remains off
-        mySerial.end();    // P1 meter port deactivated
-        mySerial.flush();  // Clear P1 buffer
-        bSerialP1State = false; // v57 indicate state
+        
+        openCloseSerial(SERIALPORT_P1_DATA, SERIALPORT_CLOSE);
 
         loopTelegram2cnt = 0;  // allow readtelegram2  for a maximum of "6 loops" of actual receives
 
         // Only activate myserial2  atdesignated times
-        // int checkIntervalRx2 = mqttCnt % 7;
+        // int checkIntervalRx2 = mqttCnt_Out % 7;
         if ( rx2_function && 
-                (mqttCnt == 2  || 
-                (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
+                (mqttCnt_Out == 2  || 
+                (mqttCnt_Out > 0 && ((mqttCnt_Out % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
-          if (!serialStopRX2) {
-              #ifdef UseNewSoftSerialLIB
-                // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
-                // mySerial.begin  (P1_BAUDRATE,SWSERIAL_8N1,SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH,0); // Note: Prod use require invert
-                mySerial2.begin (p1Baudrate2, SWSERIAL_8N1, SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2, 0);
-              #else
-                // mySerial.begin(P1_BAUDRATE);    // P1 meter port 115200 baud
-                mySerial2.begin(p1Baudrate2);    // GJ meter port   1200 baud
-              #endif
-              bSerialP2State = true; // v57 indicate state
+          if (!serial2Stop) {
+              openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_OPEN);            
               if (loopbackRx2Mode > 0) Serial.print((String) "{_" ); // v54 print incoming
-              // Serial.print((String) "{_" ); // v54 print incoming
           }
         }
         
@@ -2101,6 +2465,12 @@ void loop()
     // if (loopbackRx2Tx2) Serial.print("Rx2 "); // print message line
     if (loopTelegram2cnt < MAXTELEGRAM2CNT) readTelegramWL();   // read RX2 GJ gpio4-input (if available), write gpio2 output
   }   // if-else allow other activities
+  
+  /*
+    Do state activities v70a
+  */
+  processHotLedRead(HIGH);   // v70a do frequent check of Ledlight
+  
   //  ---------------------------------------------------------------------------------------------- END of allowOtherActivities
 
   // readTelegram2();    // read RX2 GJ gpio4-input (if available), write gpio2 output (now done in closed setting)
@@ -2145,8 +2515,8 @@ void loop()
       p1SerialFinish = true;  // v53: enforce to accomodate faults normal set at  processing P1 record
       p1SerialActive = true; // v53: enforce to accomodate faults normal set at  processing P1 record
 
-      // mySerial.end();         // v53: enforce finish , done at line 1775
-      // mySerial.flush();       // v53: enforce flush the buffer (if any) line 1775
+      // mySerial1.end();         // v53: enforce finish , done at line 1775
+      // mySerial1.flush();       // v53: enforce flush the buffer (if any) line 1775
 
       // report to error mqtt, // V20 candidate for a callable error routine
       // tbd: consider to NOT send values
@@ -2156,15 +2526,15 @@ void loop()
       // String mqttMsg = "Error, "; // build mqtt frame 
       // mqttMsg.concat("serial not connected ");  
       // mqttMsg,concat("interval="); // build mqtt frame 
-      // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
-      mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+      // char mqttCntS[8] = ""; ltoa(mqttCnt_Out,mqttCntS,10); mqttMsg.concat(mqttCntS));
+      mqttMsg.concat((String)", \"mqttCnt_Out\":"+(mqttCnt_Out+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
       // mqttMsg.toCharArray(mqttOutput, 128);
       publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
             
       // Alway print this serious timeout failure
       // if (outputOnSerial) {
-      if (!serialStopP1 && loopbackRx2Mode == 0) {
+      if (!serial1Stop && loopbackRx2Mode == 0) {
          if (outputMqttLog) publishMqtt(mqttLogTopic, "ESP P1 rj11 Active interval checking" );  // report we have survived this interval
 
          Serial.printf("\r\n# !!# ESP P1 rj11 Active interval at %11.6f, checking %6d, timecP:%d, timec2:%d .\r\n",   
@@ -2180,7 +2550,7 @@ void loop()
          allowOtherActivities = true;     // v57
       }                          
     /*    
-      // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
+      // ((float)ESP.getCycleCount()/80000000), (mqttCnt_Out + 1), ((float) startMicros / 1000000));
       Serial.print("\r\n# !!# ESP P1 rj11 Active interval checking ");   // v45: add carriage-return
       Serial.print(intervalP1cnt );
       Serial.print(", timeP:");
@@ -2228,7 +2598,7 @@ void loop()
   }
 
   ArduinoOTA.handle();             // check if we must service on the Air update
-  if (verboseLevel == 1) Serial.print(">"); // exit loop to check if we have left the building
+  if (verboseLevel == VERBOSE_ON) Serial.print(">"); // exit loop to check if we have left the building
 }
 
 /* 
@@ -2318,41 +2688,45 @@ void readTelegramP1() {
     // yield();                // allow time to others
     mqtt_local_yield();
     if (outputOnSerial) {   // indicate on console
-      Serial.print((String) " !!>" + millis() + " yield due " + p1TriggerTime + "< exceeded !!" ); // length processed previous line
+      Serial.print((String) " !!>" + millis() + " yield due " + p1TriggerTime + "< exceeded !!" ); // myLength processed previous line
     }
     p1TriggerTime = millis();
   }
-
+  
   #ifdef UseP1SoftSerialLIB              // Note this serial version will P1Active while reading between / and !
     /*
       Using our 241 adapted library, we wait between / and ! 
     */
-    if ( mySerial.P1active())  {    // does not seem to activate
-        if (!bP1Active_signalled) Serial.print((String) "\\" ); // length processed previous line
+    if ( mySerial1.P1active())  {    // does not seem to activate
+        if (!bP1Active_signalled) Serial.print((String) "\\" ); // myLength processed previous line
         bP1Active_signalled = true;
+        // ESP.wdtFeed();              // v58 feed the hungry timer
+        // delay(0);       // this causes unread
         return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
     }
   #endif  
-  if (!mySerial.available() || serialStopP1 ) return ;  // quick return if no data, v52
+  if (!mySerial1.available() || serial1Stop ) return ;  // quick return if no data, v52
 
   if (outputOnSerial)    {
     if ( !telegramP1header) Serial.print((String) P1_VERSION_TYPE + " DataRx started at " + millis() + " s=s123..\b\b\b\b\b") ; // print message line
     // if (  telegramP1header) Serial.print("\r\nxP= "); // print message line if message is broken in buffer
   }
   startMicros = micros();  // Exact time we started
-  // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
-  if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s: %5u start: %11.6f \b\b ", 
+  // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt_Out+1) +" started at " + micros());
+  if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s%d: %5u start: %11.6f \b\b ", 
         RX_yieldcount,    // v52: check countlevel
-        ((float)ESP.getCycleCount()/80000000),
+          ((float)ESP.getCycleCount()/80000000),
           (int) new_ThermostatState, (thermostatReadState ? "d" : "T"),  (thermostatWriteState ? "A" : "i"),
-          (digitalRead(WATERSENSOR_READ) ? "h" : "l"), (digitalRead(LIGHT_READ) ? "c" : "w"),
-        (mqttCnt + 1), ((float) startMicros / 1000000));
+          (digitalRead(WATERSENSOR_READ) ? "h" : "l"), 
+          (preserve_lightReadState_for_mqtt ? (lightReadState ? "C" : "W") :(digitalRead(LIGHT_READ) ? "c" : "w") ),  // v70a
+          (digitalRead(LIGHT_READ)),  // v70a
+        (mqttCnt_Out + 1), ((float) startMicros / 1000000));
 
   // Cycle: 04.781228065
 
-  if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );
+  // if (outputMqttLog && client.connected()) publishMqtt(mqttLogTopic, mqttClientName );   // v64a deactivated, superfluous 
 
-  int lenTelegram = 0;
+  int myLenTelegram = 0;
   memset(telegram, 0, sizeof(telegram));   // initialitelegram buffer-array to 0
   memset(telegramLast, 0, sizeof(telegramLast));     // initialise 3 byte array to 0
 
@@ -2360,7 +2734,7 @@ void readTelegramP1() {
 
   // Serial.println("Debug: startbuf..");
 
-  while (mySerial.available())     {      // If serial data in buffer
+  while (mySerial1.available())     {      // If serial data in buffer
     // Serial.print((String) "xa\b"); no need to display serial available this goes ok
     
     /*
@@ -2372,14 +2746,23 @@ void readTelegramP1() {
     // note Serial.setTimeout() sets the maximum and defaults to 1000 milliseconds.
     // The function returns the characters up to the last character before the supplied terminator.
 
-    #if(defined DUP_MODE || defined TEST_MODE)
-      int len = mySerial.readBytesUntil(13, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
-    #else
-      int len = mySerial.readBytesUntil('\x0a', telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
-    #endif
+    /* v58c removed and relaced by 
+      #if(defined DUP_MODE || defined TEST_MODE)  
+        // serial1terminator = '\x0d';
+        int myLen = mySerial1.readBytesUntil(serial1terminator, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      #else
+        // serial1terminator = '\x0a';
+        int myLen = mySerial1.readBytesUntil(serial1terminator, telegram, MAXLINELENGTH - 2); // read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+      #endif
+    */
+    int myLen = mySerial1.readBytesUntil(serial1terminator, telegram, MAXLINELENGTH - 2); // v58c read a max of  MAXLINELENGTH-2 per line, termination is not supplied
+
+      yield();                    // v58 do background processing required for wifi etc.
+      ESP.wdtFeed();              // v58 feed the hungry timer
+    
       if (loopbackRx2Mode == 6) {   // diagnose header    // v57
           Serial.print((String)"\r\n\t P1header1-32=(" );
-          for (int i = 0; i < 33 && i < len; i++) {
+          for (int i = 0; i < 33 && i < myLen; i++) {
               Serial.printf("%02x ", telegram[i]); 
           }
           Serial.println((String)")" );
@@ -2388,20 +2771,20 @@ void readTelegramP1() {
     // Serial.print((String) "yb\b"); no need to display RX progess this goes ok
     
 
-    if (len > 1) {      // correct dual Carrigage returns, Windows formatted testdata on Linux
-      // decrease len as the dual 0x0d 0x0d is from streamed testdata
-      if (telegram[len-2] == '\x0d' && telegram[len-1] == '\x0d' ) len-- ;  // double carriage return ?
+    if (myLen > 1) {      // correct dual Carrigage returns, Windows formatted testdata on Linux
+      // decrease myLen as the dual 0x0d 0x0d is from streamed testdata
+      if (telegram[myLen-2] == '\x0d' && telegram[myLen-1] == '\x0d' ) myLen-- ;  // double carriage return ?
     }
     // debug this
-    // if (len > 1)  Serial.print((String)" La="+ (int)telegram[len-2]);
-    // if (len > 0)  Serial.print((String)" Lb="+ (int)telegram[len-1]);
-    // if (len == 0) Serial.print((String)" Lc="+ (int)telegram[len]);
+    // if (myLen > 1)  Serial.print((String)" La="+ (int)telegram[myLen-2]);
+    // if (myLen > 0)  Serial.print((String)" Lb="+ (int)telegram[myLen-1]);
+    // if (myLen == 0) Serial.print((String)" Lc="+ (int)telegram [myLen]);
     
-    if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (len-1) + ']' );   // v52/test replaced \n into \r
+    if (verboseLevel == 0) Serial.print((String) "[Lp1=" + (myLen-1) + ']' );   // v52/test replaced \n into \r
 
     if (outputOnSerial && verboseLevel >= VERBOSE_P1) {     // do we want/need to print the Telegram for Debug
-      Serial.print((String)"\rlT=" + (len-1) + " \t[");   // v33 replaced \n into \r
-      for (int cnt = 0; cnt < len; cnt++) {
+      Serial.print((String)"\r\nxlT=" + (myLen-1) + " \t[");   // v33 replaced \n into \r
+      for (int cnt = 0; cnt < myLen; cnt++) {
           
         if (isprint(telegram[cnt])) {             // v45 revise to improve print debug 
             Serial.print(telegram[cnt]);
@@ -2419,51 +2802,51 @@ void readTelegramP1() {
     /* //debugCRC
             yield();        // ptro added 31mar21 tr/to prevent wdt reset
             // print hexadecimal of this read.
-             Serial.printf("readbytesuntil=%u :", len);
-             for (int cnt = 0; cnt < len; cnt++) {
+             Serial.printf("readbytesuntil=%u :", myLen);
+             for (int cnt = 0; cnt < myLen; cnt++) {
                  Serial.printf("%02x",telegram[cnt-1]);
              }
              Serial.println(". ");
     */
-    // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate an error report
+    // myLen == 0 ? myLenTelegram = -1 : myLenTelegram += myLen;   // if myLen = 0 indicate an error report
 
-    //debugCRC if ( len == 0 && outputOnSerial) Serial.print(" <0> "); // debug print processing serial data
-    //debugCRC if (outputOnSerial) Serial.printf("{%02X %02X %02X}",telegram[len-2],telegram[len-1],telegram[len]);
+    //debugCRC if ( myLen == 0 && outputOnSerial) Serial.print(" <0> "); // debug print processing serial data
+    //debugCRC if (outputOnSerial) Serial.printf("{%02X %02X %02X}",telegram[myLen-2],telegram[myLen-1],telegram [myLen]);
 
-    lenTelegram = lenTelegram + (len - 1); // accumulate actual number of characters (excluding cr/lf)
-    if ( len == 0) lenTelegram = -1; // if len = 0 indicate for report
+    myLenTelegram = myLenTelegram + (myLen - 1); // accumulate actual number of characters (excluding cr/lf)
+    if ( myLen == 0) myLenTelegram = -1; // if myLen = 0 indicate for report
 
 
-    //DebugCRC int lenSave = len;                     // the the original value
+    //DebugCRC int myLenSave = myLen;                     // the the original value
     /* // debugCRC
        if (outputOnSerial) Serial.print(" <"); // debug print processing serial data
-       if (outputOnSerial) Serial.print(len) ; // debug print processing serial data
+       if (outputOnSerial) Serial.print(myLen) ; // debug print processing serial data
        if (outputOnSerial) Serial.print(">"); // debug print processing serial data
     */
 
-    if (len > 0 )  {  // len=0 indicates serial error, a length of 1 means the zerobyte (0x00-0d-0a) string.
+    if (myLen > 0 )  {  // myLen=0 indicates serial error, a myLength of 1 means the zerobyte (0x00-0d-0a) string.
 
       /* //debugCRC
                // Extract last character into a printable string to  //debugCRC
-               telegramLast[0] = telegram[len - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
+               telegramLast[0] = telegram[myLen - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
                telegramLast[1] = '\n';               // 3byte telegram lastbyte termination string
                telegramLast[2] = 0;                  // 3vyte-telegram lastbyte terminaion variable
 
                // Make Telegram printable , Note this may could overwrite the running buffer
-               telegram[len + 1] = '\n';    // string set lastcharacter to \n
-               telegram[len + 2] = 0;       // variable next character before null
+               telegram[myLen + 1] = '\n';    // string set lastcharacter to \n
+               telegram[myLen + 2] = 0;       // variable next character before null
 
                // sprintf("%02X", theNumber); // take alot of memory
                if (outputOnSerial) Serial.print((String)"\r\n1:"+String(telegramLast[0],HEX)+"="+telegramLast[0]+"  >"); // Hex debug print line last character
       */
 
-      if (decodeTelegram(len + 1)) {        // process data did we have a 'true' end of message condition including terminating CR
+      if (decodeTelegram(myLen + 1)) {        // process data did we have a 'true' end of message condition including terminating CR
 
         /*  //debugCRC
-            // print/display readed length
+            // print/display readed myLength
             if (outputOnSerial) {           // this line is alway printed.
-                Serial.print(" [");         // debug print transaction length
-                Serial.print(lenTelegram);  // length processed previous line
+                Serial.print(" [");         // debug print transaction myLength
+                Serial.print(myLenTelegram);  // myLength processed previous line
                 Serial.print("] #OK# ");    // display we have a successful end of data
                 // Serial.println("\r\n");
             }
@@ -2501,26 +2884,27 @@ void readTelegramP1() {
         if (intervalP1cnt < 1140) intervalP1cnt++ ; // increase survived read count
 
         p1SerialFinish = true; // indicate mainloop we can stop P1 serial for a while
-        mySerial.end();      // flush the buffer (if any) v38
-        mySerial.flush();      // flush the buffer (if any)
-        bSerialP1State = false; // v57 indicate state
+        if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_P1_DATA, M_TIME_AVAIL_END);         // v59b print all timers
+        openCloseSerial(SERIALPORT_P1_DATA, SERIALPORT_CLOSE);            
+        if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_P1_DATA, M_TIME_RX_END);    // v59b print 4 timers
+         // bSerial1State = false; // v57 indicate state
 
       }
       /* //debugCRC
            else {                              // data not yet finished or in transit
                if (outputOnSerial) {           // this line is alway printed.
-                   Serial.print(" [");         // debug print transaction length
-                   Serial.print((String) lenTelegram + "," + lenSave);  // length processed previous line
+                   Serial.print(" [");         // debug print transaction myLength
+                   Serial.print((String) myLenTelegram + "," + myLenSave);  // myLength processed previous line
                    Serial.print("] ");         // single of with println: double lines spacing
                    // Serial.println("\r\n");
                }
          } // else
       */
 
-    } else { // if len > 0
-        // resume oher activities if we have not processed any data len < 0
+    } else { // if myLen > 0
+        // resume oher activities if we have not processed any data myLen < 0
         // this activates when we feed the input pins with programmatic data (0A0D) seperation.
-        Serial.print((String) " P1-len=" + len + " -#r=" + (bool) allowOtherActivities + "-" ); // v56c
+        Serial.print((String) " P1-len=" + myLen + " -#r=" + (bool) allowOtherActivities + "-" ); // v56c
         allowOtherActivities = true;  // v56c
     }
   } // while serial available
@@ -2539,18 +2923,22 @@ void readTelegramWL() {
     /*
       Using our 241 adapted library, we wait between / and ! 
     */
-    if (mySerial.P1active()) {    // return if P1 is active
-      if (!bP1Active_signalled) Serial.print((String) "\\" ); // length processed previous line
+    if (mySerial1.P1active()) {    // return if P1 is active
+      if (!bP1Active_signalled) Serial.print((String) "\\" ); // myLength processed previous line
           bP1Active_signalled = true;
           return ;  // quick return if serial is receiving, function of SoftwareSerial for P1
     }
   #endif  
 
+  mqtt_local_yield();   // v61b 30jul25 , program remains stable
+
+  if (serial2Stop) return;    // v52 return if we have stopped this serial
+  if (!bSerial2State) return;  // v58 useless to continue without active serial
+
+
   bGot_Telegram2Record  = false;      // v38 check RX2 seen
   
-  if (serialStopRX2) return;    // v52 return if we have stopped this serial
-
-  int lenTelegram2 = 0;
+  int myLenTelegram2 = 0;
   /*
     if (mySerial2.P1active())   {               // P2 blocked
       // if (loopbackRx2Tx2) Serial.print("RxA "); // print message line
@@ -2579,43 +2967,51 @@ void readTelegramWL() {
     while (mySerial2.available() && loopTelegram2cnt < MAXTELEGRAM2CNT && !bGot_Telegram2Record )     {    // number of periodic reads  && !bGot_Telegram2Record
        // type casting https://www.geeksforgeeks.org/cpp/cpp-program-for-int-to-char-conversion/
       // if (loopbackRx2Mode > 0) Serial.print((String)  + char(mySerial2.peek()) ); // v54 print incoming
-      // int len = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      // int len = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      // int myLen = mySerial2.readBytesUntil('\n', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+      // int myLen = mySerial2.readBytesUntil('!', telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
       
-      int len = 0;
-      #if(defined DUP_MODE || defined TEST_MODE)
-        len = mySerial2.readBytesUntil(13, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      #else 
-        len = mySerial2.readBytesUntil(00, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
-      #endif          
+
+      /* v58c test dup/test readBytesUntil removed and relaced by 
+        #if(defined DUP_MODE || defined TEST_MODE)
+          // serial2terminator = '\x0d';
+          myLen = mySerial2.readBytesUntil(serial2terminator, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+        #else 
+          // serial2terminator = '\x00';
+          myLen = mySerial2.readBytesUntil(serial2terminator, telegram2, MAXLINELENGTH2 - 2); // read a max of  64bytes-2 per line, termination is not supplied
+        #endif  
+      */
+      int myLen = mySerial2.readBytesUntil(serial2terminator, telegram2, MAXLINELENGTH2 - 2); // v58c, read a max of  64bytes-2 per line, termination is not supplied
+      yield();                    // v58 do background processing required for wifi etc.
+      ESP.wdtFeed();              // v58 feed the hungry timer
+       
       if (loopbackRx2Mode == 6) {   // diagnose header    // v57
           Serial.print((String)"\r\n\t P2header1-32=(" );
-          for (int i = 0; i < 33 && i < len; i++) {
+          for (int i = 0; i < 33 && i < myLen; i++) {
               Serial.printf("%02x ", telegram2[i]); 
           }
           Serial.println((String)")" );
       }
 
       // String telegram2_str(telegram2); // does work but still prints beyond 0x00
-      if (loopbackRx2Mode > 0 && len > 0) Serial.print((String) 
-                  + " ..len=" + len 
+      if (loopbackRx2Mode > 0 && myLen > 0) Serial.print((String) 
+                  + " ..len=" + myLen 
                   + ":\'" + (loopbackRx2Mode == 3 ? (String) "\r\n" + telegram2 + "\r\n": (String) "$")
                   + "\'.. " ); // v54 print incoming
             
-      // len == 0 ? lenTelegram = -1 : lenTelegram += len;   // if len = 0 indicate for report
-      lenTelegram2 = lenTelegram2 + len;
-      if ( len == 0) lenTelegram2 = -1; // if len = 0 indicate for report
+      // myLen == 0 ? myLenTelegram = -1 : myLenTelegram += myLen;   // if myLen = 0 indicate for report
+      myLenTelegram2 = myLenTelegram2 + myLen;
+      if ( myLen == 0) myLenTelegram2 = -1; // if myLen = 0 indicate for report
 
-      if (len > 0)  {   // do we have bytes in buffer
+      if (myLen > 0)  {   // do we have bytes in buffer
         // remember  last character
-        // telegramLast2[0] = telegram2[len - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
+        // telegramLast2[0] = telegram2[myLen - 2];  // 3byte-telegram readible lastbyte  bracket-2 null-1 cr-0
         // telegramLast2[1] = '\n';                // 3byte telegram lastbyte termination string
         // telegramLast2[2] = 0;                   // 3byte-telegram lastbyte terminaion variable
-        if ( len > (MAXLINELENGTH2 - 2) ) {            // we have clearly an overflow
-           len =  (MAXLINELENGTH2 - 2) ;
+        if ( myLen > (MAXLINELENGTH2 - 2) ) {            // we have clearly an overflow
+           myLen =  (MAXLINELENGTH2 - 2) ;
         }
-        telegram2[len + 1] = '\n';    // string set lastcharacter to \n
-        telegram2[len + 2] = 0;       // variable next character before null
+        telegram2[myLen + 1] = '\n';    // string set lastcharacter to \n
+        telegram2[myLen + 2] = 0;       // variable next character before null
         /*
          * Check ascii output
          */
@@ -2626,7 +3022,7 @@ void readTelegramWL() {
           telegram2_Pos   = 0;
         }
         
-        for (int i = 0; (i <= len && !bGot_Telegram2Record); i++) {  // forward
+        for (int i = 0; (i <= myLen && !bGot_Telegram2Record); i++) {  // forward
 
             // if (rx2_function && !bGot_Telegram2Record ) { // v38 rx2_function
             if (rx2_function && !bGot_Telegram2Record ) { // v38 rx2_function
@@ -2646,7 +3042,7 @@ void readTelegramWL() {
 
                 }
                 if (telegram2[i] == '!')  {
-                    if (telegram2_End   < 0 && (i < (len - 6)) ) telegram2_End = i + 6;  // anticiptae after checksum position !1234.6
+                    if (telegram2_End   < 0 && (i < (myLen - 6)) ) telegram2_End = i + 6;  // anticiptae after checksum position !1234.6
                     if (telegram2_Start < 0 ) telegram2_End = -1;  // reset if not yet started
                 } 
                 
@@ -2658,13 +3054,17 @@ void readTelegramWL() {
                   telegram2_org[telegram2_Pos]   = 0;     // initialize next position v54
                 } // if (telegram2_Start > 0  && (telegram2_End == 0 || i < telegram2_End) 
               } // if ( telegram2_Pos < MAXLINELENGTH2 && (telegram2_Start == 0 || telegram2_Pos > 0 || i < telegram2_End ) )
-              if (telegram2_Pos > 4) {      // check for length start2finish before Checksum
+              if (telegram2_Pos > 4) {      // check for myLength start2finish before Checksum
                 if (telegram2Record[0] == '/' && telegram2Record[telegram2_Pos - 5] == '!')  {
                   bGot_Telegram2Record = true;
                   Got_Telegram2Record_cnt++;      // v51 count for this receive
-                  mySerial2.end();          // v38 Stop- if any - GJ communication
-                  mySerial2.flush();        // v38 Clear GJ buffer
-                  bSerialP2State = false; // v57 indicate state
+
+                  if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_WL_DATA, M_TIME_AVAIL_END);         // v59b print all timers
+                  openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_CLOSE);
+                  if (outputOnSerial)
+                  if (outputOnSerial) serial_Print_PeekTime(SERIALPORT_WL_DATA, M_TIME_RX_END);         // v59b print all timers
+
+                  // bSerial2State = false; // v57 indicate state
                   if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
                       // debug print positions
                       Serial.print("\nns1=")          ; // debug v38 print processing
@@ -2686,13 +3086,13 @@ void readTelegramWL() {
             telegram2[telegram2_Pos] = 0x00;    // enforce String-end of this for serial print
             publishMqtt(mqttLogTopic2, (String)
                      "{ rx2-" +  __LINE__   // print RX2 data line, already converted to print
-                        + ", \"mqttCnt\":" + mqttCnt
+                        + ", \"mqttCnt_Out\":" + mqttCnt_Out
                         + ", \"length\":"  + telegram2_Pos
                         + ", \"rx2=\":\""  + (String) telegram2
                      + "\"}" );
-            // Serial.println((String) "\r\n\t.s2>[len=" + len + " Pos=" + telegram2_Pos + "]" + telegram2) ;
+            // Serial.println((String) "\r\n\t.s2>[myLen=" + myLen + " Pos=" + telegram2_Pos + "]" + telegram2) ;
             /*                     
-            for (int i = 200; i <= len; i++) {  // forward
+            for (int i = 200; i <= myLen; i++) {  // forward
                 Serial.print(" ") ;         // debug print processing serial data
                 Serial.print((int8) telegram2[i] ) ;         // debug print processing serial data
                 Serial.print((String) + "=" + telegram2[i] ) ;         // debug print processing serial data
@@ -2700,7 +3100,7 @@ void readTelegramWL() {
             */
         }
         if (outputOnSerial && verboseLevel >= VERBOSE_RX2) {
-          Serial.println((String) "\n.s2>[len=" + len + " Pos=" + telegram2_Pos + "]" + telegram2) ;
+          Serial.println((String) "\n.s2>[myLen=" + myLen + " Pos=" + telegram2_Pos + "]" + telegram2) ;
         }
 
         // if (rx2_function) { // do we want to execute v38 rx2_function (superfluous , as routine her eis v38)
@@ -2708,6 +3108,7 @@ void readTelegramWL() {
           Process console
         */
         if (bGot_Telegram2Record) {   // v38 print record serial2 if we have catched a record
+                                      // v58
           Serial.print("&&&");     //  v39 print indicator // added 14mar22 to show activeness
           Serial.print("\b\b+r.");     //  v41 print indicator // added 21jun23 to get it stable: Serial.print("\b\b\b+3."); 
           // 21jun23 Global variables use 41516 bytes (50%) of dynamic memory, leaving 40404 bytes for local variables. Maximum is 81920 bytes
@@ -2748,7 +3149,7 @@ void readTelegramWL() {
 
                 if ( validTelegram2CRCFound && loopbackRx2Mode == 5 ) {   // v55 debug/print one validated hex characters
                   Serial.println("");
-                  Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
+                  Serial.printf(" crt=%s, crc=%04x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
 
                   for (int i = startChar ; i  < ((endChar-startChar)+1+4); i++ ) {
                     
@@ -2881,11 +3282,11 @@ void readTelegramWL() {
                     Serial.printf(" %02x", telegram2_org[i]);      // 000-005, 008 causing unstablity
                   }
                   
-                  Serial.println((String) "\r\n\t start=" + startChar + ", len=" + ((endChar-startChar)+1) );
+                  Serial.println((String) "\r\n\t start=" + startChar + ", myLen=" + ((endChar-startChar)+1) );
                   loopbackRx2Mode = 0;   // stop debug
                 }
 
-                if (outputOnSerial || loopbackRx2Mode == 3) {   // print serial record count, total receivwed length, calculated CRC
+                if (outputOnSerial || loopbackRx2Mode == 3) {   // print serial record count, total receivwed myLength, calculated CRC
                   Serial.printf(" s=%c, e=%c, crt=%s, cr1=%x, ;", telegram2Record[startChar],telegram2Record[endChar], messageCRC2, currentCRC2) ;    // debug print calculated CRC
                   /* below are incorrect
                   currentCRC2 = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram2_org)+startChar,(endChar-startChar));   // ignore header, v48-casting
@@ -2908,7 +3309,7 @@ void readTelegramWL() {
                        Serial.printf("%02x ", telegram2_org[i]); 
 
                     }
-                    Serial.printf(" crt=%s, crc=%x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
+                    Serial.printf(" crt=%s, crc=%04x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
                 }
 
           }
@@ -2936,7 +3337,7 @@ void readTelegramWL() {
             Serial.print("-");            // print minus
             Serial.print(telegram2_Start); 
             Serial.print("=");            // debug print processing
-            Serial.print((telegram2_End - telegram2_Start)); // debug print processing serial data length
+            Serial.print((telegram2_End - telegram2_Start)); // debug print processing serial data myLength
             Serial.print(":");            // debug print processing
             Serial.print(telegram2_Pos);  // debug print processing last record positition
             Serial.print(",s=");          // debug print processing
@@ -2964,7 +3365,7 @@ void readTelegramWL() {
               // if (strncmp(telegram2Record, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0 && endChar > 0 && valChar > 0) {
               // total HeatFlow
               // HeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), (endChar - 40) );   // -37:xxx.xxx*m3, -38:xx.xxx GJ
-              long tHeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), 38) ;   // pointer & record length = 30-38 to get intger long
+              long tHeatFlowConsumption = getValue(strstr(telegram2Record,"0-1:24.2.1("), 38) ;   // pointer & record myLength = 30-38 to get intger long
               
               Serial.print(" WL-");               //  v46 print value/type unconditionally on new 
               Serial.print(telegram2[valChar+1]);   
@@ -2978,14 +3379,16 @@ void readTelegramWL() {
 
               if (tHeatFlowConsumption < 1) {       // check for valid value, must be at WL
                 Serial.print("-X");                
-              } else if ( telegram2[valChar+1] == 'G' ) { // record is expressed in GJ
+              } else if ( telegram2[valChar+1] == 'G'     // record is expressed in GJ
+                       || telegram2[valChar+2] == 'G') {  // v61b support for shifted (test) COP_MODE records
                 HeatFlowConsumption = 0;                  // reset as we have Heat
                 HeatConsumptionOld = HeatConsumption;     // save previous read
                 HeatConsumption = tHeatFlowConsumption;   // get new read  
                 if (HeatConsumptionOld == 0  && HeatConsumption > 0) {  // do not apply compare when 0
                     HeatConsumptionOld = HeatConsumption ;
                 }
-              } else if ( telegram2[valChar+1] == 'm') {  // record is expressed in m3
+              } else if ( telegram2[valChar+1] == 'm'     // record is expressed in m3
+                     ||   telegram2[valChar+2] == 'm') {  // v61b support for shifted (test) COP_MODE records
                 HeatConsumption = 0;                      // v46 reset as we have Flow
                 HeatFlowConsumption = tHeatFlowConsumption;  
               }
@@ -3003,12 +3406,12 @@ void readTelegramWL() {
         yield();  // do background processing required for wifi etc.
         ESP.wdtFeed(); // feed the hungry timer
 
-      } // if (len > 0)  {   // do we have bytes in buffer
+      } // if (myLen > 0)  {   // do we have bytes in buffer
       loopTelegram2cnt++;   /// account this readloop to prevent overrunning on RX2
     } // while data
 
     if (outputOnSerial) {
-      Serial.print((String) " [lenTelegram2="     + lenTelegram2 );  // debug print transaction length
+      Serial.print((String) " [myLenTelegram2="     + myLenTelegram2 );  // debug print transaction myLength
       Serial.print((String) ", loopTelegram2cnt=" + loopTelegram2cnt );
       Serial.print((String) ", Got_Telegram2Record_cnt="+ Got_Telegram2Record_cnt + "].");
       Serial.println("");
@@ -3023,11 +3426,11 @@ void readTelegramWL() {
 void processGpio() {    // Do regular functions of the system
   /*
   int  tmpb = processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
-  bool tmpc = processLightRead(digitalRead(LIGHT_READ));        // process LedLightstatus read pin D6
+  bool tmpc = processHotLedRead(digitalRead(LIGHT_READ));        // process LedLightstatus read pin D6
   bool tmpa = processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
   */
   processAnalogRead();                              // read analog pin (+previous/2) to smooth, return adc
-  processLightRead(LOW);        // process LedLightstatus read pin D6
+  processHotLedRead(LOW);        // process LedLightstatus read pin D6
   processThermostat(digitalRead(THERMOSTAT_READ)) ; // process thermostat switch  D7-in, D8-out
 
   processTemperatures();      // from DS18B20 tempsensors
@@ -3039,7 +3442,7 @@ void processGpio() {    // Do regular functions of the system
     //  condition ? expression-true : expression-false
     //  printf(i < 0 ? "i is below 0" : i == 0 ? "i equal 0" : "i is over 0");
     
-    Serial.print((String) "\nM#@t=" + (mqttCnt+1) + " @" + (millis() / 1000) + ", TimeP1="  + currentTimeS);  // as - including any errors -  extracted from P1 read
+    Serial.print((String) "\nM#@t=" + (mqttCnt_Out+1) + " @" + (millis() / 1000) + ", TimeP1="  + currentTimeS);  // as - including any errors -  extracted from P1 read
 
     Serial.print((String) ((validTelegramCRCFound) ? " (E#=" : " (e#=") + telegramError + ")" );  // cleaner code; display errors
     // if (validTelegramCRCFound) Serial.print((String) " (E#="          + telegramError + ")"); // data contains errors
@@ -3071,7 +3474,7 @@ void processGpio() {    // Do regular functions of the system
 /* 
     Mqtt input received, callled whenever a MQTT subscription message arrives
 */
-void callbackMqtt(char* topic, byte* payload, unsigned int length) {
+void callbackMqtt(char* topic, byte* payload, unsigned int myLength) {
   previousBlinkMillis = millis() + intervalBlinkMillis ; // end the shortblink (if any)
 
   // struggling with C++ forbids comparison between pointer and integer
@@ -3081,9 +3484,10 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
   // String w1="";
   //  w1 = (char)payload[0];
 
+  mqttCnt_In++;     // add 1 to input command
   String mqttCommand = ""; // initialise as string
   int i = 0;
-  for (i = 0; (i < length && i < sizeof(mqttReceivedCommand)); i++) { // read mqtt payload
+  for (i = 0; (i < myLength && i < sizeof(mqttReceivedCommand)); i++) { // read mqtt payload
       char receivedChar = (char)payload[i];
       mqttCommand += receivedChar;
       mqttReceivedCommand[i] = (char)payload[i];
@@ -3095,17 +3499,21 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length) {
     Serial.print(topic);
     Serial.print("]: ");
     // char w1 = (char)payload[0];
-    Serial.println((String)(mqttCommand) + ", len=" + i );
+    Serial.println((String)(mqttCommand) + ", myLen=" + i );
     // Serial.println((String)mqttReceivedCommand[0] + (int)mqttReceivedCommand[1]); 
     // yield();  // do background processing required for wifi etc.
   }
+  // if (mqttCnt_In == 1 )   // display start reason
+    publishMqtt(mqttLogTopic, (String) "ESP P1 command:" + mqttReceivedCommand 
+      + ", (" + mqttCnt_In + "/"  + mqttCnt_Out + ")." 
+      );  // v72 report  how we restarted
 }
 
 
 /* 
   Processing queued mqttCommand, received by callbackMqtt 
 */
-void ProcessMqttCommand(char* payload, unsigned int length) { 
+void ProcessMqttCommand(char* payload, unsigned int myLength) { 
   /* Commands: (single byte)
 
     ? Print brief helptexst on serial output
@@ -3119,8 +3527,9 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
     l No mqtt logging
     e enforce error div/0 causing a restart
     E same, enforce error div/0 causing a restart
-    b decrease P1 Baudrate port  Gpio14/D5  by 50
-    B increase Baudrate P1 port by 50
+    b decrease P1 Baudrate port  Gpio14/D5  by 50 or value 0-9 = 100-1000
+    B increase Baudrate P1 port by 50 or value 0-9 = 100-1000
+    J change [+-][0-9] m_bitwait of serial
     F toggle (test) Function
     f BlueLed2 Gpio2/d4 led cycle Crc / off / HotWater / Water
     W toggle Watertrigger on Gpio5/D1 or overriding it with Watertrigger1
@@ -3148,21 +3557,24 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 
 
   */
-  if ((char)payload[0] != '\x00' && 
-      ( (char)payload[1] == '\x00' || (char)payload[2] == '\x00' ) )  {   // only single/double command supported for now
-    if         ((char)payload[0] == '0') {
+  if (  (char)payload[0] != '\x00' && 
+      ( (char)payload[1] == '\x00' ||
+        (char)payload[2] == '\x00' ||
+        (char)payload[3] == '\x00' ||
+        (char)payload[4] == '\x00') )  {   // v58b up to 5 commmands
+      
+    if         ((char)payload[0] == '0' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)) {
       new_ThermostatState = 0;                   // Heating on
       if (outputOnSerial) Serial.print("Thermostat will be switched off.");
-    } else  if ((char)payload[0] == '1') {
+    } else  if ((char)payload[0] == '1' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)
       new_ThermostatState = 1;                   // Heating off
       if (outputOnSerial) Serial.print("Thermostat will be switched on.");
     } else  if ((char)payload[0] == '2') {
       new_ThermostatState = 2;                   // Heating follows input
       if (outputOnSerial) Serial.print("Thermostat will follow input.");
-    } else  if ((char)payload[0] == '3') {
-      new_ThermostatState = 3;                   // Heating left alone
+    } else  if ((char)payload[0] == '3' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)
       if (outputOnSerial) Serial.print("Thermostat routine disabled.");
-    } else  if ((char)payload[0] == 'R') {                                            // Restart
+    } else  if ((char)payload[0] == 'R' && mqttCnt_In > 0 ) {               // restart; v72 process only when it is a suubsequent command)
       if (outputOnSerial) Serial.print("Restart Request Received.");
       ESP.restart();
     } else  if ((char)payload[0] == 'D') {
@@ -3181,11 +3593,26 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       if (!outputMqttLog2)  Serial.print("OFF\r\n ");
       if (outputMqttLog2)   Serial.println("\nON ");
     } else  if ((char)payload[0] == 'v') {
-      if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') verboseLevel =  (int)payload[1] - 48;   // set number myself
-      else verboseLevel++ ;
-      if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
+      if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') {
+          verboseLevel =  (int)payload[1] - 48;   // set number myself
+          if (verboseLevel == 8) {
+            Serial.print("\tv8/setDebugOutput(true)\t");    // v58
+            Serial.setDebugOutput(true);    // v58
+          }                
+          if (verboseLevel == 9) {
+            Serial.print("\tv9/setDebugOutput(false)\t");    // v58            
+            Serial.setDebugOutput(false);   // v58
+          }            
+          if (verboseLevel > VERBOSE_MAX) {
+            outputOnSerial = true;
+            verboseLevel = VERBOSE_MQTT;  // print all below and MQTT
+          }
+      } else { 
+            verboseLevel++ ;
+      }
       if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
-    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '1' ) {
+      if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
+    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '1' && mqttCnt_In > 0 ) {  // v72 process only when it is a suubsequent command)
         Serial.print("## forcing divide error");
         while (true) {
           int a = 0;
@@ -3194,7 +3621,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.printf(" error0 %d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
-    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '2' ) {
+    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '2' && mqttCnt_In > 0 ) {  // v72 process only when it is a suubsequent command)
         Serial.print("## forcing infinite loop");
         while (true) {
           int a = 1;
@@ -3208,13 +3635,114 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       Serial.print("\t doForceFaultP1=");
       if (!doForceFaultP1)  Serial.println("OFF\t");
       if (doForceFaultP1)   Serial.println("ON\t");
-    } else  if ((char)payload[0] == 'b') {    // here
-        p1Baudrate = p1Baudrate - 50 ;
-        Serial.print((String)"Decreasing Baudrate to " + p1Baudrate);
-    } else  if ((char)payload[0] == 'B') {    // here
-        p1Baudrate = p1Baudrate + 50 ;
-        Serial.print((String)"Increasing Baudrate to " + p1Baudrate);
+
+    } else  if ((char)payload[0] == 'B') {    // v58b: changed to control Baudrate of port 1/2 with +/- 0-9
+      if (((char)payload[1] >= '1' && (char)payload[1] <= '3') &&
+          ((char)payload[2] == '+' || (char)payload[2] == '-') && 
+          ((char)payload[3] >= '1' && (char)payload[3]) ) {
+          int temp = (((int)payload[3] - 48) * 25);   // set number 0-9  add or minus
+          if ( (char)payload[3] == '6')  temp =   100;   // increase by 100 if 9
+          if ( (char)payload[3] == '7')  temp =   500;   // increase by 100 if 9
+          if ( (char)payload[3] == '8')  temp =  1000;   // increase by 100 if 9
+          if ( (char)payload[3] == '9')  temp =  5000;   // increase by 100 if 9
+          if ( (char)payload[2] == '-')  temp = temp * -1;
+          if ( (char)payload[1] == '1' || (char)payload[1] == '3') serial1Baudrate = serial1Baudrate + temp; // set number 1-10  
+          if ( (char)payload[1] == '2' || (char)payload[1] == '3') serial2Baudrate = serial2Baudrate + temp; // set number 1-10  
+          
+          Serial.print((String)"\tBaud" + (char)payload[1] + "="   // v58b display result
+                 + ( (char)payload[1] == '1' ?  serial1Baudrate : serial2Baudrate )
+                 + "\t" );
+        }
+    } else  if ( (char)payload[0] == '\\') {   // v60a change l_bitwait        
+          Serial.println("hello");
+    } else  if ( (char)payload[0] == 'K' || (char)payload[0] == 'k' ) {   // v60a change l_bitwait
+          Serial.print((String) "\n\rM_TIME_BIT_START=" + mySerial1.peekTime(M_TIME_BIT_START) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_STOP) - mySerial1.peekTime(M_TIME_BIT_START)) + ")"
+                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_STOP))  
+                        + "\r\n" ); 
+          Serial.print((String) "M_TIME_BIT_START1=" + mySerial1.peekTime(M_TIME_BIT_START1) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_STOP1) - mySerial1.peekTime(M_TIME_BIT_START1)) + ")"
+                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_STOP1))  
+                        + "\r\n" ); 
+          Serial.print((String) "M_TIME_BIT_STOP=" + mySerial1.peekTime(M_TIME_BIT_STOP) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_END1) - mySerial1.peekTime(M_TIME_BIT_STOP)) + ")"          
+                        + "=\t M_TIME_BIT_END1=" + mySerial1.peekTime(M_TIME_BIT_END1) 
+                        + "(" + (mySerial1.peekTime(M_TIME_BIT_END2) - mySerial1.peekTime(M_TIME_BIT_END1)) + ")"
+                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_END2))  
+                        + "\r\n" ); 
+    } else  if (  ( (char)payload[0] == 'J' || (char)payload[0] == 'j' )  &&              // v58 change m_bitwait
+                  ( (char)payload[1] == '+' || (char)payload[1] == '-')   &&
+                  ( (char)payload[2] >= '0' && (char)payload[2] <= '9') ) {
         
+        int temp  = (((int)payload[2] - 48));
+        if ( (char)payload[2] == '6')  temp =  10;   // increase by more
+        if ( (char)payload[2] == '7')  temp =  25;   // increase by more
+        if ( (char)payload[2] == '8')  temp =  50;   // increase by more
+        if ( (char)payload[2] == '9')  temp = 100;   // increase by more
+        // Serial.print((String)"\r\n Changing m_bitwait with " + temp ) ;
+        if ((char)payload[1] == '-') temp = temp * -1;
+        // Serial.print((String)"\r\n to " + temp ) ;
+
+        /*
+            Get timer values
+        */
+        unsigned long m_bitWait = 0;
+        unsigned long speed = 0;
+        if ( (char)payload[0] == 'J' ) {
+          temp  = mySerial1.m_bitWait + temp;
+          m_bitWait = mySerial1.m_bitWait;
+          speed = serial1Baudrate;
+        } else  {
+          temp  = mySerial2.m_bitWait + temp;
+          m_bitWait = mySerial2.m_bitWait;
+          speed = serial2Baudrate;
+        }
+
+        Serial.print((String) "\r\n"
+              + (char)payload[0] + (char)payload[1] + (char)payload[2] 
+              + "-> Bitwait-" + 
+              + ( (char)payload[0] == 'J' ? "P1" : "WL" )
+              + "=" + temp 
+              ) ;
+        /*
+            set timer in Driver
+        */
+        if ( (char)payload[0] == 'J' ) 
+              mySerial1.m_bitWait  = temp;
+        else  mySerial2.m_bitWait  = temp;
+
+      /*
+          Routine to simulate timer parts of bitbang SoftwareSerial241.cpp
+      */
+      unsigned long m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
+      unsigned long l_bitTime = m_bitTime;
+
+
+      unsigned long l_wait = l_bitTime + l_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
+      Serial.print((String) ", l_bitTime="+ l_bitTime +", l_wait=" + l_wait + "..(");
+      #define BYTE_MAXWAIT_T 7100
+      #define WAITIram5K { while (ESP.getCycleCount()-l_start < l_wait && l_wait<BYTE_MAXWAIT_T); l_wait += l_bitTime; }
+      uint8_t rec = 0;
+      // cli();   // hold interrupts ( or noInterrupts() )
+      ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
+
+      unsigned long l_start = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+         for (int i = 0; i < 8; i++) {
+            WAITIram5K;
+            rec >>= 1;
+            if (digitalRead(SERIAL_RX))
+              rec |= 0x80;
+            else                    // v52 balance isr rxread always doing or operation
+              rec |= 0x00;
+         }  
+         WAITIram5K;                // stopbit
+      temp = ESP.getCycleCount();         // cycle counter, which increments with each clock cycle  (doc: v55d)
+      // sei();   // resume interrupts
+      ETS_INTR_UNLOCK(); // v63a enable as suggested by DeepSeek 
+  
+      Serial.print((String)"t_wait=" + (temp - l_start) + ")..\t" ) ;   // 407
+
+
   /* DNO , leave it to investigate how to force an exception
       } else  if ((char)payload[0] == 'e') {    // here
             try {
@@ -3230,33 +3758,40 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.print(rx2_function == true ? "ON" : "OFF");
       }
 
-    } else  if ((char)payload[0] == 'f') {  // control Blue_led assignment     //herev38
-      if (blue_led2_Water) {
-          blue_led2_Water = !blue_led2_Water;
-          blue_led2_HotWater = !blue_led2_HotWater;          
-        #ifdef NoTx2Function                    
-          if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);   // OFF
-        #endif                    
+    } else  if ((char)payload[0] == 'f') {  // control Blue_led2 assignment     //v61a revise CRC->Off->Water->Hot
+      if ((char)payload[1] == '0'  ||(char)payload[1] == '1') {
+          blue_led2_Water    = false;
+          blue_led2_Crc      = false;
+          blue_led2_HotWater = false;
+          #ifdef NoTx2Function                    
+            if ((char)payload[1] == '0'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
+            if ((char)payload[1] == '1'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);  // OFF
+          #endif                    
+          Serial.print("BlueLed2 = Inact");           // BlueLed2 Off
+      } else if (blue_led2_Water) {
+          blue_led2_Water    = false;
+          blue_led2_Crc      = false;
+          blue_led2_HotWater = true;
           Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
           // Serial.print(""); // stability test v43 // extra
           // Serial.print(""); // stability test v43
           Serial.print("."); // stability test v43
-
-          // Serial.print("BlueLed2 = HotWater.");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
           // Serial.print(""); // stability test v38    // stability deactive v44
           // Serial.print("."); // stability test v38   // stability deactive v44
       } else if (blue_led2_HotWater) {
-          blue_led2_HotWater = !blue_led2_HotWater;
-          blue_led2_Crc = !blue_led2_Crc;
+          blue_led2_Water    = false;
+          blue_led2_Crc      = true;
+          blue_led2_HotWater = false;
           Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Crc check to BleuLed2 , initial On
       } else if (blue_led2_Crc) {
-          blue_led2_Crc = !blue_led2_Crc;
+          blue_led2_Crc      = false;
+          blue_led2_Water    = false;
+          blue_led2_HotWater = false;
           Serial.print("BlueLed2 = Off");            // BlueLed2 Off
       } else {
-          blue_led2_Water = !blue_led2_Water;
-        #ifdef NoTx2Function                                       
-          if (!loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
-        #endif
+          blue_led2_Water    = true;
+          blue_led2_Crc      = false;
+          blue_led2_HotWater = false;
           Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
       }
        // Clear GJ buffer
@@ -3267,7 +3802,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
          if (loopbackRx2Mode == 1 || loopbackRx2Mode == 3) {  // v57
             outputOnSerial = false;   // disable debug details as we focus on serial input display
             rx2ReadInterval = 1;      // process this for any RX2 loop
-            verboseLevel = 4;         // v57
+            verboseLevel = VERBOSE_P1;         // v57
          }
         /* 
             Playing here with myserial is useless
@@ -3275,25 +3810,25 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 
          if        (loopbackRx2Mode == 1 ) { // redefine myserial2
             SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2, !bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
-            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 - 10);
+            if (!serial2Stop) mySerial2.begin(serial2Baudrate - 10);
             Serial.print((String) " RX2 baudrateB1 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
                     + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
-                    + ", p1Baudrate2=" + p1Baudrate2  
+                    + ", serial2Baudrate=" + serial2Baudrate  
             );
           } else if (loopbackRx2Mode == 2 ) {
             SoftwareSerial mySerial2(SERIAL_RX2, SERIAL_TX2,  bSERIAL2_INVERT, MAXLINELENGTH2); // (RX, TX, invertmode, buffer)
-            if (!serialStopRX2) mySerial2.begin(p1Baudrate2 + 10);
+            if (!serial2Stop) mySerial2.begin(serial2Baudrate + 10);
             Serial.print((String) " RX2 baudrateB2 =" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
                     + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")  
-                    + ", p1Baudrate2=" + p1Baudrate2  
+                    + ", serial2Baudrate=" + serial2Baudrate  
             );
           }
           // print loopTelegram2cnt ???
         */
       } else {
          loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
-         Serial.print((String) " RX1 baudrateA1=" + mySerial.baudRate() // v53: print diagse status if resetted myserial2
-                             + " RX2 baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+         Serial.print((String) " P1 baudrateA1=" + mySerial1.baudRate() // v53: print diagse status if resetted myserial2
+                             + " WL baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
                              + " loopbackRx2Tx2=" + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")
                              + " " );
       }
@@ -3358,7 +3893,8 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       waterTriggerCnt  = 0 ;     // v47 reset waterTriggerCnt
       waterReadCounter = 0 ;     // Zero the Water counters
       waterReadHotCounter = 0 ;  // Zero the WaterHot counter
-      mqttCnt = 0;               // Zero mqttCnt
+      mqttCnt_Out = 0;               // Zero mqttCnt_Out
+      mqttCnt_In  = 0;               // V72 Zero mqttCnt_In
 
       p1MissingCnt = 0;      // v52 updated when we failed to read any P1
       p1CrcFailCnt = 0;      // v52 updated when we Crc failed
@@ -3370,7 +3906,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
       waterTriggerState = LOW;   // reset debounce
       waterReadState    = LOW;   // read watersensor pin
       if (outputOnSerial) {
-        Serial.print("WaterCnt = 0, mqttCnt = 0, reset/Watersensor/timers");
+        Serial.print("WaterCnt = 0, mqttCnt_Out = 0, reset/Watersensor/timers");
       }
     } else  if ((char)payload[0] == 'I') {
       intervalP1cnt = 2880;              // make P1 Interval not critical
@@ -3396,7 +3932,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
         if (!outputMqttPower2 ) Serial.print("Inactive.");
       }
     } else  if ((char)payload[0] == 'm') {       // v48 10jun25 print m-asked Input array
-      Serial.println((String)"\r\n dataIn telegram_crcIn len=" + telegram_crcIn_len + " som>>");
+      Serial.println((String)"\r\n dataIn telegram_crcIn myLen=" + telegram_crcIn_len + " som>>");
       for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
         if (isprint(telegram_crcIn[cnt])) {             // if printable
             Serial.print(telegram_crcIn[cnt]);
@@ -3406,14 +3942,14 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
             Serial.print("\n");
         } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
             Serial.print("|");
-            break;
+            // break;
         } else  {
             Serial.print("?");                    // unprintable
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
     } else  if ((char)payload[0] == 'M') {       // v48 10jun25 print M-asking array
-      Serial.println((String)"\r\n Recovery telegram_crcOut len=" + telegram_crcOut_len + " som>>");
+      Serial.println((String)"\r\n Recovery telegram_crcOut myLen=" + telegram_crcOut_len + " som>>");
       for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
         if (isprint(telegram_crcOut[cnt])) {             // if printable
             Serial.print(telegram_crcOut[cnt]);
@@ -3423,29 +3959,53 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
             Serial.print("\n");
         } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
             Serial.print("|");
-            break;
+            // break;
         } else  {
             Serial.print("?");                    // unprintable
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
-    } else  if ((char)payload[0] == 'S') {  // v52 serial stop activating P1
-      if  (    (char)payload[1] ==  '0') p1SerialFinish = false;   // set number myself
-      else if ((char)payload[1] ==  '1') p1SerialFinish = true ;   // set number myself
-      else serialStopP1 = !serialStopP1;
-      if (outputOnSerial) {
-        Serial.print((String) 
-          " Serial P1="  + (!serialStopP1  ? "Active" : "disabled") + " )" 
-          " p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") + " )" 
-          " p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
-        ) ;
-      }
-    } else  if ((char)payload[0] == 's') {  // v52 serial stop activating RX2
-        if ( (char)payload[1] >= '1' && (char)payload[1] <= '9') rx2ReadInterval = (int)payload[1] - 48;   // set number myself
-        else serialStopRX2 = !serialStopRX2;
-        // if (rx2ReadInterval < 1) rx2ReadInterval = 7;   // reset back to 7 (actual 6*12=72secs)
-        if (outputOnSerial) Serial.print((String) " Serial RX2=" + rx2ReadInterval  
-                            + " (" + (!serialStopRX2  ? "Active" : "disabled") + " )" ) ;
+    
+    } else  if ( (char)payload[0] == 'S') {  // v52 serial stop activating P1
+        if  (    (char)payload[1] == '0') p1SerialActive = !p1SerialActive;   // set number myself
+        else if ((char)payload[1] == '1') p1SerialFinish = !p1SerialFinish ;   // set number myself
+        else if ((char)payload[1] == 'p') serial1PortMode = 0;    // v58b use physical port data SS241
+        else if ((char)payload[1] == 'T') serial1PortMode = 1;    // v58b use internal simulation  SS241
+        else if ((char)payload[1] == '\x00') serial1Stop = !serial1Stop;
+
+        if (outputOnSerial) Serial.print((String) 
+              " Serial1 P1 state " 
+            +  (serial1Stop  ? "disabled" : "Enabled") 
+            +  (mySerial1.portActive() ? "/ISR" : "/---")   // v59 display if port has ISR activated
+            + " mode="        + serial1PortMode    // v58b
+            + " Finish="  + (p1SerialFinish  ? "1" : "0") + " )" 
+            + " Active="  + (p1SerialActive  ? "1" : "0") + " )" ) ;
+
+        else Serial.print((String) "\tSerial1=" 
+              + (!serial1Stop  ? "E" : "D") 
+              + serial1PortMode
+              + (p1SerialActive  ? "A" : "a")
+              + (p1SerialFinish  ? "F" : "f")              
+              + "\t" );
+    } else  if ( (char)payload[0] == 's') {  // v52 serial stop activating RX2
+        if (     (char)payload[1] >= '1' && (char)payload[1] <= '9') 
+             rx2ReadInterval = (int)payload[1] - 48;   // set number myself
+        else if ((char)payload[1] == 'p') serial2PortMode = 0;    // v58b use physical port data SS241
+        else if ((char)payload[1] == 'T') serial2PortMode = 2;    // v58b use internal simulation  SS241
+        else if ((char)payload[1] == '\x00') serial2Stop = !serial2Stop;
+        
+
+        if (outputOnSerial) Serial.print((String) 
+              " Serial2 WL state " 
+            +  (serial2Stop  ? "disabled" : "Enabled") 
+            +  (mySerial2.portActive() ? "/ISR" : "/---")    // v59 display if port has ISR activated
+            + " mode="           + serial2PortMode    // v58b   
+            + " interval="       + rx2ReadInterval ) ;   //  % mqttCnt_Out
+
+        else Serial.print((String) "\tserial2=" 
+              + (!serial2Stop  ? "e" : "d") 
+              + serial2PortMode + "\t"  );
+
     } else  if ((char)payload[0] == 'a') {  // v52 manipulate analog read value
         // nowValueAdc = 0;
         if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') nowValueAdc = (((int)payload[1] - 48) * 100);   // set number myself
@@ -3464,6 +4024,51 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           if ( (char)payload[1] == '2') command_testH2();    // v52: check mqtt empty strings
           if ( (char)payload[1] == '3') command_testH3();    // v55 
           if ( (char)payload[1] == '4') command_testH4();    // v55a redudant delay()
+
+    } else  if ((char)payload[0] == 't') {    // v59b print bittime ttable
+            // commands: 
+            //      txy - byte timer table serial port x by y blockbytes
+            //      tt  - timer staks table as maintained by softserial
+            //      ts  - port state as maintend by  softserial
+            //      --  - defaul print fst 16 bytes of P1 record
+            if ( ( (char)payload[1] == '1' || (char)payload[1] == '2') &&
+                 ( ( (char)payload[2] >= '1' && (char)payload[2] <= '6' ) ||
+                     (char)payload[2] == 'b' ||  
+                     (char)payload[2] == 'i' ||  
+                     (char)payload[2] == 'd' || // t1d will display tbufferstimes, character  and masking table
+                     (char)payload[2] == 'c' )
+               ) {
+
+                 int peekport = (((int)payload[1] - 48));   // set portnumber
+                       if ( (char)payload[2] == '1') serial_Print_PeekBits(peekport,   32);
+                  else if ( (char)payload[2] == '2') serial_Print_PeekBits(peekport,   64);
+                  else if ( (char)payload[2] == '3') serial_Print_PeekBits(peekport,  128);
+                  else if ( (char)payload[2] == '4') serial_Print_PeekBits(peekport,  256);   // 200mS print time
+                  else if ( (char)payload[2] == '5') serial_Print_PeekBits(peekport,  512);   // 200mS print time
+                  else if ( (char)payload[2] == '6') serial_Print_PeekBits(peekport, 1024);   // 200mS print time
+                  else if ( (char)payload[2] == 'c') serial_Print_PeekBits(peekport, 2048);   // use text compare
+                  else if ( (char)payload[2] == 'b') serial_Print_PeekBits(peekport,(-2 * MAXLINELENGTH));   // print bit compare
+                  else if ( (char)payload[2] == 'i') serial_Print_PeekBits(peekport,(-1 * MAXLINELENGTH));   // binary compare CrcIn
+                  else if ( (char)payload[2] == 'd') {
+                                                     serial_Print_PeekBits(peekport, 1024);       // print time table  
+                                                     serial_Print_PeekBits(peekport, 2048);       // print diff table
+                                                     serial_Print_PeekBits(peekport,(-2 * MAXLINELENGTH)); // print mask compare
+                                                     }
+
+                 } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
+            else if ((char)payload[1] == 's') {
+                      Serial.println((String)"\n\rT-imer Porstate: ");
+                      printf_port_state_isr();
+                      Serial.println((String)"");
+                 }
+            else if ((char)payload[1] == 't') {   // print m_buffer_time[M_TIME_BIT_...] table entries
+                      Serial.println((String)"\n\rT-imer Task: ");
+                      serial_Print_PeekTime(1,M_TIME_ENTRIES);
+                      serial_Print_PeekTime(2,M_TIME_ENTRIES);
+                      Serial.println((String)"");
+            } else if ((char)payload[1] == '2')  serial_Print_PeekBits(2       ,  16);   // print 16 entries serial 2
+            else                                 serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
+
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
           Serial.println((String)"\r\n? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
@@ -3477,23 +4082,28 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                                                     + (new_ThermostatState == 3 ? " <--" : "" ) );
           Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
           Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
-          Serial.println((String)"L log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
+          Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
           Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-          Serial.println((String)"b Baud decrease gpio14:"        + "\t" +  p1Baudrate);
-          Serial.println((String)"B Baud increase gpio14"         + "\t" +  p1Baudrate);
-          Serial.println((String)"l Stoplog "+ mqttLogTopic);
+          Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
+                                    + " serial1=" +  serial1Baudrate
+                                    + " serial2=" +  serial2Baudrate);
+          Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
+          Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
           Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
           Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
                                                                          + (blue_led2_Water ? "Y" : "N") 
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
+          Serial.println((String)"t 1/2 0-6/i/c/d Print Byte Tables serial1/2 ");        // v59, v64a
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
           Serial.println((String)"Z zero counters " + 
-                + "( faults: " 
+                + "(mqtt=" + mqttCnt_Out              // v63 Output count
+                + " cmd=" + mqttCnt_In            // v72 display input number
+                + " faults: " 
                 + " Miss=" + p1MissingCnt         // v52 failed to read any P1
                 + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
                 + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
@@ -3508,18 +4118,37 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
           Serial.println((String)"M print Masking array "+ "( MaskX="+ telegram_crcOut_cnt + " )" );   // v52 number of X maskings
           Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )" );   // v52 number of Times we validated
           Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
-          Serial.println((String)"S ON/off \t\tserial1P1-"
-                        + (bSerialP1State  ? "A" : "i")
-                        + "\t" + (!serialStopP1  ? "Yes" : "No") 
-                        + ", p1SerialFinish=" + (p1SerialFinish  ? "1" : "0") 
+          int temp1 = mySerial1.m_bitWait * 1;
+            // S P/T|0-1 serial1 on/off finish
+            // s P/T|0-9 serial2 interval
+          Serial.println((String)"S (p|Test|0-1) ON/off "
+                        + "\t" + (!serial1Stop  ? "Yes" : "No") 
+                        + "\tserial1P1-"
+                        + (bSerial1State  ? "A" : "i")
+                        +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
+                        + " , bitWait=" + temp1
+                        + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
+                        + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
                         + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
                         );
-          Serial.println((String)"s ON/off/{0-9} \t\tserial2P2-"
-                        + (bSerialP2State  ? "A" : "i")
-                        + ":"+ rx2ReadInterval  
-                        +" \t" + (!serialStopRX2  ? "Yes" : "No") );
+          
+          int temp2 = mySerial2.m_bitWait * 1;
+          Serial.println((String)"s (p|Test|0-9) ON/off" 
+                        + " \t" + (!serial2Stop  ? "Yes" : "No")          
+                        + "\tserial2P2-"
+                        + (bSerial2State  ? "A" : "i")
+                        +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
+                        + " , bitWait=" + temp2
+                        + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
+                        + ", interval:"+ rx2ReadInterval  
+                        );
           
           Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
+          Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+                                                      // + "/" + (mySerial1.m_bitWait % 1) + "/"
+                                                      + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
+                                                      + ", jserial2=" + mySerial2.m_bitWait);
+          
           Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
           
           Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
@@ -3538,7 +4167,7 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
                                 + "\t" + DS18B20_SENSOR    + "=DS18B20_SENSOR:"   + !digitalRead(DS18B20_SENSOR)   
                                 + "\t" + BLUE_LED2         + "=BLUE_LED2:"        + !digitalRead(BLUE_LED2)       ); 
           Serial.println((String) "\t" + SERIAL_RX         + "=SERIAL_RX:"        + !digitalRead(SERIAL_RX)        
-                                + "\t" + LIGHT_READ        + "=LIGHT_READ:"       + !digitalRead(LIGHT_READ)       
+                                + "\t" + LIGHT_READ        + "=HOT_READ:"         + !digitalRead(LIGHT_READ)       
                                 + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
                                 + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
                                 + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
@@ -3556,12 +4185,14 @@ void ProcessMqttCommand(char* payload, unsigned int length) {
 */
 void publishP1ToMqtt()    // this will go to Mosquitto
 {
+  preserve_lightReadState_for_mqtt = false;  // indicate we have/will process this state  
   // int publishP1ToMqttCrc = 0;           // defining here leads tot memory corruption & stalls ??
   publishP1ToMqttCrc = 0;                  // reset
-  if (validTelegramCRCFound) publishP1ToMqttCrc = 1; else if (validCrcInFound) publishP1ToMqttCrc = 2; 
+  if (validTelegramCRCFound) publishP1ToMqttCrc = 1;    // was read OK
+  else if (validCrcInFound)  publishP1ToMqttCrc = 2;    // recovered
   else p1MissingCnt++;    // v52 count missing Crc (likeley records was not read at all)
   
-  mqttCnt++ ;             // update counter
+  mqttCnt_Out++ ;             // update counter
   // Serial.println("Debug4 publishP1ToMqtt");
   if (CheckData() || forceCheckData ) {       // do we have/want some valid P1 meter reading
     // Serial.println("Debug CheckData=true");
@@ -3573,14 +4204,13 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       }
       digitalWrite(BLUE_LED, LOW);   //Turn the ESPLED on
     */
-
     // digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off to signal a short
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
     delay(250);
     // digitalWrite(BLUE_LED, LOW);   //Turn the ESPLED on
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
 
-  // Buffers
+    // Buffers
     // char msgpub[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360  04apr21 to #define 480
 
 
@@ -3621,7 +4251,12 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     } 
 
     msg.concat(",\"Heating\":%u");                     // Heating valve (out)
-    msg.concat(",\"HeatMode\":%u");                    // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
+    if (new_ThermostatState == old_ThermostatState) {  // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
+      msg.concat(",\"HeatMode\":%u");                  // current state
+    } else {
+      msg.concat(",\"XeatMode\":%u");                  // v71 execute mode, next run reported as HeatMode
+      old_ThermostatState = new_ThermostatState;       // v71 this to prevent we nullify an openHAB request
+    }
     /*
       if (outputOnSerial) {
         Serial.print( "Sending Mqtt temp5of5: " );
@@ -3642,7 +4277,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // msg.concat("\"GasConsumption\": %lu");
 
     // msg.concat(", \"Version\":1.3a }");
-    msg.concat(", \"mqttCnt\":%u");                     // as of 19nov19 include our message counter
+    msg.concat(", \"mqttCnt\":%u");      // as of 19nov19 include our message counter, v72 keep field name
 
     msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
 
@@ -3698,9 +4333,9 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(", \"Version\":\"%s\"");                    // V57 prog_version %u to %s  version "Version":4157.2_7_1"
     msg.concat(" }"); // terminate JSON
     
-  // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
-  //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
-  //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
+   // important note: sprinft corrupts and crashes esp8266, use snprinf which CAN handle multiple variables
+   //  msg.toCharArray(msgpub, MQTTBUFFERLENGTH);         // 27aug18 changed from 256 to 320 to 360 to MQTTBUFFERLENGTH
+   //  sprintf(output, msgpub,           // construct data  http://www.cplusplus.com/reference/cstdio/sprintf/ , formats: http://www.cplusplus.com/reference/cstdio/printf/
     // snprintf(output, sizeof(output), msgpub ,
     char output[MQTTBUFFERLENGTH];             // 20mar21 changed from 320 to 360, 04apr21 to #define 480, moved to here
     memset(output, 0, sizeof(output));  // initialise , v55b tto initialise
@@ -3733,7 +4368,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             thermostatWriteState,       // output setting for heating 1=inSetHighPowerRelais, 0=OffnoPowertoRelais
             new_ThermostatState,        // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
             // GasConsumption;
-            mqttCnt,                    // mqtt counter
+            mqttCnt_Out,                    // mqtt counter
 
             waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
             waterReadCounter,           // Watersensor state 21mar21 number falldowns
@@ -3753,16 +4388,16 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
     if (Got_Telegram2Record_cnt > Got_Telegram2Record_prev) {
         Got_Telegram2Record_prev = Got_Telegram2Record_cnt;   // count for this record
-        Got_Telegram2Record_last = mqttCnt;                 // administrate receive
+        Got_Telegram2Record_last = mqttCnt_Out;                 // administrate receive
     } else {
-        if (((mqttCnt - (Got_Telegram2Record_last)+1) % 7) == 1) {  // signal error at every 7th fault, +1 to prevent initial fault
+        if (((mqttCnt_Out - (Got_Telegram2Record_last)+1) % 7) == 1) {  // signal error at every 7th fault, +1 to prevent initial fault
                                             // normally , every 7th interval we have a RX2 record., 
           if (outputOnSerial) {
              Serial.println((String)"#!!# ESP RX2 timeout Warmtelink=" + intervalP1cnt );
           }
           String mqttMsg = "{\"error\":004 ,\"msg\":\"RX2fail";  // start of Json error message
           mqttMsg.concat((String) " " +  + "\", \"RX2Cnt\":"+ (Got_Telegram2Record_cnt) );      // finish JSON error message
-          mqttMsg.concat((String) " " +  + "\", \"mqttCnt\":"+ (mqttCnt) +"}");      // finish JSON error message
+          mqttMsg.concat((String) " " +  + "\", \"mqttCnt_Out\":"+ (mqttCnt_Out) +"}");      // finish JSON error message
           publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
         }
     }
@@ -3837,8 +4472,7 @@ bool processThermostat(bool myOperation)    // my operation is currently readed 
     if (outputOnSerial) Serial.print(" set ") ;
     if ( thermostatWriteState) {
       digitalWrite(THERMOSTAT_WRITE, HIGH ); // leave to high, switch off relay that issues voltage to Valve
-    }
-    if (!thermostatWriteState) {
+    } else {
       digitalWrite(THERMOSTAT_WRITE, LOW );  // pull to ground switch on relay that issues voltage to Valve
     }
   } else {
@@ -3881,7 +4515,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 
   if (nowValueAdc <= REQUIRED_ANALOG_ADC) {     // v49 check if we a Light sensor value reading
     String mqttMsg = "{\"error\":003 ,\"msg\":\"ADC Lightsensor value ";  // start of Json error message
-    mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt\":"+ (mqttCnt+1) +"}");      // finish JSON error message
+    mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt_Out\":"+ (mqttCnt_Out+1) +"}");      // finish JSON error message
     
     // char mqttOutput[128];
     // mqttMsg.toCharArray(mqttOutput, 128);
@@ -3920,12 +4554,12 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     }
   }
   
-  if (mqttCnt == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
+  if (mqttCnt_Out == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
     char output[128];
     snprintf(output, sizeof(output), 
-          "{\"info\":000, \"mqttCnt=\":%ld ,\"msg\":\"restart reason 0x%08x"
+          "{\"info\":000, \"mqttCnt_Out=\":%ld ,\"msg\":\"restart reason 0x%08x"
           ", epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x \"}",
-          mqttCnt , save_reason, 
+          mqttCnt_Out , save_reason, 
           save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
     if (client.connected()) client.publish(mqttErrorTopic, output);
     // publishMqtt(mqttErrorTopic, output); // report to /error/P1 topic
@@ -3938,12 +4572,12 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
       // client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
 
       // Serial.println((String) "\r\nmqtt>" + __LINE__ + ":" 
-      //     + "mqttCnt=" + mqttCnt
+      //     + "mqttCnt_Out=" + mqttCnt_Out
       //     + mqttTopic + ", "  + mqttOutput  + "<");  // display error on debug
 
       client.publish(mqttTopic, mqttOutput);          
       /*  v57: debug called itself loop
-        if (mqttCnt > 3) {
+        if (mqttCnt_Out > 3) {
         } else {
             client.publish(mqttTopic, mqttOutput);
         }
@@ -3966,19 +4600,58 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
 
 }
 
-// process Ledlightstatus indicating if Hotwater is tapped, return state
-bool processLightRead(bool myOperation)
-{
-  lightReadState   = digitalRead(LIGHT_READ); // read D6
+
+/*
+  bool processLightRead_v70(bool myOperation)
+  {
+    lightReadState   = digitalRead(LIGHT_READ); // read D6
+    #ifdef NoTx2Function                      
+      if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
+    #endif  
+    
+    if (mqttCnt_Out == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
+    // Process this one-to-one directly to output
+    if (outputOnSerial and lightReadState)  Serial.print("\r\nLightReadState D6 LOW...");  // debug
+    if (outputOnSerial and !lightReadState) Serial.print("\r\nLightReadState D6 HIGH..");  // debug
+    return lightReadState;  // return status
+  }
+*/
+/*
+  process / hold Ledlightstatus indicating if Hotwater was tapped during this P1 interval
+    LOW  = read (hold) state
+    HIGH = reset/renew until LOW
+*/
+bool processHotLedRead(bool notkeep_HoldState) {
+  bool local_lightReadState = false;
+  if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
+  else local_lightReadState = false; // read D6 and keep until mqtt
+
+  if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
-    if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
+    if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
   #endif  
-  
-  if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
-  // Process this one-to-one directly to output
-  if (outputOnSerial and lightReadState)  Serial.print("\r\nLightReadState D6 LOW...");  // debug
-  if (outputOnSerial and !lightReadState) Serial.print("\r\nLightReadState D6 HIGH..");  // debug
-  return lightReadState;  // return status
+
+  if (local_lightReadState == false) {               // true if Led/Hot is on
+      lightReadState        = local_lightReadState;    
+      preserve_lightReadState_for_mqtt = true;       // keep monitoring this until sent by mqtt process
+  } else {                                           // if hot off
+      if (notkeep_HoldState == false && !preserve_lightReadState_for_mqtt) {   
+            lightReadState   = local_lightReadState; // else preserved state was processed by mqtt
+      }
+  }
+
+  if (outputOnSerial && notkeep_HoldState == false) {  // regular debug once per P1 interval LOW
+             Serial.print((String) "\r\n Hotwater:2\t"    // v70 debug cuyrret, active and sent state of HotWater led
+              + "LightReadState D6 is "
+              + (local_lightReadState ? "High" : "Low")   // active state
+              + " last=" 
+              + (      lightReadState ? "Cold" : "Hot")      // hold status was high
+              + " preserve=" 
+              + (preserve_lightReadState_for_mqtt  ? "Yes"  : "No" )      // hold status was high
+              + "." );  // debug
+  }   
+
+  return local_lightReadState;  // return active status
 }
 
 
@@ -3986,7 +4659,7 @@ bool processLightRead(bool myOperation)
   process P1 data start / to ! Let us decode to see what the /KFM5KAIFA-METER meter is reading
   called each time we have a telegram record
 */
-bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends in Linefeed \n
+bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that ends in Linefeed \n
 {
   // there are 24 telegram lines (electricity() totalling  676bytes + 24 returns = 700 bytes
 
@@ -3994,8 +4667,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   validTelegramCRCFound = false;  // init telegram record
   validCrcInFound       = false;  // init Crcin record
 
-  int startChar = FindCharInArrayRev(telegram, '/', len);  // 0-offset "/KFM5KAIFA-METER" , -1 not found
-  int endChar   = FindCharInArrayRev(telegram, '!', len);  // 0-offset "!769A" , -1 not found
+  int startChar = FindCharInArrayRev(telegram, '/', myLen);  // 0-offset "/KFM5KAIFA-METER" , -1 not found
+  int endChar   = FindCharInArrayRev(telegram, '!', myLen);  // 0-offset "!769A" , -1 not found
   bool endOfMessage = false;    // led on during long message transfer
 
   // if-else-if check if we are on header, trailer of in between those lines
@@ -4009,9 +4682,9 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     // DebugCRC testTelegramPos = 0;     // initialise array
 
     // initialise CRC
-    // currentCRC=CRC16(0x0000,(unsigned char *) telegram+startChar, len-startChar);
+    // currentCRC=CRC16(0x0000,(unsigned char *) telegram+startChar, myLen-startChar);
 
-    //DebugCRC if (outputOnSerial) Serial.printf("{.%02X%02X%02X%02X}",telegram[len-startChar-2],telegram[len-startChar-1],telegram[len-startChar],telegram[len-startChar+1]);
+    //DebugCRC if (outputOnSerial) Serial.printf("{.%02X%02X%02X%02X}",telegram[myLen-startChar-2],telegram[myLen-startChar-1],telegram[myLen-startChar],telegram[myLen-startChar+1]);
 
     //   xN= {52 0D 00}
     //     {.0D000A00} /KFM5KAIFA-METER [16,17] {00 0D 4B}{29 0D 45}
@@ -4024,15 +4697,15 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
     if (strncmp(telegram+startChar , "/KFM5KAIFA-METER", strlen("/KFM5KAIFA-METER")) == 0) telegramP1header = true;   // indicate we are in header mode
 
-    currentCRC = Crc16In(0x0000, reinterpret_cast<unsigned char*>(telegram) + startChar, len - startChar - 1);  // initialise using header, v48-casting
-    if (telegram[startChar+len-2] == '\x0d') { // v48-casting add crc16 0x0a
+    currentCRC = Crc16In(0x0000, reinterpret_cast<unsigned char*>(telegram) + startChar, myLen - startChar - 1);  // initialise using header, v48-casting
+    if (telegram[startChar+myLen-2] == '\x0d') { // v48-casting add crc16 0x0a
       // currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add implied NL on header
         unsigned char tempLiteral[] = {0x0A};  // use temporarily literal to "unsigned char* cast of Crc16In, v48-casting
         currentCRC = Crc16In(currentCRC, tempLiteral, 1);
     }
 
     /*
-      if ( len = 1 && telegram[len-1] == '\x0d') {
+      if ( myLen = 1 && telegram[myLen-1] == '\x0d') {
         Serial.print("DebugAddCrLf.."); 
         currentCRC = CRC16(currentCRC, (unsigned char *) "\x0a\x0d\x0a", 3); // add stripped header
       }
@@ -4041,8 +4714,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
     /*
          if (outputOnSerial)  {     // Printing /KFM5KAIFA-METER
              // Serial.println("soh>\r\n");
-             if (len > 4) {
-                 for (int cnt = startChar; cnt < len - (startChar + 2); cnt++) { // print P1 characters
+             if (myLen > 4) {
+                 for (int cnt = startChar; cnt < myLen - (startChar + 2); cnt++) { // print P1 characters
                    // copy over the processed data
                    testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
                    if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
@@ -4056,180 +4729,236 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
          }
     */
 
-  } else {  // startChar >= 0
+  } 
+  else {  // startChar >= 0
   
     if (endChar >= 0 && telegramP1header) {   // Are we reading the trailer of the Meter with header passed
 
-      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram) + endChar, 1); // include trailer '!' into CRC, v48-casting
-      char messageCRC[5];
-      strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
-      messageCRC[4] = 0;                                // make it an end of string
+        currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram) + endChar, 1); // include trailer '!' into CRC, v48-casting
+        char messageCRC[5];
+        strncpy(messageCRC, telegram + endChar + 1, 4);   // copy 4 bytes crc and
+        messageCRC[4] = 0;                                // make it an end of string
 
-      validTelegramCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
-      if (doForceFaultP1) validTelegramCRCFound = false;    // v52 enforce P1 error
-      
-      if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
-      // incoperate CRC reciovery function
-      if (validTelegramCRCFound) {   // temporarily test√erify on Debug switch
-        p1ReadRxCnt++ ; // Count times we have had a succesfull CRC read
-        RX_yieldcount = 3; // assume all if well and we had of have surived any yieldcount
-        if (currentCRC == dataInCRC) { // on match build masking array
-          // ----------------------------------------------------------------------------------------------
-          validCrcInFound = validTelegramCRCFound;            // v45 telegram has CRC OK , so CrcIn is OK
-          if  (telegram_crcIn_len == telegram_crcOut_len) {    // do we have a masking array ?
+        validTelegramCRCFound = (strtol(messageCRC, NULL, 16) == currentCRC);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
+        if (doForceFaultP1) validTelegramCRCFound = false;    // v52 enforce P1 error
+        
+        if (outputOnSerial) Serial.printf(", msLt#%d ", telegram_crcOut_len);
+        // incoperate CRC reciovery function
+        if (validTelegramCRCFound) {   // temporarily test√erify on Debug switch
+          p1ReadRxCnt++ ; // Count times we have had a succesfull CRC read
+          RX_yieldcount = 3; // assume all if well and we had of have surived any yieldcount
+          if (currentCRC == dataInCRC) { // on match build masking array
+            // ----------------------------------------------------------------------------------------------
+            validCrcInFound = validTelegramCRCFound;            // v45 telegram has CRC OK , so CrcIn is OK
+            if  (telegram_crcIn_len == telegram_crcOut_len) {    // do we have a masking array ?
+  
+                  for (int i=0; i < telegram_crcOut_len; i++) {    // check more masks
+                      if (telegram_crcOut[i] != 'X' && telegram_crcOut[i] != telegram_crcIn[i] ) {
+                            telegram_crcOut_cnt++;                // increase mask count
+                            if (outputOnSerial) Serial.printf(", ms#%d=%c%c", i, telegram_crcIn[i], telegram_crcOut[i]);
+                            telegram_crcOut[i] = 'X' ;            // mask this position
+                      }
+                  }
+                  if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
+                  getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
+            } else {                                            // no or myLength changed masking array
+  
+                  if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
+                  for (int i=0; i < telegram_crcIn_len; i++) {
+                      telegram_crcOut[i] = telegram_crcIn[i];     // (re)create masking array
+                  }
+                  telegram_crcOut_len = telegram_crcIn_len;
+                  telegram_crcOut[telegram_crcOut_len] = 0x00;    // ensure we have a termination string
+                  if (outputOnSerial) Serial.printf(", msLo#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
+  
+            }
+         } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
 
-                for (int i=0; i < telegram_crcOut_len; i++) {    // check more masks
-                    if (telegram_crcOut[i] != 'X' && telegram_crcOut[i] != telegram_crcIn[i] ) {
-                          telegram_crcOut_cnt++;                // increase mask count
-                          if (outputOnSerial) Serial.printf(", ms#%d=%c%c", i, telegram_crcIn[i], telegram_crcOut[i]);
-                          telegram_crcOut[i] = 'X' ;            // mask this position
-                    }
-                }
-                if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
-                getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
-          } else {                                            // no or length changed masking array
-
-                if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
-                for (int i=0; i < telegram_crcIn_len; i++) {
-                    telegram_crcOut[i] = telegram_crcIn[i];     // (re)create masking array
-                }
-                telegram_crcOut_len = telegram_crcIn_len;
-                telegram_crcOut[telegram_crcOut_len] = 0x00;    // ensure we have a termination string
-                if (outputOnSerial) Serial.printf(", msLo#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
-
-          }
-        } else {  // should not happen, perhaps a logic error when running CRC is not same on total CrcIn rtecord.
-
-            Serial.printf(", crE:%x!=%x",currentCRC,messageCRC);
-            telegram_crcOut[0] = 0x00;     // reset mask length and counters
+            Serial.printf(", crE:%04x!=%04x",currentCRC,messageCRC);
+            telegram_crcOut[0] = 0x00;     // reset mask myLength and counters
             telegram_crcOut_len = 0;
             telegram_crcOut_cnt = 0;
             if (outputOnSerial) Serial.printf(", msk0=%d ",telegram_crcOut_cnt);
 
-        }
-        // ----------------------------------------------------------------------------------------------
-      } else {    // we have a CRC error on running CRC, try to recover using using created mask
-        
-        if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if length of error is equal , try to unmask differences  ?
-            for (int i=0; i < telegram_crcIn_len; i++) {
-                if (telegram_crcOut[i] != 'X' && telegram_crcIn[i] != telegram_crcOut[i] ) {   // Unmask the error ??
-                  if (outputOnSerial) {
-                    Serial.printf(", mskio=%d:", i);
-                    if (isprint(telegram_crcIn[i]))  Serial.print(telegram_crcIn[i]); else Serial.print("?");
-                    Serial.print("/");
-                    if (isprint(telegram_crcOut[i])) Serial.print(telegram_crcOut[i]); else Serial.print("?");
-                  }
-                  telegram_crcIn[i] = telegram_crcOut[i];
-                }                 
-            }
-            dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len ); // Get new native Crcin, v48-casting
-            validCrcInFound = (strtol(messageCRC, NULL, 16) == dataInCRC);    // check if we have a 16base-match
-            if (validCrcInFound) {
-              telegram_crcIn_rcv++ ;                       // count we can/could recover this corrupted telegram read
-              if (outputOnSerial) Serial.printf(" crI%d(%d)=%x<=m>%x ,", telegram_crcIn_rcv, telegram_crcIn_len, dataInCRC,strtol(messageCRC, NULL, 16));  // print recovered count and value
-              RecoverTelegram_crcIn();
-            }
-
-        }
-      }
-
-      if (outputOnSerial) Serial.printf(" crJ(%d)\t!%s (arc=%x)", telegram_crcIn_len, messageCRC, currentCRC); // /t produces an error
-      if (outputOnSerial) Serial.printf(", msLx#%d ", telegram_crcOut_len);
-      
-      /* // DebugCRC not activated as most of the time we miss characters which make CRC Invalid
-         if (outputOnSerial)  {
-             if( validTelegramCRCFound) Serial.print((String)  "\nVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
-             if(!validTelegramCRCFound) Serial.print((String)"\nINVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
-             Serial.printf(", crc=%x msg=%s \n",currentCRC,messageCRC);
          }
-      */
-
-      // digitalWrite(LED_BUILTIN, LOW);  // Turn the LED on
-      // digitalWrite(BLUE_LED, HIGH);       //Turn the ESPLED off
-      digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // revert BLUE led
-      allowOtherActivities = true;    // hold off other conflicting acvities
-      /*
-        //DebugCRC
-              if (outputOnSerial)     {
-                // Serial.println("a\n<eof0\nb");
-                for (int cnt = 0; cnt < len-2; cnt++) {
-
-                 // copy over the processed data
-                 testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
-                 if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
-
-                  Serial.print(telegram[cnt]);
-                  // Serial.print(".");
-                }
-
-
-                if (mqttCnt < 10 && telegramError == 0) {
-                  Serial.printf("\n\nString>%s< [%u, crc=%x msg=%s ]\n",testTelegram,testTelegramPos,currentCRC,messageCRC);
-                  yield();
-                  Serial.print("\n HEX:>");
-                  for (int cnt=0; cnt <= testTelegramPos; cnt++) {
-        ;                  Serial.printf("%02X",testTelegram[cnt]);
+          // ----------------------------------------------------------------------------------------------
+       } 
+      else {   // !validTelegramCRCFound , we have a CRC error on running CRC, try to recover using using created mask
+           /* 
+            This will insert byteswhen lengths difference is less or to recovery_INSERTION_LENTGH setting
+            */ 
+              // if  ((telegram_crcOut_len-1) == telegram_crcIn_len && !doForceFaultP1) {    // if myLength of error is oner missing try to unmask by shift differences ?
+              if  ( (telegram_crcOut_len - telegram_crcIn_len) > 0 &&
+                    (telegram_crcOut_len - telegram_crcIn_len) <= recovery_INSERTION_LENTGH &&
+                    (mySerial1.m_bitWait % 2) == 1 &&                 // when we are in odd mode
+                    !doForceFaultP1) {
+                  /* find position with 2 or more successive faults */
+                  int j = 0;
+                  for (int i=0; i < telegram_crcIn_len && j == 0; i++) {   // search for 2byte error on don't care positions
+                      if ( telegram_crcOut[i]   != 'X' && telegram_crcIn[i]   != telegram_crcOut[i] &&
+                           telegram_crcOut[i+1] != 'X' && telegram_crcIn[i+1] != telegram_crcOut[i+1] ) j = i;
                   }
-                  Serial.print("<HEX \n");
-                }
+                  /* here we have the difference position  */
+                  if (verboseLevel == VERBOSE_ON) {
+                      Serial.print((String) " CRCio-delta: "
+                            +  " crcI=" + telegram_crcIn_len
+                            + ", crcO=" + telegram_crcOut_len
+                            + ", pos=" + j
+                            + " ");
+                  }
+                  if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
+                    if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len - telegram_crcIn_len) ); // indicate number shifted
+                    for (int l = 0; telegram_crcIn_len < telegram_crcOut_len && l < recovery_INSERTION_LENTGH; l++) {
+                      if (!outputOnSerial) Serial.print(">"); // indicate we have shifted
+                      int k = telegram_crcOut[j+l];         // get first masked position to be inserted into one-byte short Crcin
+                      for (int i=(j+l); i < telegram_crcOut_len; i++) {   // search for 2byte error}
+                          j = telegram_crcIn[i];  // save this current one to do next insert
+                          telegram_crcIn[i] = k;  // insert saved 
+                          k = j+l;                  // ready for next
+                      } // when ready the array Crc-In has shifte one byte to right
+                      telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
+                    }
+                    /*
+                    if (!outputOnSerial) Serial.print(">"); else Serial.printf(", insert=%d:", j); // indicate we have shifted
+                    int k = telegram_crcOut[j];         // get first masked position to be inserted into one-byte short Crcin
+                    for (int i=j; i < telegram_crcOut_len; i++) {   // search for 2byte error}
+                        j = telegram_crcIn[i];  // save this current one to do next insert
+                        telegram_crcIn[i] = k;  // insert saved 
+                        k = j;                  // ready for next
+                    } // when ready the array Crc-In has shifte one byte to right
+                    telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
+                    */
+                  } else {
+                    if (!outputOnSerial) Serial.print("<0");  // too short cannot recover, indicate
+                    else Serial.print((String) "shortJ=" + j + "/lenDiff=" + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted
+                  }
+             }
+           
+           /* 
+            This will recover CRC by UnMasking
+            */  
+            if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1) {    // if myLength of error is equal , try to unmask differences  ?
+                  for (int i=0; i < telegram_crcIn_len; i++) {
+                      if (telegram_crcOut[i] != 'X' && telegram_crcIn[i] != telegram_crcOut[i] ) {   // Unmask the error ??
+                        if (outputOnSerial) {
+                          Serial.printf(", mskio=%d:", i);
+                          if (isprint(telegram_crcIn[i]))  Serial.print(telegram_crcIn[i]); else Serial.print("?");
+                          Serial.print("/");
+                          if (isprint(telegram_crcOut[i])) Serial.print(telegram_crcOut[i]); else Serial.print("?");
+                        }
+                        telegram_crcIn[i] = telegram_crcOut[i];
+                      }                 
+                    }
+                  dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len ); // Get new native Crcin, v48-casting
+                  validCrcInFound = (strtol(messageCRC, NULL, 16) == dataInCRC);    // check if we have a 16base-match
+                  if (validCrcInFound) {
+                    telegram_crcIn_rcv++ ;                       // count we can/could recover this corrupted telegram read
+                    if (outputOnSerial) Serial.printf(" crI%d(%d)=%04x<=m>%04x ,", telegram_crcIn_rcv, telegram_crcIn_len, dataInCRC,strtol(messageCRC, NULL, 16));  // print recovered count and value
+                    RecoverTelegram_crcIn();
+                  }
+             } else {
+                if (!doForceFaultP1) {    // no debug/print if we are forcing out due to unconnected P1
+                    if (!outputOnSerial) Serial.print((String) "<" + (telegram_crcOut_len - telegram_crcIn_len));  // too short cannot recover, indicate
+                    else Serial.print((String)" shortCrcLen=" + (telegram_crcOut_len - telegram_crcIn_len) + " "); // indicate we have shifted
+             } 
+         }
+         }
+        if (outputOnSerial) Serial.printf(" crJ(%d)\t!%s (arc=%x)", telegram_crcIn_len, messageCRC, currentCRC); // /t produces an error
+        if (outputOnSerial) Serial.printf(", msLx#%d ", telegram_crcOut_len);
+        
+          /* // DebugCRC not activated as most of the time we miss characters which make CRC Invalid
+            if (outputOnSerial)  {
+                if( validTelegramCRCFound) Serial.print((String)  "\nVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
+                if(!validTelegramCRCFound) Serial.print((String)"\nINVALID CRC FOUND ! start=" + startChar + " end="+ endChar );
+                Serial.printf(", crc=%x msg=%s \n",currentCRC,messageCRC);
+            }
+          */
 
-                currentCRC = 0;
+          // digitalWrite(LED_BUILTIN, LOW);  // Turn the LED on
+          // digitalWrite(BLUE_LED, HIGH);       //Turn the ESPLED off
+         digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // revert BLUE led
+         allowOtherActivities = true;    // hold off other conflicting acvities
+          /*
+          //DebugCRC
+                if (outputOnSerial)     {
+                  // Serial.println("a\n<eof0\nb");
+                  for (int cnt = 0; cnt < myLen-2; cnt++) {
 
-                //  Serial.println(" <eof1");
-                //  Serial.println("\r\n"); // disabled at this  interferes with the cast EoT record
-           } // else if (endChar >= 0 && telegramP1header)
-      */
+                  // copy over the processed data
+                  testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
+                  if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
 
-    } else {                                  // We are reading between header and trailer
+                    Serial.print(telegram[cnt]);
+                    // Serial.print(".");
+                  }
+
+
+                  if (mqttCnt_Out < 10 && telegramError == 0) {
+                    Serial.printf("\n\nString>%s< [%u, crc=%x msg=%s ]\n",testTelegram,testTelegramPos,currentCRC,messageCRC);
+                    yield();
+                    Serial.print("\n HEX:>");
+                    for (int cnt=0; cnt <= testTelegramPos; cnt++) {
+          ;                  Serial.printf("%02X",testTelegram[cnt]);
+                    }
+                    Serial.print("<HEX \n");
+                  }
+
+                  currentCRC = 0;
+
+                  //  Serial.println(" <eof1");
+                  //  Serial.println("\r\n"); // disabled at this  interferes with the cast EoT record
+            } // else if (endChar >= 0 && telegramP1header)
+          */
+
+    } else {  // if endChar >= 0 && telegramP1header  // We are reading between header and trailer
       
-      // currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
+      // currentCRC = Crc16In(currentCRC, (unsigned char*)telegram, myLen - 1); // calculatate CRC upto/including 0x0D
       //    reinterpret_cast<unsigned char*> to prevent "C-style pointer casting" message
-      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram), len - 1); // calculatate CRC upto/including 0x0D, v48-casting
+      currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>(telegram), myLen - 1); // calculatate CRC upto/including 0x0D, v48-casting
       
       // prevent "C-style pointer casting" message
-      //  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
-      // dnw:  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>("\x0a"), 1); // add excluded \n
-      // dnw:  if (telegram[len - 2] == '\x0d') currentCRC = Crc16In(currentCRC, "\x0a", 1); // add excluded \n
-      if (telegram[len - 2] == '\x0d') {    // correctly use a literal to addin to Crc16in, v48-casting
+      //  if (telegram[myLen - 2] == '\x0d') currentCRC = Crc16In(currentCRC, (unsigned char *) "\x0a", 1); // add excluded \n
+      // dnw:  if (telegram[myLen - 2] == '\x0d') currentCRC = Crc16In(currentCRC, reinterpret_cast<unsigned char*>("\x0a"), 1); // add excluded \n
+      // dnw:  if (telegram[myLen - 2] == '\x0d') currentCRC = Crc16In(currentCRC, "\x0a", 1); // add excluded \n
+      if (telegram[myLen - 2] == '\x0d') {    // correctly use a literal to addin to Crc16in, v48-casting
         // use temporarily literal to add
         unsigned char tempLiteral[] = {0x0A};
         currentCRC = Crc16In(currentCRC, tempLiteral, 1);
-      }
+       }
 
       if (outputOnSerial) {
-        // Serial.print("<");
-        if (len > 2) {  // (was > 2)
-          for (int cnt = 0; cnt < len - 2; cnt++) {  // read max 64 bytes (was len-2)
-            /*// DebugCRC
-              //DebugCRC copy over the processed data
-              testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
-              if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
-            */
-            if (!isPrintable(telegram[cnt]) || telegram[cnt] == ' ' ) telegramError++; // check if data is readable
+          // Serial.print("<");
+          if (myLen > 2) {  // (was > 2)
+            for (int cnt = 0; cnt < myLen - 2; cnt++) {  // read max 64 bytes (was myLen-2)
+              /*// DebugCRC
+                //DebugCRC copy over the processed data
+                testTelegram[testTelegramPos]=telegram[cnt]              ; // v13 test 31mar21 ptro
+                if (testTelegramPos < MAXLINELENGTH-2) testTelegramPos++ ; // v13 test 31mar21 ptro
+              */
+              if (!isPrintable(telegram[cnt]) || telegram[cnt] == ' ' ) telegramError++; // check if data is readable
 
-            /* //debugCRC
-              {
-                  Serial.print(telegram[cnt]);
-              } else {
-                  telegramError++;                  // count as error
-                  // Serial.printf("\?%02\?",telegram[cnt]);
-                  Serial.printf("\?%02\?",telegramLast2[0]);
-                  // Serial.print((String)"?"+String(telegramLast[cnt],HEX)+"?");
-              }
-            */
-          } // for loop
-          //DebugCRC if (outputOnSerial) Serial.printf("{%02X}",telegram[len-2]);
-        }
-        /* //DebugCRC
-          if (len <= 2) {
-          Serial.print(charArray[len]);
+              /* //debugCRC
+                {
+                    Serial.print(telegram[cnt]);
+                } else {
+                    telegramError++;                  // count as error
+                    // Serial.printf("\?%02\?",telegram[cnt]);
+                    Serial.printf("\?%02\?",telegramLast2[0]);
+                    // Serial.print((String)"?"+String(telegramLast[cnt],HEX)+"?");
+                }
+              */
+            } // for loop
+            //DebugCRC if (outputOnSerial) Serial.printf("{%02X}",telegram[myLen-2]);
           }
-          // Serial.print(">\r\n");
-          // Serial.print(">");
-        */
-      } // if output serial
-    } // else if endChar >= 0 && telegramP1header
-
+          /* //DebugCRC
+            if (myLen <= 2) {
+            Serial.print(charArray [myLen]);
+            }
+            // Serial.print(">\r\n");
+            // Serial.print(">");
+          */
+       } // if output serial
+     } // else if endChar >= 0 && telegramP1header
   } // startChar >= 0
 
   // if (outputMqttLog && client.connected()) client.publish(mqttLogTopic, telegram );   // debug to mqtt log ?
@@ -4238,23 +4967,23 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // if (outputMqttLog) client.publish(mqttLogTopic, telegramLast );
 
   /*
-    if (!(telegram[len - 2] == ')') ) { // ignore if not ending on )
-      telegram[0] = telegram[len - 2];
-      telegram[1] = telegram[len - 2];
-      telegram[2] = telegram[len - 2];
+    if (!(telegram[myLen - 2] == ')') ) { // ignore if not ending on )
+      telegram[0] = telegram[myLen - 2];
+      telegram[1] = telegram[myLen - 2];
+      telegram[2] = telegram[myLen - 2];
       client.publish(mqttLogTopic, telegram );   // log
       return endOfMessage;
     }
   */
 
   /*
-     if (telegram[len - 3] == ')' ) client.publish(mqttLogTopic, "tele-3" );   // log
-     if (telegram[len - 2] == ')' ) client.publish(mqttLogTopic, "tele-2" );   // log valid
-     if (telegram[len - 1] == ')' ) client.publish(mqttLogTopic, "tele-1" );   // log
-     if (telegram[len]     == ')' ) client.publish(mqttLogTopic, "tele=0" );   // log
-     if (telegram[len + 1] == ')' ) client.publish(mqttLogTopic, "tele+1" );   // log
-     if (telegram[len + 2] == ')' ) client.publish(mqttLogTopic, "tele+2" );   // log
-     if (telegram[len + 3] == ')' ) client.publish(mqttLogTopic, "tele+3" );   // log
+     if (telegram[myLen - 3] == ')' ) client.publish(mqttLogTopic, "tele-3" );   // log
+     if (telegram[myLen - 2] == ')' ) client.publish(mqttLogTopic, "tele-2" );   // log valid
+     if (telegram[myLen - 1] == ')' ) client.publish(mqttLogTopic, "tele-1" );   // log
+     if (telegram [myLen]     == ')' ) client.publish(mqttLogTopic, "tele=0" );   // log
+     if (telegram[myLen + 1] == ')' ) client.publish(mqttLogTopic, "tele+1" );   // log
+     if (telegram[myLen + 2] == ')' ) client.publish(mqttLogTopic, "tele+2" );   // log
+     if (telegram[myLen + 3] == ')' ) client.publish(mqttLogTopic, "tele+3" );   // log
 
      if (telegram[22] == 'S'     ) client.publish(mqttLogTopic, "tele+S" );   // log
      if (telegram[22] == 'S'     ) client.publish(mqttLogTopic, telegram );   // log DateTime
@@ -4279,8 +5008,8 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
 
   // used to catch P1meter line termination bracket
-  // if (telegram[len - 3] != ')' ) client.publish(mqttErrorTopic, telegram ); // log invalid
-  // if (telegram[len - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
+  // if (telegram[myLen - 3] != ')' ) client.publish(mqttErrorTopic, telegram ); // log invalid
+  // if (telegram[myLen - 3] != ')' ) client.publish(mqttLogTopic, "tele-2" );   // log invalid
 
   // tbd v56c: this check before or after while in recovery ????
   /*
@@ -4289,11 +5018,11 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
 
   if (   telegram[0] != '0' && telegram[0] != '1' && telegram[1] != '-' ) return endOfMessage; // if subrecord not start wih 0- or 1-
 
-  // if ( !(telegram[len - 3] == ')' || telegram[len - 4] == ')' )) return endOfMessage; // if not terminated by bracket then return
-  if ( !(telegram[len - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
+  // if ( !(telegram[myLen - 3] == ')' || telegram[myLen - 4] == ')' )) return endOfMessage; // if not terminated by bracket then return
+  if ( !(telegram[myLen - 3] == ')')) return endOfMessage; // if not terminated by bracket then return
 
   /*
-    // Serial.println((String)"DebugDecode6:"+ (int)telegram[len - 3] );   // with testdata, does not arrive here
+    // Serial.println((String)"DebugDecode6:"+ (int)telegram[myLen - 3] );   // with testdata, does not arrive here
     
     // Serial.println((String)"DebugDecode7 (=" + strncmp(telegram, "(", strlen("(")) + " )="+strncmp(telegram, ")", strlen(")"))) ;
     // Serial.println((String)"DebugDecode7 substr1-7(=" + telegram[0]+telegram[1]+telegram[2]+telegram[3]+telegram[4]+"<");
@@ -4344,40 +5073,39 @@ bool decodeTelegram(int len)    // done at every P1 line read by rs232 that ends
   // 1-0:1.8.1(000992.992*kWh)
   // 1-0:1.8.1 = Elektra verbruik laag tarief (DSMR v4.0)  
   if (strncmp(telegram, "1-0:1.8.1(", strlen("1-0:1.8.1(")) == 0) {        // total Watts Low
-    powerConsumptionLowTariff = getValue(telegram, len);
+    powerConsumptionLowTariff = getValue(telegram, myLen);
     }
 
   // 1-0:1.8.2(000560.157*kWh)
   // 1-0:1.8.2 = Elektra verbruik hoog tarief (DSMR v4.0)
   if (strncmp(telegram, "1-0:1.8.2(", strlen("1-0:1.8.2(")) == 0)         // total Watts High
-    powerConsumptionHighTariff = getValue(telegram, len);
+    powerConsumptionHighTariff = getValue(telegram, myLen);
 
   // 1-0:2.8.1(000348.890*kWh)
   // 1-0:2.8.1 = Elektra opbrengst laag tarief (DSMR v4.0)
   if (strncmp(telegram, "1-0:2.8.1(", strlen("1-0:2.8.1(")) == 0)         // total Production Low
-    powerProductionLowTariff = getValue(telegram, len);
+    powerProductionLowTariff = getValue(telegram, myLen);
 
   // 1-0:2.8.2(000859.885*kWh)
   // 1-0:2.8.2 = Elektra opbrengst hoog tarief (DSMR v4.0)
   if (strncmp(telegram, "1-0:2.8.2(", strlen("1-0:2.8.2(")) == 0)         // total Production High
-    powerProductionHighTariff = getValue(telegram, len);
+    powerProductionHighTariff = getValue(telegram, myLen);
 
   // 1-0:1.7.0(00.424*kW) Actueel verbruik
-  // 1-0:2.7.0(00.000*kW) Actuele teruglevering
   // 1-0:1.7.x = Electricity consumption actual usage (DSMR v4.0)
   if (strncmp(telegram, "1-0:1.7.0(", strlen("1-0:1.7.0(")) == 0)        // Watts usage
     // client.publish(mqttLogTopic, telegram );
-    CurrentPowerConsumption = getValue(telegram, len);
+    CurrentPowerConsumption = getValue(telegram, myLen);
 
-
+  //  data257:           1-0:2.7.0(00.000*kW)<|  
   if (strncmp(telegram, "1-0:2.7.0(", strlen("1-0:2.7.0(")) == 0)        // Watts produced
-    CurrentPowerProduction = getValue(telegram, len);
+    CurrentPowerProduction = getValue(telegram, myLen);
 
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
   // 0-1:24.2.1(250222224600W)(65.478*GJ)  -new
   // 0-1:24.2.1 = Gas (DSMR v4.0) on Kaifa MA105 meter
   if (strncmp(telegram, "0-1:24.2.1(", strlen("0-1:24.2.1(")) == 0)      // Gaz
-    GasConsumption = getValue(telegram, len);
+    GasConsumption = getValue(telegram, myLen);
 
   return endOfMessage;
 }
@@ -4415,16 +5143,16 @@ void RecoverTelegram_crcIn() {
     currentTimeS2,powerConsumptionLowTariff2...CurrentPowerProduction2
     v56c: every field found is also copied back to its segmented (copyback1) equivilent 
 */
-void  getValues2FromP1Record(char buf[], int len) {  // 716
+void  getValues2FromP1Record(char buf[], int myLen) {  // 716
   // return;
-  // if (mqttCnt == 3) Serial.printf(" mqttcount=%d len=%d ", mqttCnt, len ); // mqttcount=3 len=716
-  // if (mqttCnt < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong here, v52 disabled
+  // if (mqttCnt_Out == 3) Serial.printf(" mqttcount=%d myLen=%d ", mqttCnt_Out, myLen ); // mqttcount=3 myLen=716
+  // if (mqttCnt_Out < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong here, v52 disabled
 
   int f = 0;
   // InitialiseValues();         // Data record, ensure we start fresh with newly values in coming records
                                                           //     01234567890123456789012
-  f = FindWordInArrayFwd(buf, "0-0:1.0.0(", len, 9);      // =  "0-0:1.0.0(250106212048W)"
-  // Serial.printf(" f=%d ", f ); // mqttcount=3 len=716
+  f = FindWordInArrayFwd(buf, "0-0:1.0.0(", myLen, 9);      // =  "0-0:1.0.0(250106212048W)"
+  // Serial.printf(" f=%d ", f ); // mqttcount=3 myLen=716
   if (( buf[f+22] == 'S' || buf[f+22] == 'W') && buf[f+23] == ')' )  {  // check for Summer or Wintertime
     char resDate[16];     // maximum prefix of timestamp message
     memset(resDate, 0, sizeof(resDate));       // Pointer to the block of memory to fill.
@@ -4485,7 +5213,7 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
                 //                           019061.182*kWh)_
                 //                           1234567890 
                 //                         s+1    
-      f = FindWordInArrayFwd(buf, "1-0:1.8.1(", len, 9);       // total use Low getValues2FromP1Record f=74+35; f=109
+      f = FindWordInArrayFwd(buf, "1-0:1.8.1(", myLen, 9);       // total use Low getValues2FromP1Record f=74+35; f=109
       powerConsumptionLowTariff2 = getValue(buf+f, 26);
       powerConsumptionLowTariff  = powerConsumptionLowTariff2;  // v56c copyback1
       
@@ -4501,7 +5229,7 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
   // return;
  
   if (f >= 0) {
-    f = FindWordInArrayFwd(buf, "1-0:1.8.2(", len, 9);       // total use High          (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:1.8.2(", myLen, 9);       // total use High          (v56c: start at begin of buf)
     powerConsumptionHighTariff2  = getValue(buf+f, 26);
     powerConsumptionHighTariff   = powerConsumptionHighTariff2; // v56c copyback1
 
@@ -4516,25 +5244,25 @@ void  getValues2FromP1Record(char buf[], int len) {  // 716
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:2.8.1(", len, 9);        // total Production Low   (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:2.8.1(", myLen, 9);        // total Production Low   (v56c: start at begin of buf)
     powerProductionLowTariff2  = getValue(buf+f, 26);
     powerProductionLowTariff   = powerProductionLowTariff2;     // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:2.8.2(", len, 9);        // total Production High  (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:2.8.2(", myLen, 9);        // total Production High  (v56c: start at begin of buf)
     powerProductionHighTariff2 = getValue(buf+f, 26);
     powerProductionHighTariff  = powerProductionHighTariff2;    // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", len, 9);        // Watts usage            (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", myLen, 9);        // Watts usage            (v56c: start at begin of buf)
     CurrentPowerConsumption2   = getValue(buf+f, 21);
     CurrentPowerConsumption    = CurrentPowerConsumption2;      // v56c copyback1
   }
 
   if (f >= 0) {  
-    f = FindWordInArrayFwd(buf, "1-0:1.7.0(", len, 9);        // Watts produced          (v56c: start at begin of buf)
+    f = FindWordInArrayFwd(buf, "1-0:2.7.0(", myLen, 9);        // Watts produced          (v64a correction v56c: start at begin of buf)
     CurrentPowerProduction2   = getValue(buf+f, 21);
     CurrentPowerProduction    = CurrentPowerProduction2;        // v56c copyback1
   }
@@ -4551,10 +5279,10 @@ long getValue(char *buffer, int maxlen)
   // 1234567890123456789012345678901234567890   = 40    18061   000   // countlist 1
   // 01234567890123456789012345678901234567890  = 40                  // countlist 0
   //           123456789012                                           // countlist after first bracket
-  // 0-0:1.0.0(180611014816S)                   = data record len=25, string length datalen 12
+  // 0-0:1.0.0(180611014816S)                   = data record myLen=25, string myLength datalen 12
   // 0-1:24.2.1(150531200000S)(00811.923*m3)    = gaz date record which we do not have at our P1
   // 0-1:24.2.1(250222224600W)(65.478*GJ)       = new GJ
-  // 1-0:1.8.2(010707.720*kWh)                  = power consumption record len=26 datalen 10
+  // 1-0:1.8.2(010707.720*kWh)                  = power consumption record myLen=26 datalen 10
   // /ISk5\2MT382-1000...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record 0-162bytes
   //  .........1.........2.........3.........4.........5
 
@@ -4582,14 +5310,14 @@ long getValue(char *buffer, int maxlen)
     if (l < 0) {   // no asterisk in message, check for Summer or Winter Time date record
       // 11jun20 yield();  // do background processing else things will not work
       // l = FindCharInArrayRev(buffer, 'S', maxlen - 0) - s - 1;  // search S , s=start of (
-      if (buffer[22] == 'S') l = 6; // length 7-digits does not work vaue too large
-      if (buffer[22] == 'W') l = 6; // length 7-digits does not work vaue too large
+      if (buffer[22] == 'S') l = 6; // myLength 7-digits does not work vaue too large
+      if (buffer[22] == 'W') l = 6; // myLength 7-digits does not work vaue too large
   */
 
-  if (l < 4)  return 0;    // length from (-* too short
-  if (l > 12) return 0;   // length from (-* too long
+  if (l < 4)  return 0;    // myLength from (-* too short
+  if (l > 12) return 0;   // myLength from (-* too long
 
-  char res[16];                 // extract number starting at startbracket+1 for a length of l
+  char res[16];                 // extract number starting at startbracket+1 for a myLength of l
   memset(res, 0, sizeof(res));
 
   if (strncpy(res, buffer + s + 1, l))  // start buffer+10+1
@@ -4617,15 +5345,15 @@ char TranslateForPrint(char c)
 /* 
   generic subroutine to find a character in reverse , return position as offset to 0
 */
-int FindCharInArrayRev(const char array[], char c, int len) {              // Find character >=0 found, -1 failed
+int FindCharInArrayRev(const char array[], char c, int myLen) {              // Find character >=0 found, -1 failed
   //           123456789012
   // 1234567890123456789012345678901234567890  = 40
-  // 0-0:1.0.0(180611014816S)                  = sublen12 len=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
+  // 0-0:1.0.0(180611014816S)                  = sublen12 myLen=25 pos24=) post10=(=ret10, pos23=S=ret23   , maxlen==23 == return i=10
   // 0-1:24.2.1(150531200000S)(00811.923*m3)
   // 0-1:24.2.1(250222224600W)(65.478*GJ)  - GJ 
   // ...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record
-  for (int i = len - 1; i >= 0; i--)   // backward
-  // for (int i = len - 1; i < 1; i--)   // backward
+  for (int i = myLen - 1; i >= 0; i--)   // backward
+  // for (int i = myLen - 1; i < 1; i--)   // backward
   {
     if (array[i] == c)
     {
@@ -4636,10 +5364,10 @@ int FindCharInArrayRev(const char array[], char c, int len) {              // Fi
 }
 
 /*
-  find character forwarding for len bytes
+  find character forwarding for myLen bytes
 */
-int FindCharInArrayFwd(const char array[], char c, int len) {              // Find character >=0 found, -1 failed
-  for (int i = 0; i < len+1 ; i++)   // forward
+int FindCharInArrayFwd(const char array[], char c, int myLen) {              // Find character >=0 found, -1 failed
+  for (int i = 0; i < myLen+1 ; i++)   // forward
   {
     if (array[i] == c)
     {
@@ -4671,20 +5399,20 @@ int FindWordInArrayFwd(const char array[], const char word[], int alen, int wlen
     input:
      crc unsigned integer (2 bytes 0x0000-0xFFFF)
      buf pointer=address of unsigned char to reference characters as int 0-255 values
-     len length of buf 0-768
+     myLen myLength of buf 0-768
      
-     currentCRC = CRC16(currentCRC, (unsigned char*)telegram, len - 1); // calculatate CRC upto/including 0x0D
+     currentCRC = CRC16(currentCRC, (unsigned char*)telegram, myLen - 1); // calculatate CRC upto/including 0x0D
 */
 unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
   /*
 
         char telegram_crcIn[MAXLINELENGTH];   // active telegram that is checked for crc
-        int  telegram_crcIn_len = 0;          // length of this record
+        int  telegram_crcIn_len = 0;          // myLength of this record
         char telegram_crcOut[MAXLINELENGTH];  // processed telegram with changed positions to X
         int  telegram_crcOut_len = 0;  
 
-        for (int i = len - 1; i >= 0; i--)   // backward
-        // for (int i = len - 1; i < 1; i--)   // backward
+        for (int i = myLen - 1; i >= 0; i--)   // backward
+        // for (int i = myLen - 1; i < 1; i--)   // backward
         {
           if (array[i] == c)
           {
@@ -4730,9 +5458,9 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
         telegram_crcIn_cnt > 1 &&
         telegram_crcIn[telegram_crcIn_len - 1] == '!' ) {  // (single quoted) are we on end of record ??
       dataInCRC = CRC16(0x0000, reinterpret_cast<unsigned char*>(telegram_crcIn), telegram_crcIn_len);  // get CRC of whole copied record, v48-casting
-      if (outputOnSerial) {   // print serial record count, total receivwed length, calculated CRC
+      if (outputOnSerial) {   // print serial record count, total receivwed myLength, calculated CRC
         // Serial.println((String)" ct=" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
-        Serial.printf("\tcr0=%x,crc=%d,crl=%d\t", dataInCRC,  telegram_crcIn_cnt, telegram_crcIn_len) ; 
+        Serial.printf("\tcr0=%04x,crc=%d,crl=%d\t", dataInCRC,  telegram_crcIn_cnt, telegram_crcIn_len) ; 
       }
   }
   telegram_crcIn_cnt++;
@@ -4799,15 +5527,15 @@ bool CheckData()        //
     // Serial.println((String)"Checkdata3.."+" new="+powerConsumptionLowTariff+" old="+OldPowerConsumptionLowTariff);   // problem returns and does not let publish
 
     OldPowerConsumptionLowTariff = powerConsumptionLowTariff ;
-    if (powerConsumptionLowTariff < 1) OldPowerConsumptionLowTariff = 0 ;
-    return false;
+    if (powerConsumptionLowTariff < 1) { OldPowerConsumptionLowTariff = 0 ;
+      return false; }
   }
 
   if ((powerConsumptionHighTariff - OldPowerConsumptionHighTariff > 70) || powerConsumptionHighTariff < 1)  // ignore zeroreads
   {
     OldPowerConsumptionHighTariff = powerConsumptionHighTariff ;
-    if (powerConsumptionHighTariff < 1) OldPowerConsumptionHighTariff = 0 ;
-    return false;
+    if (powerConsumptionHighTariff < 1) { OldPowerConsumptionHighTariff = 0 ;
+      return false; }
   }
 
   // following is totally not used at our place but can be used if/when we have solarpanels.
@@ -4815,15 +5543,15 @@ bool CheckData()        //
   if ((powerProductionLowTariff  - OldPowerProductionLowTariff    > 70) || powerProductionLowTariff < 0)   // production > 0
   {
     OldPowerProductionLowTariff  = powerProductionLowTariff ;
-    if (powerProductionLowTariff < 0) OldPowerProductionLowTariff = 0 ;
-    return false;
+    if (powerProductionLowTariff < 0) { OldPowerProductionLowTariff = 0 ;
+      return false; }
   }
 
   if ((powerProductionHighTariff - OldPowerProductionHighTariff > 70) || powerProductionHighTariff < 0)    // production > 0
   {
-    OldPowerProductionHighTariff = powerProductionHighTariff ;
-    if (powerProductionHighTariff < 0) OldPowerProductionHighTariff = 0 ;
-    return false;
+    OldPowerProductionHighTariff = powerProductionHighTariff ; 
+    if (powerProductionHighTariff < 0) { OldPowerProductionHighTariff = 0 ;
+      return false; }
   }
   if ((CurrentPowerConsumption > 18400) || (CurrentPowerProduction < 0)) return false;  // return if outside 80Amp load
 
@@ -4888,9 +5616,9 @@ void SetOldValues()     // executed at end succesful  telegrams
 }
 
 // check if data/field is numeric 0-9 & decimal-point
-bool isNumber(const char *res, int len)       // False/true if numeriv
+bool isNumber(const char *res, int myLen)       // False/true if numeriv
 {
-  for (int i = 0; i < len; i++)
+  for (int i = 0; i < myLen; i++)
   {
     if (((res[i] < '0') || (res[i] > '9')) && (res[i] != '.' && res[i] != 0))
     {
@@ -4993,7 +5721,7 @@ void processTemperatures() {
       }
     }
   // }
-  mqttMsg.concat((String)"\", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+  mqttMsg.concat((String)"\", \"mqttCnt_Out\":"+(mqttCnt_Out+1));    // +1 to reflect the actual mqtt message
   mqttMsg.concat("\"}");      // finish JSON error message
 
   if (!bTemp_Reading_State) { //  report failure on mqtt
@@ -5059,43 +5787,43 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interfe
 */
 void WaterTrigger0_ISR()
 {
-  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
+  // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
     if (waterISRActive) {    // set routine already active
         if (outputOnSerial) Serial.print( (String) ".W" );
     } else {
       waterISRActive = true;    // V47 - prevent calling while routine is active
 
-        // implement  secondary debounce routine to check ISR compliance
-        ISR_time = millis();
-        if ((ISR_time - last_ISR_time) > 500) {
-            last_ISR_time = ISR_time;
-            ISR_time_cnt++ ;          // increase our change counter      
-        }
+      // implement  secondary debounce routine to check ISR compliance
+      ISR_time = millis();
+      if ((ISR_time - last_ISR_time) > 500) {
+          last_ISR_time = ISR_time;
+          ISR_time_cnt++ ;          // increase our change counter      
+      }
 
-        if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) "i" );    
-        interval_delay(1); // V47 wait 1ms --> implemented by flat plain while loop, all other types forbidden in ISR
-        if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
-            waterTriggerState = !waterTriggerState; // revert to make the same
+      if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) "i" );    
+      interval_delay(1); // V47 wait 1ms --> implemented by flat plain while loop, all other types forbidden in ISR
+      if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
+          waterTriggerState = !waterTriggerState; // revert to make the same
 
-            waterTriggerCnt++ ;             // increase our call counter
-            // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
-            // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
-            waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
+          waterTriggerCnt++ ;             // increase our call counter
+          // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
+          // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
+          waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
-            if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
-              detachWaterInterrupt();
-              Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
-              // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
-              // waterTriggerState = LOW;      // v41 v47 force to low to ease things
-            }
+          if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+            detachWaterInterrupt();
+            Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+            // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
+            // waterTriggerState = LOW;      // v41 v47 force to low to ease things
+          }
           #ifdef NoTx2Function
             if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
           #endif
             if (outputOnSerial && verboseLevel >= VERBOSE_GPIO) Serial.print( (String) (waterTriggerState ? "tH " : "tL ") );    // V47 print ISR call counterwaterTriggerTime
-          }
-
+       }
       waterISRActive = false;    // alow next interrupt
   }
+  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // v65 at end , as per advice espressif
 }
 
 
@@ -5233,6 +5961,7 @@ void mqtt_local_yield()   // added V21 as regular yeield does not call Pubsubcli
     // Allow / Do (likely) superfluous control to esp8266 routines
   yield();        // give control to wifi management
   // delay(50);      // delay 50 mSec
+  // delay(1);      // delay 50 mSec v61b 30jul25 make things unstable
   ESP.wdtFeed();  // feed the hungry timer
   if (client.connected()) client.loop();  // feed the mqtt client, required to collect mqtt commands
 }
@@ -5475,29 +6204,19 @@ void command_testH4(){    // code to maken things stable teststable
                 // v57c-0  added multiple combinations, things remain instable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
+                    delay(0);     // v58 add to check for stability
+                    delay(0);     // v58 add to check for stability
+                    delay(0);     // v58 add to check for stability
+                    delay(0);     // v58 add to check for stability   // v58c 267 + asm 10
+#ifdef TEST_MODE    // v56c
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability  // v58c 10
+// #ifdef TEST_MODE    // v56c
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability   // v58c 3
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
-                    delay(0);     // v57 add to check for stability
+
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
@@ -5507,6 +6226,21 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
 
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+                    delay(0);     // v57 add to check for stability
+#endif
 
 }
 
@@ -5562,4 +6296,393 @@ void command_testH5(){    // code to maken things stable teststable v57c-1 no-ef
     publishMqtt(mqttErrorTopic, msg3);       // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
     publishMqtt(mqttErrorTopic, msgpub3);    // v51: {"currentTime":"%s","CurrentPowerConsumption":%lu
 
+}
+
+/*
+  Open Close a specific Serial Port
+  routine will call save close if already open.
+*/
+void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIALPORT_P1/WL_DATA/TIME , SERIALPORT_OPEN/CLOSE
+
+      if        (serial_port_number == SERIALPORT_P1_DATA && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial1.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial1.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial1State = false; // v57 indicate state
+          if (mySerial1.portActive()) Serial.print((String) "#!1#" );
+      } else if (serial_port_number == SERIALPORT_P1_DATA && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial1.portActive()) openCloseSerial(SERIALPORT_P1_DATA,SERIALPORT_CLOSE );
+          if (mySerial3.portActive()) openCloseSerial(SERIALPORT_P1_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            // 2.7.4: swSer.begin(BAUD_RATE, SWSERIAL_8N1, D5, D6, false, 95, 11);
+            mySerial1.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+            // mySerial2.begin (  1200,SWSERIAL_8N1,SERIAL_RX2, SERIAL_TX2, bSERIAL2_INVERT, MAXLINELENGTH2,0);
+          #else
+            mySerial1.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
+            // mySerial1.begin(serial1Baudrate);  // < v58a ss241 P1 meter port   115k2    // required during test without P1
+          #endif
+            bSerial1State = true; // v57 indicate state
+
+      } else if (serial_port_number == SERIALPORT_WL_DATA && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial2.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial2.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial2State = false; // v57 indicate state
+          if (mySerial2.portActive()) Serial.print((String) "#!2#" );
+      } else if (serial_port_number == SERIALPORT_WL_DATA && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
+          if (mySerial4.portActive()) openCloseSerial(SERIALPORT_WL_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            mySerial2.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          #else
+            mySerial2.begin(serial1Baudrate, serial2PortMode);    // v58a, V58b Use simulated data P1
+          #endif
+            bSerial2State = true; // v57 indicate state
+
+      } else if (serial_port_number == SERIALPORT_P1_TIME && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial3.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial3.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial3State = false; // v57 indicate state
+          if (mySerial3.portActive()) Serial.print((String) "#!3#" );
+      } else if (serial_port_number == SERIALPORT_P1_TIME && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial1.portActive()) openCloseSerial(SERIALPORT_P1_DATA,SERIALPORT_CLOSE );
+          if (mySerial3.portActive()) openCloseSerial(SERIALPORT_P1_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            mySerial3.begin(serial1Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          #else
+            mySerial3.begin(serial1Baudrate, serial1PortMode);    // v58a, V58b Use simulated data P1
+          #endif
+            bSerial3State = true; // v57 indicate state
+
+      } else if (serial_port_number == SERIALPORT_WL_TIME && serial_port_mode == SERIALPORT_CLOSE) {
+          mySerial4.end();          // v58b: not sure  but to acertain,  finish any active
+          mySerial4.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
+          bSerial4State = false; // v57 indicate state
+          if (mySerial4.portActive()) Serial.print((String) "#!4#" );
+      } else if (serial_port_number == SERIALPORT_WL_TIME && serial_port_mode == SERIALPORT_OPEN ) {
+          if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
+          if (mySerial4.portActive()) openCloseSerial(SERIALPORT_WL_TIME,SERIALPORT_CLOSE );
+          #ifdef UseNewSoftSerialLIB
+            mySerial4.begin(serial2Baudrate, SWSERIAL_8N1, SERIAL_RX, -1, bSERIAL_INVERT, MAXLINELENGTH, 0); // Note: Prod use require invert
+          #else
+            mySerial4.begin(serial2Baudrate, serial2PortMode);    // v58a, V58b Use simulated data P1
+          #endif
+            bSerial4State = true; // v57 indicate state
+      } else { 
+        Serial.printf("\r\nWrong call %d using seria %d mode %d , states:\r\n", __LINE__, serial_port_number, serial_port_mode );
+        printf_port_state_isr();
+      }
+}      
+
+/*
+    Print our serial portstates and their ISR status
+*/
+void printf_port_state_isr() {
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 1, (bSerial1State ? 1 : 0) , (mySerial1.portActive() ? 1 : 0));
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 2, (bSerial2State ? 1 : 0) , (mySerial2.portActive() ? 1 : 0));
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 3, (bSerial3State ? 1 : 0) , (mySerial3.portActive() ? 1 : 0));
+         Serial.printf("..serial%i , state=%i ISR=%i\r\n", 4, (bSerial4State ? 1 : 0) , (mySerial4.portActive() ? 1 : 0));
+}
+
+/*
+  Diagnose, print a series of Times as collected by softserial
+*/
+void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
+  if (time_port == 1) {
+    Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 setup"     // print first 4 (time initiated an port allocated)
+        + " "  +  mySerial1.peekTime(M_TIME_START)
+        + " "  +  mySerial1.peekTime(M_TIME_RX_START)
+        + ". "
+        + " "  +  mySerial1.peekTime(M_TIME_RX_END));
+    if (m_time_request >= M_TIME_RX_END )              // print all standard
+    Serial.print((String) 
+        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
+        + "= " +  mySerial1.peekTime(M_TIME_BEGIN_START) 
+        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
+        + "="  +  mySerial1.peekTime(M_TIME_BEGIN_END) 
+        + " +" + (mySerial1.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
+        + "="  +  mySerial1.peekTime(M_TIME_AVAIL_START)
+        + " +" + (mySerial1.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
+        + "="  +  mySerial1.peekTime(M_TIME_AVAIL_END)
+        + "\r\n"
+        + " ISR1st: "
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR_START) + ":\t"
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_START1) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR_START1))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_END))
+        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + " , ISRstart2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_START) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + "\r\n"
+        + " ISR2ls: "
+        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":\t"
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START1))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))
+        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_END))
+        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + " , ISRexit2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT) - mySerial1.peekTime(M_TIME_BIT_ISR_EXIT))
+        + "\r\n"
+        );  
+  }                
+  if (time_port == 2) {
+    Serial.println((String) "time: Begin + end ( / + startread /endread )\r\n");
+    Serial.print((String) P1_VERSION_TYPE + " serial2 setup "     // print first 4 (time initiated an port allocated)
+        + " "  +  mySerial2.peekTime(M_TIME_START)
+        + " "  +  mySerial2.peekTime(M_TIME_RX_START)
+        + ". "
+        + " "  +  mySerial2.peekTime(M_TIME_RX_END));
+    if (m_time_request > M_TIME_RX_END )              // print all standard
+    Serial.print((String) 
+        + " +" + (mySerial2.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
+        + "= " +  mySerial2.peekTime(M_TIME_BEGIN_START) 
+        + " +" + (mySerial2.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
+        + "="  +  mySerial2.peekTime(M_TIME_BEGIN_END) 
+        + " +" + (mySerial2.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
+        + "="  +  mySerial2.peekTime(M_TIME_AVAIL_START)
+        + " +" + (mySerial2.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
+        + "="  +  mySerial2.peekTime(M_TIME_AVAIL_END)
+        + "\r\n"
+        );
+  }                
+
+}
+
+/*
+  Diagnose, print a series of Bit Times as collected by softserial
+*/
+void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
+
+  if (bit_port == 1) {
+    unsigned long temp = 0UL;               // check duplicates          
+    unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
+    unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
+    // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
+    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
+                  + " serial port="+ bit_port 
+                  + " #Inpos=" + mySerial1.peekBitPos()
+                  + "\t-------------time:" + micros()
+                  );
+
+    // print timer table, when in request > then buffer, skip this
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
+      // Serial.print((String) "\t" + mySerial1.peekBit(i));
+      if (i > 0) {    
+          temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
+          if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
+                 temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+                                  Serial.printf("\t%4d~" , temp     );      // variation
+          else  if (temp <= 9999) Serial.printf("\t%4d " , temp     );      // normal
+          else                    Serial.printf("\t_%3d " , temp/1000);      // excessive
+          Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
+       }
+      if ( (i % 8) == 0) {
+          temp = mySerial1.peekBit(i);
+          // Serial.print((String) "\r\n" + i + "="); 
+          Serial.printf("\r\n %3d=>", i);
+          // Serial.print((String) "> ");  // %11.6f
+          if (temp > 999999999UL) { Serial.printf("%3d", (temp / 1000000000UL)); temp = temp - ((temp / 1000000000UL) * 1000000000UL); 
+                                    Serial.print("."); }
+                               else Serial.print( "    ");
+          if (temp >    999999UL) { Serial.printf("%3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
+                                    Serial.print("."); }
+                               else Serial.print( "    ");
+          if (temp >       999UL) { Serial.printf("%3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
+                                    Serial.print("."); }
+                               else Serial.print( "    ");
+                                    Serial.printf("%3d", (temp));
+          Serial.print("> ");
+          // mySerial1.peekBit(i) + "> " );  // next line time
+       }
+      if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
+    }
+
+   
+    /*
+      Print data In <> Mask   :C line1  :m Line2  :d Line3
+    */
+    int temp0 = mySerial1.peekBit(0);  // get zero reference
+    int temp1 = temp0;                 // get zero reference
+    if (bit_sequence >=0 )  {
+        Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
+    }
+    int j = 0;    // v61a: to print CRC character
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
+        if (i == 0)  Serial.printf("\r\n data%3d - %9.4f:C\t", i, (float) 0.0000);
+        else if (convert_p1_print( mySerial1.peekByte(i-1)) == '|' || convert_p1_print( mySerial1.peekByte(i-1)) == '!')
+                 Serial.printf("\r\n data%3d - %9.4f:C\t", i, 
+                      (float)((((mySerial1.peekBit(i) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
+
+        Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
+
+        if (convert_p1_print( mySerial1.peekByte(i)) == '|' || convert_p1_print( mySerial1.peekByte(i)) == '!')  {   // check if we are going to new P1 record
+          int m_len = 0;                          //  count masked line length
+          if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare ?
+
+              // Serial.print((String) "\r\n dataM"+ j + ":\t");  
+              Serial.printf("\r\n data%3d:m\t\t", j);                  // print masked line 
+              
+              for (int m = j; m <= i; m++ )  {
+                  Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
+                  m_len++;     // account this masked line length
+              }
+
+              // Serial.print((String) "\r\n dataC"+ j + ":\t");  
+              Serial.printf("\r\n data%3d:d (%3d)\t", j, m_len);                  // print differnce pointer lines
+              for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
+                if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
+                    telegram_crcOut[m] == 'X') 
+                    Serial.print(" "); 
+                else Serial.print("^");
+              }
+              j = i + 1;
+          }
+          // Serial.print((String) "\r\n dataR"+ (i+1) + ":\t");  // Use i as j = 0
+          // Serial.printf("\r\n data%3d - %9.4f:C\t", (i+1), (float)(((mySerial1.peekBit(i+1) - temp0)*12.5)/1000000.0000) );
+        }
+        if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
+    }     
+
+
+    /*
+      Print Timed Read <> Mask 
+    */
+    if (bit_sequence < 0) {   // print only bitchanges in Binary with/when range is negative
+      if (((bit_sequence*-1) / MAXLINELENGTH) == 1 ) {
+        Serial.print((String) "\t <M> Check binary Mask: 0  to " +  (bit_sequence * -1) );
+        int cnt = 0;
+        int temp0 = mySerial1.peekBit(0);  // get zero reference
+        for (int m = 0; m <= ( (bit_sequence % MAXLINELENGTH) * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
+          if ( m == 0 ||
+              mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
+              !(telegram_crcOut[m] == mySerial1.peekByte(m) || telegram_crcOut[m] == 'X')) {
+            // Serial.print((String) "\r\n Data:" + m +  "\t");
+            Serial.printf("\r\n Data:%3d t=%6.4f\t", m, 
+                          (float)((((mySerial1.peekBit(m) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
+            Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+            print_binary(mySerial1.peekByte(m));
+            Serial.print((String)+  " <i-M> " );
+            print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
+            Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
+            Serial.print((String)+  " <m-I> " );
+            Serial.print((String) " " + (char) convert_p1_print(telegram_crcIn[m]) );
+            cnt++; // maximize
+          }
+          if (  telegram_crcOut[m]    == '!'    ||
+                mySerial1.peekByte(m) == '!'    || 
+                cnt > 15) {
+            Serial.println((String) "\r\n break diff cnt=" + cnt  + " at=" + m);
+            break; // terminate at end
+          }            
+        }   
+       } 
+      else {
+
+        /*
+          Print binary read timed
+        */
+        Serial.print((String) "\t <I> Check binary Read (scope-time): 0  to " +  (bit_sequence * -1) );
+        int cnt = 0;
+        int temp0 = mySerial1.peekBit(0);  // get zero reference
+        int temp1 = mySerial1.peekBit(0);  // get zero previous
+        for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
+          if ( m == 0 ||
+              mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
+              !(telegram_crcOut[m+1]  == mySerial1.peekByte(m+1)  || telegram_crcOut[m+1] == 'X') ||   // triple detect
+              !(telegram_crcOut[m]    == mySerial1.peekByte(m)    || telegram_crcOut[m]   == 'X') ||
+              !(telegram_crcOut[m-1]  == mySerial1.peekByte(m-1)  || telegram_crcOut[m-1] == 'X')) {
+                // Serial.print((String) "\r\n Data:" + m +  "\t");
+              if (cnt <= 16 || mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ) {
+                Serial.printf("\r\n Data:%3d Bt=%8.4f dx=%6.4f\t", m, 
+                                (float) ( ((mySerial1.peekBit(m) - temp0)*12.5)/1000000.0000 ),
+                                (float) ( ((mySerial1.peekBit(m) - temp1)*12.5)/1000000.0000 )
+                              );
+                Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+                print_binary(mySerial1.peekByte(m));
+                Serial.print((String)+  " <i-M> " );
+                print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
+                Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
+                cnt++; // maximize
+                if  (m > 3  && mySerial1.peekByte(m-4)  == '!') break;   // exit to prevent beyond telegram print
+              }
+           }
+          // if (  telegram_crcOut[m]    == '!'    ||
+          //       mySerial1.peekByte(m) == '!'    || 
+          //       cnt > 15) {
+          //   Serial.println((String) "\r\n break diff cnt+=" + cnt  + " at=" + m);
+          //   break; // terminate at end
+          // }
+
+          temp1 = mySerial1.peekBit(m);  // save previous
+          if (m == 0) temp0 = temp0 + compensate_bitTime;     // single = causes somewhere wdt
+          // if (m > 0) temp1 = temp1 - compensate_bitTime;   // will double the difference time
+          // if (m = 0) temp0 = temp0 - compensate_bitTime;     // single = causes somewhere wdt
+
+        }   
+      } // ((bit_sequence*1) % MAXLINELENGTH) 
+    } // else bit_sequence < 0
+  }
+
+  if (bit_port == 2) {
+    unsigned long temp = 0UL;    
+    unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial2Baudrate;
+    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
+                  + " serial port="+ bit_port 
+                  + " #Inpos=" + mySerial2.peekBitPos()
+                  + "-------------time:" + micros()
+                  + " \r\n");
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
+      // Serial.print((String) "\t" + mySerial2.peekBit(i));
+      if (i > 0) {
+          if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&
+                 temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+               Serial.print((String) "\t" + temp + "~" );
+          else Serial.print((String) "\t" + temp + " " );
+          Serial.print((char) convert_p1_print( mySerial2.peekByte(i-1)) );
+       }
+      if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial2.peekBit(i) + "> " );  // next line time
+      if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
+    }
+    Serial.print((String) "\r\n data0:\t");                 // print character line data
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
+         Serial.print((char) convert_p1_print( mySerial2.peekByte(i)) );
+         if (convert_p1_print( mySerial2.peekByte(i)) == '|')     // check if we are going to new P1 record
+             Serial.print((String) "\r\n data"+ i + ":\t");  
+         if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
+    }     
+  }    
+
+  Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
+}
+
+/*
+  Convert and print binary  (recursive)
+*/
+void print_binary(unsigned int number) {
+  if (number <= 255) {                      // print byte
+    Serial.print((String) " ");
+    Serial.print((String) (number & 0x40 ? '1' : '0'));
+    Serial.print((String) (number & 0x20 ? '1' : '0'));
+    Serial.print((String) (number & 0x10 ? '1' : '0'));
+    Serial.print((String) (number & 0x80 ? '1' : '0'));
+    Serial.print((String) " ");
+    Serial.print((String) (number & 0x08 ? '1' : '0'));
+    Serial.print((String) (number & 0x04 ? '1' : '0'));
+    Serial.print((String) (number & 0x02 ? '1' : '0'));
+    Serial.print((String) (number & 0x01 ? '1' : '0'));
+    Serial.print((String) " ");    
+  } else {
+    if (number >> 1) print_binary(number >> 1);
+    Serial.print((String) (number & 1 ? '1' : '0'));
+  }
+}
+
+/* return printabel character for diagnose */
+int convert_p1_print(int data_in) {
+  int data_out = '?';
+       if (isprint(data_in)  ) data_out = data_in;
+  else if ( data_in == '\x0d') data_out = '<';
+  else if ( data_in == '\x0a') data_out = '|';
+  else if ( data_in == '\x00') data_out = '_';
+  return data_out;
 }
