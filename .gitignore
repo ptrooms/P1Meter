@@ -40,6 +40,9 @@ telegram0crlf.txt
 # my local save/play files
 p1-analyse-*.txt
 
+## local ######
+*.ods#
+
 ## Visual Studio Code specific ######
 .vscode
 .vscode/.browse.c_cpp.db*
