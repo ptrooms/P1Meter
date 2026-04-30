@@ -7,6 +7,12 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 ## [v21.72] - reworked and improve restart capabilities (apr26)
+	- cleaned top directory
+	- - post_build.py moved to tools/post_build.py
+	- - restructured and removed unwanted data, test/data-scripts moved to subdir tools/scripts	
+	- remove git submodule DallasTemperature and replaced by localised contents 
+	- - submodule contained a library.json dependenday that caused an Intelli VScode loop for update version
+	- - not sure this was caused by submodule or due to search for higher ^2.3.8 whioe we need 2.3.3
 	- Mqtt commands received are (also) reported to mqtt "/log/p1 ESP P1 command: , (in/out)"
 	- removed platform dependency in library DallasTemperature.json for OneWire 
 	- - to prevent VSCode loop-update PlatformIO when updating IntelliSense
