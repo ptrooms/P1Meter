@@ -2,9 +2,10 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "71" // number this version
+#define VERSION_NUMBER "72" // number this version 29apr26
 
 /* Procedure Guide for changes:
+  0. set VSC/IDE to PlaformIO mode 
   1. Commit running changes
   2. update VERSION_NUMBER
   3. Update changelog
@@ -114,6 +115,12 @@
 */
 
 /* change history
+  - v72  - implement restart followup decisions due to reained message(s).  
+          If restarted , ignore (retained) command R-estart, e-rror and 3-ignore state
+            this to prevent any loop due to last retained mqtt command and
+            prevent dwfault heatingstate is on when retained mode was '3' ignore.
+         - refactor "mqttCnt" to "mqttCnt_Out"
+            count number of input commands via "mqttCnt_In" and display this with as cmd= on '?' command
   - v71  - protect coalescing change of new_ThermostatState by old_ThermostatState
           when we have changed the thermostat mode, we report the state in Json as Xeatmode
           03feb26: fault old_ThermostatState == new_ThermostatState; should be "="
@@ -303,7 +310,7 @@ woes in Wifi/Lamx layer
         git log                 // check log status
   V52 13jul25 02u35 renamed to master
   V52 13jul25: restart information display
-     protection "suspend @getValues2FromP1Record while mqttCnt < 5" unneeded, now commented
+     protection "suspend @getValues2FromP1Record while mqttCnt_Out < 5" unneeded, now commented
     'e0'  = divide error
     'e1'  = infinite loop fault
     'E'   = Enforce read fault in Reading P1 data
@@ -311,7 +318,7 @@ woes in Wifi/Lamx layer
   V52 06jul25: restart information display
     command 'S'/'s' serial1Stop serial2Stop (prohibit serial data)
     RX_yieldcount ignore serial if too many failures
-    print & save restart reason information en report this at first mqttCnt into mqtt Errortopic
+    print & save restart reason information en report this at first mqttCnt_Out into mqtt Errortopic
     format localIp() address to string for display 'D', can also IPAddress just as an array of 4 ints.
     diagnose state display using @-signal loop , &-got rx2 record
     DEBUG_PRINTxx macros
@@ -555,7 +562,7 @@ woes in Wifi/Lamx layer
 // 	-- Beautified
 // ## [V21.20]
 // - 11apr21 16u29 V20: added JSON error message to topic /error/.. if P1 serial is not (properly) connected
-// 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt":28}
+// 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt_Out":28}
 // - 11apr21 15u16 mqtt timeout (override) set from 15 to 60 seconds #define MQTT_KEEPALIVE = 60
 // 	-- sometimes the mqtt server is very busy and we do not want a preliminary reboot
 // - 11apr21 15u15 Added mqtt server address  in serial debug at startup
@@ -1203,7 +1210,8 @@ char serial2terminator = '\x00';  // v58c termination telegrams serial1 (test/du
 
 // Vars to store meter readings & statistics
 bool mqttP1Published = false;        //flag to check if we have published
-long mqttCnt = 0;                    // updated with each publish as of 19nov19
+long mqttCnt_Out  = 0;         // updated with each publish as of 19nov19, v72 renamed mqttCnt_Out
+long mqttCnt_In   = 0;         // v72 Udate at each input command, retains means, will be 1
 long p1MissingCnt = 0;         // v52 updated when we failed to read any P1
 long p1CrcFailCnt = 0;         // v52 updated when we Crc failed
 long p1RecoverCnt = 0;         // v52 updated when we successfully recovered P1
@@ -1383,7 +1391,7 @@ char telegram2Record[MAXLINELENGTH2+32];  // telegram extracted data maxsize for
 bool bGot_Telegram2Record = false;    // RX2 databuffer  between /header & !trailer
 long Got_Telegram2Record_prev = 0;    // RX2 number of sucessfull RX2 records before loop
 long Got_Telegram2Record_cnt  = 0;    // RX2 number of sucessfull RX2 records total loop
-long Got_Telegram2Record_last = 0;    // mqttCnt last Telegram2Record received
+long Got_Telegram2Record_last = 0;    // mqttCnt_Out last Telegram2Record received
 // const char dummy3a[] = {0x0000};      // prevent overwrite memoryleak, v55b remove
 // const char dummy4a[] = {0x0000};      // prevent overwrite memoryleak, v55b remove
 
@@ -1807,11 +1815,11 @@ void setup()
 
   #ifdef TEST_PRINTF_FLOAT
     // Test float functions
-    Serial.printf ("Test FloatingPoint support\n", mqttCnt);
+    Serial.printf ("Test FloatingPoint support\n", mqttCnt_Out);
     // asm(".global _printf_float"); // setin in Setup()
     // read: https://en.cppreference.com/w/c/io/fprintf
-    Serial.printf ("\r\tmqttCnt ValueD = %05d\n", mqttCnt);   // strange lont number 2681....8192.0
-    Serial.printf ("\r\tmqttCnt Value4.1f = %4.1f\n", mqttCnt);   // strange lont number 2681....8192.0
+    Serial.printf ("\r\tmqttCnt ValueD = %05d\n", mqttCnt_Out);   // strange lont number 2681....8192.0
+    Serial.printf ("\r\tmqttCnt Value4.1f = %4.1f\n", mqttCnt_Out);   // strange lont number 2681....8192.0
     Serial.printf ("\r\t12.345 ValeUu2 = %3u_\n", 12.345);        // strange 3607772529_
     Serial.printf ("\r\t9.0453 Value4.2f = %4.2f\n", 9.0453);     // 9.05
     Serial.printf ("\r\t9.1 Value4.1f = %4.1f\n", 9.1);           //  9.1
@@ -2371,10 +2379,10 @@ void loop()
         loopTelegram2cnt = 0;  // allow readtelegram2  for a maximum of "6 loops" of actual receives
 
         // Only activate myserial2  atdesignated times
-        // int checkIntervalRx2 = mqttCnt % 7;
+        // int checkIntervalRx2 = mqttCnt_Out % 7;
         if ( rx2_function && 
-                (mqttCnt == 2  || 
-                (mqttCnt > 0 && ((mqttCnt % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
+                (mqttCnt_Out == 2  || 
+                (mqttCnt_Out > 0 && ((mqttCnt_Out % rx2ReadInterval) == 0)) ) ) {  // only use RX2 port at these intervals
           // Start secondary serial connection if not yet active
           if (!serial2Stop) {
               openCloseSerial(SERIALPORT_WL_DATA, SERIALPORT_OPEN);            
@@ -2518,8 +2526,8 @@ void loop()
       // String mqttMsg = "Error, "; // build mqtt frame 
       // mqttMsg.concat("serial not connected ");  
       // mqttMsg,concat("interval="); // build mqtt frame 
-      // char mqttCntS[8] = ""; ltoa(mqttCnt,mqttCntS,10); mqttMsg.concat(mqttCntS));
-      mqttMsg.concat((String)", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+      // char mqttCntS[8] = ""; ltoa(mqttCnt_Out,mqttCntS,10); mqttMsg.concat(mqttCntS));
+      mqttMsg.concat((String)", \"mqttCnt_Out\":"+(mqttCnt_Out+1));    // +1 to reflect the actual mqtt message
       mqttMsg.concat("}");  // end of json
       // mqttMsg.toCharArray(mqttOutput, 128);
       publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
@@ -2542,7 +2550,7 @@ void loop()
          allowOtherActivities = true;     // v57
       }                          
     /*    
-      // ((float)ESP.getCycleCount()/80000000), (mqttCnt + 1), ((float) startMicros / 1000000));
+      // ((float)ESP.getCycleCount()/80000000), (mqttCnt_Out + 1), ((float) startMicros / 1000000));
       Serial.print("\r\n# !!# ESP P1 rj11 Active interval checking ");   // v45: add carriage-return
       Serial.print(intervalP1cnt );
       Serial.print(", timeP:");
@@ -2704,7 +2712,7 @@ void readTelegramP1() {
     // if (  telegramP1header) Serial.print("\r\nxP= "); // print message line if message is broken in buffer
   }
   startMicros = micros();  // Exact time we started
-  // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt+1) +" started at " + micros());
+  // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt_Out+1) +" started at " + micros());
   if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s%d: %5u start: %11.6f \b\b ", 
         RX_yieldcount,    // v52: check countlevel
           ((float)ESP.getCycleCount()/80000000),
@@ -2712,7 +2720,7 @@ void readTelegramP1() {
           (digitalRead(WATERSENSOR_READ) ? "h" : "l"), 
           (preserve_lightReadState_for_mqtt ? (lightReadState ? "C" : "W") :(digitalRead(LIGHT_READ) ? "c" : "w") ),  // v70a
           (digitalRead(LIGHT_READ)),  // v70a
-        (mqttCnt + 1), ((float) startMicros / 1000000));
+        (mqttCnt_Out + 1), ((float) startMicros / 1000000));
 
   // Cycle: 04.781228065
 
@@ -3078,7 +3086,7 @@ void readTelegramWL() {
             telegram2[telegram2_Pos] = 0x00;    // enforce String-end of this for serial print
             publishMqtt(mqttLogTopic2, (String)
                      "{ rx2-" +  __LINE__   // print RX2 data line, already converted to print
-                        + ", \"mqttCnt\":" + mqttCnt
+                        + ", \"mqttCnt_Out\":" + mqttCnt_Out
                         + ", \"length\":"  + telegram2_Pos
                         + ", \"rx2=\":\""  + (String) telegram2
                      + "\"}" );
@@ -3434,7 +3442,7 @@ void processGpio() {    // Do regular functions of the system
     //  condition ? expression-true : expression-false
     //  printf(i < 0 ? "i is below 0" : i == 0 ? "i equal 0" : "i is over 0");
     
-    Serial.print((String) "\nM#@t=" + (mqttCnt+1) + " @" + (millis() / 1000) + ", TimeP1="  + currentTimeS);  // as - including any errors -  extracted from P1 read
+    Serial.print((String) "\nM#@t=" + (mqttCnt_Out+1) + " @" + (millis() / 1000) + ", TimeP1="  + currentTimeS);  // as - including any errors -  extracted from P1 read
 
     Serial.print((String) ((validTelegramCRCFound) ? " (E#=" : " (e#=") + telegramError + ")" );  // cleaner code; display errors
     // if (validTelegramCRCFound) Serial.print((String) " (E#="          + telegramError + ")"); // data contains errors
@@ -3476,6 +3484,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int myLength) {
   // String w1="";
   //  w1 = (char)payload[0];
 
+  mqttCnt_In++;     // add 1 to input command
   String mqttCommand = ""; // initialise as string
   int i = 0;
   for (i = 0; (i < myLength && i < sizeof(mqttReceivedCommand)); i++) { // read mqtt payload
@@ -3494,6 +3503,10 @@ void callbackMqtt(char* topic, byte* payload, unsigned int myLength) {
     // Serial.println((String)mqttReceivedCommand[0] + (int)mqttReceivedCommand[1]); 
     // yield();  // do background processing required for wifi etc.
   }
+  // if (mqttCnt_In == 1 )   // display start reason
+    publishMqtt(mqttLogTopic, (String) "ESP P1 command:" + mqttReceivedCommand 
+      + ", (" + mqttCnt_In + "/"  + mqttCnt_Out + ")." 
+      );  // v72 report  how we restarted
 }
 
 
@@ -3550,19 +3563,18 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         (char)payload[3] == '\x00' ||
         (char)payload[4] == '\x00') )  {   // v58b up to 5 commmands
       
-    if         ((char)payload[0] == '0') {
+    if         ((char)payload[0] == '0' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)) {
       new_ThermostatState = 0;                   // Heating on
       if (outputOnSerial) Serial.print("Thermostat will be switched off.");
-    } else  if ((char)payload[0] == '1') {
+    } else  if ((char)payload[0] == '1' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)
       new_ThermostatState = 1;                   // Heating off
       if (outputOnSerial) Serial.print("Thermostat will be switched on.");
     } else  if ((char)payload[0] == '2') {
       new_ThermostatState = 2;                   // Heating follows input
       if (outputOnSerial) Serial.print("Thermostat will follow input.");
-    } else  if ((char)payload[0] == '3') {
-      new_ThermostatState = 3;                   // Heating left alone
+    } else  if ((char)payload[0] == '3' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)
       if (outputOnSerial) Serial.print("Thermostat routine disabled.");
-    } else  if ((char)payload[0] == 'R') {                                            // Restart
+    } else  if ((char)payload[0] == 'R' && mqttCnt_In > 0 ) {               // restart; v72 process only when it is a suubsequent command)
       if (outputOnSerial) Serial.print("Restart Request Received.");
       ESP.restart();
     } else  if ((char)payload[0] == 'D') {
@@ -3600,7 +3612,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       }
       if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
       if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
-    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '1' ) {
+    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '1' && mqttCnt_In > 0 ) {  // v72 process only when it is a suubsequent command)
         Serial.print("## forcing divide error");
         while (true) {
           int a = 0;
@@ -3609,7 +3621,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.printf(" error0 %d ", c); // print used variable 'c'
           // force a never ending loop        
         } 
-    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '2' ) {
+    } else  if ((char)payload[0] == 'e' && (char)payload[1] == '2' && mqttCnt_In > 0 ) {  // v72 process only when it is a suubsequent command)
         Serial.print("## forcing infinite loop");
         while (true) {
           int a = 1;
@@ -3881,7 +3893,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       waterTriggerCnt  = 0 ;     // v47 reset waterTriggerCnt
       waterReadCounter = 0 ;     // Zero the Water counters
       waterReadHotCounter = 0 ;  // Zero the WaterHot counter
-      mqttCnt = 0;               // Zero mqttCnt
+      mqttCnt_Out = 0;               // Zero mqttCnt_Out
+      mqttCnt_In  = 0;               // V72 Zero mqttCnt_In
 
       p1MissingCnt = 0;      // v52 updated when we failed to read any P1
       p1CrcFailCnt = 0;      // v52 updated when we Crc failed
@@ -3893,7 +3906,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       waterTriggerState = LOW;   // reset debounce
       waterReadState    = LOW;   // read watersensor pin
       if (outputOnSerial) {
-        Serial.print("WaterCnt = 0, mqttCnt = 0, reset/Watersensor/timers");
+        Serial.print("WaterCnt = 0, mqttCnt_Out = 0, reset/Watersensor/timers");
       }
     } else  if ((char)payload[0] == 'I') {
       intervalP1cnt = 2880;              // make P1 Interval not critical
@@ -3987,7 +4000,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             +  (serial2Stop  ? "disabled" : "Enabled") 
             +  (mySerial2.portActive() ? "/ISR" : "/---")    // v59 display if port has ISR activated
             + " mode="           + serial2PortMode    // v58b   
-            + " interval="       + rx2ReadInterval ) ;   //  % mqttCnt
+            + " interval="       + rx2ReadInterval ) ;   //  % mqttCnt_Out
 
         else Serial.print((String) "\tserial2=" 
               + (!serial2Stop  ? "e" : "d") 
@@ -4088,7 +4101,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
           Serial.println((String)"Z zero counters " + 
-                + "(mqtt=" + mqttCnt              // v63 Output count
+                + "(mqtt=" + mqttCnt_Out              // v63 Output count
+                + " cmd=" + mqttCnt_In            // v72 display input number
                 + " faults: " 
                 + " Miss=" + p1MissingCnt         // v52 failed to read any P1
                 + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
@@ -4178,7 +4192,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
   else if (validCrcInFound)  publishP1ToMqttCrc = 2;    // recovered
   else p1MissingCnt++;    // v52 count missing Crc (likeley records was not read at all)
   
-  mqttCnt++ ;             // update counter
+  mqttCnt_Out++ ;             // update counter
   // Serial.println("Debug4 publishP1ToMqtt");
   if (CheckData() || forceCheckData ) {       // do we have/want some valid P1 meter reading
     // Serial.println("Debug CheckData=true");
@@ -4263,7 +4277,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // msg.concat("\"GasConsumption\": %lu");
 
     // msg.concat(", \"Version\":1.3a }");
-    msg.concat(", \"mqttCnt\":%u");                     // as of 19nov19 include our message counter
+    msg.concat(", \"mqttCnt\":%u");      // as of 19nov19 include our message counter, v72 keep field name
 
     msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
 
@@ -4354,7 +4368,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             thermostatWriteState,       // output setting for heating 1=inSetHighPowerRelais, 0=OffnoPowertoRelais
             new_ThermostatState,        // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
             // GasConsumption;
-            mqttCnt,                    // mqtt counter
+            mqttCnt_Out,                    // mqtt counter
 
             waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
             waterReadCounter,           // Watersensor state 21mar21 number falldowns
@@ -4374,16 +4388,16 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
     if (Got_Telegram2Record_cnt > Got_Telegram2Record_prev) {
         Got_Telegram2Record_prev = Got_Telegram2Record_cnt;   // count for this record
-        Got_Telegram2Record_last = mqttCnt;                 // administrate receive
+        Got_Telegram2Record_last = mqttCnt_Out;                 // administrate receive
     } else {
-        if (((mqttCnt - (Got_Telegram2Record_last)+1) % 7) == 1) {  // signal error at every 7th fault, +1 to prevent initial fault
+        if (((mqttCnt_Out - (Got_Telegram2Record_last)+1) % 7) == 1) {  // signal error at every 7th fault, +1 to prevent initial fault
                                             // normally , every 7th interval we have a RX2 record., 
           if (outputOnSerial) {
              Serial.println((String)"#!!# ESP RX2 timeout Warmtelink=" + intervalP1cnt );
           }
           String mqttMsg = "{\"error\":004 ,\"msg\":\"RX2fail";  // start of Json error message
           mqttMsg.concat((String) " " +  + "\", \"RX2Cnt\":"+ (Got_Telegram2Record_cnt) );      // finish JSON error message
-          mqttMsg.concat((String) " " +  + "\", \"mqttCnt\":"+ (mqttCnt) +"}");      // finish JSON error message
+          mqttMsg.concat((String) " " +  + "\", \"mqttCnt_Out\":"+ (mqttCnt_Out) +"}");      // finish JSON error message
           publishMqtt(mqttErrorTopic, mqttMsg); // report to /error/P1 topic
         }
     }
@@ -4501,7 +4515,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 
   if (nowValueAdc <= REQUIRED_ANALOG_ADC) {     // v49 check if we a Light sensor value reading
     String mqttMsg = "{\"error\":003 ,\"msg\":\"ADC Lightsensor value ";  // start of Json error message
-    mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt\":"+ (mqttCnt+1) +"}");      // finish JSON error message
+    mqttMsg.concat((String) " " + nowValueAdc + "\", \"mqttCnt_Out\":"+ (mqttCnt_Out+1) +"}");      // finish JSON error message
     
     // char mqttOutput[128];
     // mqttMsg.toCharArray(mqttOutput, 128);
@@ -4540,12 +4554,12 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     }
   }
   
-  if (mqttCnt == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
+  if (mqttCnt_Out == 1 && mqttTopic != mqttErrorTopic ) {   // v51: recursive report restart reason
     char output[128];
     snprintf(output, sizeof(output), 
-          "{\"info\":000, \"mqttCnt=\":%ld ,\"msg\":\"restart reason 0x%08x"
+          "{\"info\":000, \"mqttCnt_Out=\":%ld ,\"msg\":\"restart reason 0x%08x"
           ", epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x \"}",
-          mqttCnt , save_reason, 
+          mqttCnt_Out , save_reason, 
           save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
     if (client.connected()) client.publish(mqttErrorTopic, output);
     // publishMqtt(mqttErrorTopic, output); // report to /error/P1 topic
@@ -4558,12 +4572,12 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
       // client.publish(mqttTopic, mqttOutput); // report to /error/P1 topic
 
       // Serial.println((String) "\r\nmqtt>" + __LINE__ + ":" 
-      //     + "mqttCnt=" + mqttCnt
+      //     + "mqttCnt_Out=" + mqttCnt_Out
       //     + mqttTopic + ", "  + mqttOutput  + "<");  // display error on debug
 
       client.publish(mqttTopic, mqttOutput);          
       /*  v57: debug called itself loop
-        if (mqttCnt > 3) {
+        if (mqttCnt_Out > 3) {
         } else {
             client.publish(mqttTopic, mqttOutput);
         }
@@ -4595,7 +4609,7 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
       if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, lightReadState); // debug readstate0
     #endif  
     
-    if (mqttCnt == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
+    if (mqttCnt_Out == 0) lightReadState = HIGH;    // ensure inverted OFF at first publish
     // Process this one-to-one directly to output
     if (outputOnSerial and lightReadState)  Serial.print("\r\nLightReadState D6 LOW...");  // debug
     if (outputOnSerial and !lightReadState) Serial.print("\r\nLightReadState D6 HIGH..");  // debug
@@ -4612,7 +4626,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
   else local_lightReadState = false; // read D6 and keep until mqtt
 
-  if (mqttCnt == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
+  if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
     if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
   #endif  
@@ -4879,7 +4893,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                   }
 
 
-                  if (mqttCnt < 10 && telegramError == 0) {
+                  if (mqttCnt_Out < 10 && telegramError == 0) {
                     Serial.printf("\n\nString>%s< [%u, crc=%x msg=%s ]\n",testTelegram,testTelegramPos,currentCRC,messageCRC);
                     yield();
                     Serial.print("\n HEX:>");
@@ -5131,8 +5145,8 @@ void RecoverTelegram_crcIn() {
 */
 void  getValues2FromP1Record(char buf[], int myLen) {  // 716
   // return;
-  // if (mqttCnt == 3) Serial.printf(" mqttcount=%d myLen=%d ", mqttCnt, myLen ); // mqttcount=3 myLen=716
-  // if (mqttCnt < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong here, v52 disabled
+  // if (mqttCnt_Out == 3) Serial.printf(" mqttcount=%d myLen=%d ", mqttCnt_Out, myLen ); // mqttcount=3 myLen=716
+  // if (mqttCnt_Out < 5 ) return;   // testmode just to be sure we can do OTA if things go wrong here, v52 disabled
 
   int f = 0;
   // InitialiseValues();         // Data record, ensure we start fresh with newly values in coming records
@@ -5707,7 +5721,7 @@ void processTemperatures() {
       }
     }
   // }
-  mqttMsg.concat((String)"\", \"mqttCnt\":"+(mqttCnt+1));    // +1 to reflect the actual mqtt message
+  mqttMsg.concat((String)"\", \"mqttCnt_Out\":"+(mqttCnt_Out+1));    // +1 to reflect the actual mqtt message
   mqttMsg.concat("\"}");      // finish JSON error message
 
   if (!bTemp_Reading_State) { //  report failure on mqtt

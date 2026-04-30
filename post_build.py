@@ -3,9 +3,9 @@ Import("env")  # type: ignore : Import is not defined in pylance
 
 # using: https://forum.pjrc.com/index.php?threads/useful-script-for-generating-objdump-results-from-platformio.73834/
 
-#https://docs.platformio.org/en/latest/projectconf/advanced_scripting.html
-#https://docs.platformio.org/en/latest/projectconf/section_env_build.html#projectconf-dynamic-build-flags
-#https://docs.platformio.org/en/latest/scripting/actions.html
+# https://docs.platformio.org/en/latest/projectconf/advanced_scripting.html
+# https://docs.platformio.org/en/latest/projectconf/section_env_build.html#projectconf-dynamic-build-flags
+# https://docs.platformio.org/en/latest/scripting/actions.html
 
 # extensa: https://github.com/jcmvbkbc/gcc-xtensa
 
@@ -28,6 +28,13 @@ def after_build(source, target, env):
 
     objdump=env.subst("${FRAMEWORK_ARDUINOESP8266_DIR}") + "/../toolchain-xtensa/bin/xtensa-lx106-elf-objdump"
     print("ptro objdump new: " + objdump)
+
+    """ 
+    ensure directory exists
+    """
+    src_dir=env.subst("${BUILD_DIR}")
+    print("ptro src_dir: " + src_dir)
+    os.makedirs(src_dir, exist_ok=True)
     
     src_elf=env.subst("\"${BUILD_DIR}/${PROGNAME}.elf\"")
     src_lst=env.subst("\"${BUILD_DIR}/${PROGNAME}.asm\"")
