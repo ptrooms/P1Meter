@@ -6,6 +6,7 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.73] - tbd changes
 ## [v21.72] - reworked and improve restart capabilities (apr26)
 	- cleaned top directory
 	- - post_build.py moved to tools/post_build.py
@@ -212,3 +213,21 @@ create stable Versions-Vxx which when stable are merged into master.
 		-- Reset, noLogmqtt, doDebugserialout, doP1mqtt, 1-heatD8/2-off/3-leave/2-followD7
 - 25jun2018 00u00 - added Digital read D6 {LedLight1} for hotwater LedLight sensor
 - 24jun2018 00u00 - added analog read A0 (Ajson: {analogRead} for temperature sensor
+
+## Change Procedure
+Procedure Guide for changes:
+  0. set VSC/IDE to PlaformIO mode 
+  1. Commit running changes
+  2. update VERSION_NUMBER (in source #define VERSION_NUMBER "xx")
+  3. Update changelog ( this file Changes.md)
+  4. Create new Branch (Vxx)
+  5. compile check / test (PlatformIO build V and --> )
+  6. Commit changes to Git
+  7. Check PlatformIO  "env:p1meter-production_241(code-P1Meter)""
+  8. Check/ping NodeMCU upload IP address: .. platformio_p1meter_env.ini
+  9. Do not udaloed at the whole hour, this for openHAB proces
+  10. Upload to NodeMCU (--> PlatformIO Upload) , monitor progress
+
+when ready, mrge to master on github:
+  11. Create Pull and Merge request to master
+  12. create next version for changes

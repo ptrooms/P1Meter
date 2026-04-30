@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "72" // number this version 29apr26
+#define VERSION_NUMBER "73" // number this version 30apr26 (master)
 
 /* Procedure Guide for changes:
   0. set VSC/IDE to PlaformIO mode 
