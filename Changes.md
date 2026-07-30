@@ -6,6 +6,9 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.73] - insert/add code to detect misreads of RS232
+	- notably reading "g" is surely an error
+	- - we found that in about 1 on 10 caes, a "0" (zero) is misinterpreted causingchecksum error or even runaways on data
 ## [v21.73] - tbd changes
 ## [v21.72] - reworked and improve restart capabilities (apr26)
 	- cleaned top directory

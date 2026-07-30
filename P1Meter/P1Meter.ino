@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "73" // number this version 30apr26 (master)
+#define VERSION_NUMBER "74" // number this version 30jul26 (master)
 
 /* Procedure Guide for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -1192,7 +1192,7 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
-int  loopbackRx2Mode  = 0;       // '0' Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc
+int  loopbackRx2Mode  = 0;       // '0' Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc, 6=print
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
@@ -1325,6 +1325,7 @@ int publishP1ToMqttCrc = 0;           // 0=failed, 1=OK, 2=recovered
 bool validCrcInFound = false;         // Set by Decode when Full (recovered) datarecord has valid Crc
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
+int  telegram_errIn_cnt = 0;          // v74 number of times we have a false read
 char telegram_crcIn[MAXLINELENGTH+32];   // active telegram that is checked for crc
 int  telegram_crcIn_len = 0;          // myLength of this record
 int  telegram_crcOut_cnt = 0;         // number of times masking was positioned
@@ -2857,15 +2858,17 @@ void readTelegramP1() {
         
         // print validity status of processed for debug reasons.
         allowOtherActivities = true;      // v56c resume finished processing of this P1 record.
+
+        Serial.print((String) (telegram_errIn_cnt > 0 ? '-' : '_'));
         if (validTelegramCRCFound) {
-              Serial.print((String) "_C");      // print checked OK
+              Serial.print((String) "C");      // print checked OK _C -C
         } else {
           if (validCrcInFound) {
-              Serial.print((String) "_R");  // v52 count Recoveries
+              Serial.print((String) "R");  // v52 count Recoveries _R -R
               p1RecoverCnt++ ; 
           } else {
-              Serial.print((String) "Z_");  // v45 print failed or recovered
-              p1CrcFailCnt++ ;              // v52 count Crc fails
+              Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
+              p1CrcFailCnt++ ;             // v52 count Crc fails
           } 
         }
 
@@ -4658,6 +4661,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
 /* 
   process P1 data start / to ! Let us decode to see what the /KFM5KAIFA-METER meter is reading
   called each time we have a telegram record
+    - return true (end of message/trailer) or false if not yet finished
 */
 bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that ends in Linefeed \n
 {
@@ -4669,10 +4673,14 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
 
   int startChar = FindCharInArrayRev(telegram, '/', myLen);  // 0-offset "/KFM5KAIFA-METER" , -1 not found
   int endChar   = FindCharInArrayRev(telegram, '!', myLen);  // 0-offset "!769A" , -1 not found
+  int errorChar = FindCharInArrayRev(telegram, 'g', myLen);  // v74 check if we have a raw error 
+  if (errorChar > 0) telegram_errIn_cnt++;  // v74 account errors
+  if ( FindCharInArrayRev(telegram, 'g', myLen) > 0) telegram_errIn_cnt++;  // v74 check if we have a raw error 
   bool endOfMessage = false;    // led on during long message transfer
 
   // if-else-if check if we are on header, trailer of in between those lines
   if (startChar >= 0) {                       // We are at start/first line of Meter reading
+    telegram_errIn_cnt = (errorChar > 0) ?  1 : 0;  // initialise errors
     // digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off
     // digitalWrite(BLUE_LED, LOW);       // Turn the ESPLED on to inform user
     digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // invert BLUE ked
