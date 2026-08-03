@@ -6,9 +6,18 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
-## [v21.73] - insert/add code to detect misreads of RS232
-	- notably reading "g" is surely an error
-	- - we found that in about 1 on 10 caes, a "0" (zero) is misinterpreted causingchecksum error or even runaways on data
+## [v21.74] - insert/add code to detect misreads of RS232
+	- smartmasking: when maskarray grows too large due to new day or many changes, we reset the array to reinitialise
+	- - This can be switched off by/via de 'm' command. The state is shown  as before "m-inactive", "M-active"
+	- - When the arrau os below a certain threshold, we inactivate 
+	- notably reading "g" is surely an error, we addded some check during debug
+	- - when in debug a telegram contains misformed 'g' , we print prefix line with 'xlT#..' iso 'xlT=..'
+	- - we found that in about 1 on 10 cases, a "0" (zero) can misinterpreted causingchecksum error or even runaways on data. This behavior seems to develope in a few days. Perhaps a shift in meter-timing.
+	- fyi at 115k2 --> m_bittime = 694 cycles , total byte (910 bits) is between 6930 en 6932 cycles
+	- - verified - unchanged - 30jul26 m_bitwait = 417 
+    - -       since v69c:12aug25 via BITWAIT1 by USE_RXREAD58 due PROD_MODE in SoftwareSerial241.h
+    - -       m_bitTime (80MHz/115k2) = 694 cycles --> resulting m_wait = 508 cycles between bits.
+    - -       maximum total cycles per byte = 7100 (set by BYTE_MAXWAIT_1 ) 
 ## [v21.73] - tbd changes
 ## [v21.72] - reworked and improve restart capabilities (apr26)
 	- cleaned top directory

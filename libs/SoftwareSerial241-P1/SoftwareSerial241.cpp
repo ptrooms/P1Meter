@@ -529,13 +529,13 @@ unsigned long SoftwareSerial::peekBitPos() {
 
 
 
-// note: wait starts at approx 500
+// note: wait starts at approx cycle 500
 // getCycleCountIram = cycle counter, which increments with each clock cycle  (doc: v55d)
 // BYTE_MAXWAIT_1 was 7000, changed in v59b to 7100 (actually unneeded safeguards byte olverflow)
 // using wait to prevent overrunning when Clocks are slower (7000 works ok, 2021-05-05 22:01:29: testing #BYTE_MAXWAIT_1)
 // WAITIram4w is using m_wait for delay
 // not used v63b #define WAITIram5  { while (wait<BYTE_MAXWAIT_1 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
-// at 115k2 --> m_bittime = 694 cycles , total byte 910 bits) is between 6930 en 6932 cycles 
+// 80Mhz at 115k2 Bd --> m_bittime = 694 cycles , total per byte (10 bits) is between 6930 en 6932 cycles 
 //                                        whiuch can be viewd by queuring the m_buffer_bits[] table
 
 
@@ -564,6 +564,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
    // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
 
       // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz /
+      // verified - unchanged - 30jul26 m_bitwait = 417 
+      //          since v69c:12aug25 via BITWAIT1 by USE_RXREAD58 due PROD_MODE in SoftwareSerial241.h
+      //          m_bitTime (80MHz/115k2) = 694 cycles --> resulting m_wait = 508 cycles between bits.
+      //          tot cycles per byte = 7100 (set by BYTE_MAXWAIT_1 )
       unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505 // 425 115k2@80MHz /
       // stored as m_wait
 
