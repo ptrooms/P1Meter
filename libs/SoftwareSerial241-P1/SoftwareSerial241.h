@@ -1,5 +1,10 @@
 /*
-SoftwareSerial.h v70
+SoftwareSerial.h 05aug26 v74 using PROD_MODE which uses RXREAD58 with BITWAIT1 417 (leadtime to ISR)
+
+Note: RXREAD2 must tbe cached for bitbang in order to BitBank read the Warmtelink ().
+      we can enforce this in code SoftwareSerial241.cpp but choose to do this here... in void()
+      We DO NOT :"USE_RXREAD2" as that in turn will P1 use this for dumb reading 115k200.
+      USE_RXREAD58 contains all kinds of logic to improve P1 reliability and report (bit)timing.
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 Copyright (c) 2015-2016 Peter Lerup. All rights reserved.
@@ -203,7 +208,8 @@ public:
    void enableRx(bool on, int recordtype);      // v58 to use/do/selec type of data 0-physical/ 1-simulatedP1 / 2-simulatatedWL
 
    void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
-   void rxRead2();		// BitBang Wl without p1active detection beween / and !
+   void rxRead2() ICACHE_RAM_ATTR;		// test to IRAM iso at function BitBang Wl without p1active detection beween / and !
+   // void rxRead2();		// BitBang Wl without p1active detection beween / and !
    void rxRead58();		// BitBang routine v58 
    void rxRead59();		// BitBang routine v59 
    void rxRead60();		// BitBang routine v60
@@ -241,7 +247,8 @@ private:
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
    #ifdef RXREAD58
-      unsigned int m_inPos, m_outPos;
+      // unsigned int m_inPos, m_outPos;          
+      volatile unsigned int m_inPos, m_outPos;     // v74 do not optimize for test in rxread58
    #else
       volatile unsigned int m_inPos, m_outPos;
    #endif

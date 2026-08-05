@@ -7,6 +7,9 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 ## [v21.74] - insert/add code to detect misreads of RS232
+	- updated comments in program
+	- decrease IRAM cache size by only caching the the active serial read routine, currently RXREAD58
+	- test for compile using Arduino IDE. Note: copy/sync the cusomtized SoftwareSerial241.cpp/h to $HOME/Arduino/libraries/
 	- smartmasking: when maskarray grows too large due to new day or many changes, we reset the array to reinitialise
 	- - This can be switched off by/via de 'm' command. The state is shown  as before "m-inactive", "M-active"
 	- - When the arrau os below a certain threshold, we inactivate 
