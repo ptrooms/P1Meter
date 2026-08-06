@@ -1200,8 +1200,10 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 
 // bool outputOnSerial  = true;    // "D" debug default output in Testmode
 // ---------------------------------------------------------------------------------------------------
-bool switchMaskingOut = false;    // every time we have an OK CRC out record we flipback the previously masked "X" position
+#define MASKING_LIMIT 18         // Number of masked positions after we sw
+bool switchMaskingOut = true;    // every time we have an OK CRC out record we flipback the previously masked "X" position
 bool switchMaskingCmd = true;    // 'm' in/activate switchMaskingOut
+int  setMaskLimitCnt  = 18;      // number of mask poisition in masking array, per default this will reset.
 bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
@@ -4050,12 +4052,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       switchMaskingCmd = !switchMaskingCmd;      // v74: swich on/off masking function that resets at every CRCin 
       Serial.println((String)"\r\n dataIn telegram_crcIn"
          + " myLen=" + telegram_crcIn_len 
-         + " Masking("+ (switchMaskingOut ? "M" : "m") +") now " + (switchMaskingCmd ? "Active" : "Inactive")   // v74: display state
+         + " Masking("+ (switchMaskingOut ? "m" : "M") +") now " + (switchMaskingCmd ? "Active" : "Inactive")   // v74: display state
          + " MaskCount=" + telegram_crcOut_cnt     // v74 print number of masked poisitions
          + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
          + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
          + " som>>");
-      switchMaskingOut = true;
+      switchMaskingOut = false;
       Serial.print((String) "\r\nsI=0\t");   // initialise
       for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
         if (isprint(telegram_crcIn[cnt])) {             // if printable
@@ -4073,12 +4075,20 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
     } else  if ((char)payload[0] == 'M') {       // v48 10jun25 print M-asking array
-      Serial.println((String)"\r\n Recovery telegram_crcOut"
-         + " myLen="     + telegram_crcOut_len     // lenth of output record
-         + " Masking("+ (switchMaskingCmd ? "m" : "M") +")=" + (switchMaskingOut  ? "Active" : "Inactive")   // v74: display state
-         + " MaskCount=" + telegram_crcOut_cnt     // v74 print number of masked poisitions
+      
+      if ((char)payload[1] == '+') setMaskLimitCnt++ ;                            // increase Mask limiter
+      else if ((char)payload[1] == '-' && setMaskLimitCnt > 4) setMaskLimitCnt--; // decrease Mask limiter
+      
+      Serial.println((String)"\r\n Recovery telegram_crcOut"      // display states
+         + " myLen="     + telegram_crcOut_len                    // lenth of output record
+         + " Masking("
+                + (switchMaskingCmd ? "m" : "M")    // v74 m/M  On/Off masking
+                + (((char)payload[1] == '+' || (char)payload[1] == '-') ? (char)payload[1] : (char)'.') // v74 show limit
+                + setMaskLimitCnt                   // v74 display maslimiter
+                +")=" + (switchMaskingOut  ? "Active" : "Inactive")   // v74: display state
+         + " MaskCount=" + telegram_crcOut_cnt      // v74 print number of masked poisitions in Masking array
          + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-         + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
+         + " Elen=" + p1ShortCnt                    // v74 number of errors length Input != Mask
          + " som>>");
       Serial.print((String) "\r\nsM=0\t");   // initialise
       for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
@@ -4227,7 +4237,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
-          Serial.println((String)"t 1/2 0-6/i/c/d Print Byte Tables serial1/2 ");        // v59, v64a
+          Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -4247,8 +4257,11 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
           Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
           Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
-          Serial.println((String)"M print Masking array "+ "( MaskX="+ telegram_crcOut_cnt + " )"  // v52 number of X maskings
-                          + " Masking(m)=" + (switchMaskingOut  ? "Active" : "Inactive")           // v74: display state
+          Serial.println((String)"M {+-} print Masking array(limiter) "
+                          + "( MaskX="+ telegram_crcOut_cnt    // v52 number of X maskings
+                          + "<"+ setMaskLimitCnt + " )"       // v74 display masklimit count
+                          + " Masking("+ (switchMaskingCmd  ? "+m" : "-m")  + ")="  // v74 display state of masking command
+                          + (switchMaskingOut  ? "Active" : "Inactive")             // v74: display state masking array
                   );
           Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )"      // v52 number of Times we validated
                           + " & flips Masking(m) to " + (switchMaskingCmd  ? "Off" : "On")   // v74: display state
@@ -4897,7 +4910,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
 
             // M print Masking array ( MaskX=17 ) Masking(m)=Active
             // m print Input array ( Processed=1828 ) & flips Masking(m) to Off
-            if (telegram_crcOut_cnt < 8) switchMaskingOut = false;   // v74 never smart match below 8, minimal change per p1
+            if (telegram_crcOut_cnt < 8) switchMaskingOut = true;   // v74 never smart match below 8, minimal change per p1
             if  (telegram_crcIn_len == telegram_crcOut_len) {    // do we have a masking array ?
  
                   for (int i=0; i < telegram_crcOut_len; i++) {    // check more masks
@@ -4907,17 +4920,16 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                          if (outputOnSerial) Serial.printf(", ms#%d=%c%c", i, telegram_crcIn[i], telegram_crcOut[i]);
                          telegram_crcOut[i] = 'X' ;            // mask this position
                       } else {
-                        if (telegram_crcOut[i] == 'X' && switchMaskingOut && switchMaskingCmd ) { // v74 actively flipback if previusly masked
+                        if (telegram_crcOut[i] == 'X' && !switchMaskingOut && switchMaskingCmd ) { // v74 actively flipback if previusly masked
                           telegram_crcOut_cnt--;                    // decrease mask count
                           telegram_crcOut[i] =  telegram_crcIn[i];  // restore Mask from CRCin
                         }
                       }
                    }
-                   switchMaskingOut = false;
-                   if (switchMaskingCmd && telegram_crcOut_cnt > 15) switchMaskingOut = true;   // v74 next run, reset
-
-                  if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
-                  getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
+                   switchMaskingOut = true;
+                   if (switchMaskingCmd && telegram_crcOut_cnt > setMaskLimitCnt) switchMaskingOut = false;   // v74 next run, reset
+                   if (outputOnSerial) Serial.printf(", msk#=%d ",telegram_crcOut_cnt);       
+                   getValues2FromP1Record(telegram_crcIn, telegram_crcIn_len);
             } else {                                            // no or myLength changed masking array
   
                   if (outputOnSerial) Serial.printf(", msLi#%d:%d ",telegram_crcIn_len, telegram_crcOut_len);
