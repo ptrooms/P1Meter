@@ -2,14 +2,14 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "74" // number this version 30jul26 (master)
+#define VERSION_NUMBER "75" // number this version 30jul26 (master)
 
-/* Procedure Guide for changes:
+/* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
-  1. Commit running changes
-  2. update VERSION_NUMBER
-  3. Update changelog
-  4. Create new Branch
+  1. Commit running changes (sync and optionally merge with master)
+  2. update VERSION_NUMBER (see here line above)
+  3. Update changelog /home/pafoxp/code-P1Meter/Changes.md
+  4. Create new Branch (vscode , left down menu branch)
   5. compile check (PlatformIO build V)
   6. Commit changes to Git
   7. Check PlatformIO  "env:p1meter-production_241(code-P1Meter)""
@@ -1281,6 +1281,10 @@ bool preserve_lightReadState_for_mqtt  = LOW;      // v70a preserve Highest Ledl
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
+int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
+     #define WATER_ERROR_SWITCH_ok      0x0f  // v75 <= 0x0F we have no faults
+     #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off
+     #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
 long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
@@ -4798,6 +4802,20 @@ bool processHotLedRead(bool notkeep_HoldState) {
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
   else local_lightReadState = false; // read D6 and keep until mqtt
 
+  /*
+    when water ISR routine is disabled and hot is turned on, perhas the water sensor is more stable
+    try to reset this condition
+  */
+  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // we have an error on the water sensor 
+      if (local_lightReadState) {
+        if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;   // try to reset
+          waterErrorSwitch |=  WATER_ERROR_SWITCH_hoton;     // indicate we have ON activated
+        } else {
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // switch off hoton
+        }
+      }
+  }
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
     if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
@@ -6000,13 +6018,15 @@ void processTemperatures() {
   ISR read water sensor on default pin grpio4 and respect debouncetime approx 40mSec
 */
 void attachWaterInterrupt() {   // activate waterinerrupt sensor
-  if (useWaterTrigger1) {
-    attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
-    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
-  } else {
-    attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
-    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
-  }
+  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) {    // v75 do not active attach if we have an error condition
+    if (useWaterTrigger1) {
+      attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
+      if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
+    } else {
+      attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
+      if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
+    }
+  }    
   waterTriggerCnt = 1;          // indicate ISR has been activated
 }
 
@@ -6050,9 +6070,15 @@ void WaterTrigger0_ISR()
           // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
           waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
+          // v74a: on 08aug26 we have exceesive messages and the esp8266 did not start.
+          //        we needed to reset hte watersensor itself.
+          //        liky the water sensor is vibrating
+          //  not really a solution but we can insert code to delay the use until a later time.
+          //
           if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
             detachWaterInterrupt();
             Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+            waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop ; // v75 set error
             // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
             // waterTriggerState = LOW;      // v41 v47 force to low to ease things
           }
@@ -6097,6 +6123,7 @@ void WaterTrigger1_ISR()
         if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           Serial.print( (String) ", Detach>200WaterISR1="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop ; // v75 set error
           // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
           // waterTriggerState = LOW;      // v41 v47 force to low to ease things
         }
