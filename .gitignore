@@ -6,12 +6,15 @@
 
 ## Localised setting ######
 *.bak
-*.save
+*.save*
+*_save*
 P1Meter/P1OverrideSettings.h
 notes.txt
 compile_version_notes.txt
 gitignore*
 debug/
+# not sure where thi came from on 04aug26
+compile_commands.json
 
 ## Program related ##
 P1Meter/*.txt

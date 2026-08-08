@@ -1,4 +1,6 @@
-/* v70
+/* v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
+      currently operated and test for RX_READ58.
+      Note: RXREAD & RXREAD2 is kep in IRAM
 
 SoftwareSerial.cpp - Implementation of the Arduino software serial for ESP8266.
 adapted to P1 messageing with activates P1active between '/' and '!' readed data
@@ -61,15 +63,15 @@ extern "C" {
 // and callbacks corresponding to each possible GPIO pins have to be defined
 SoftwareSerial *ObjList[MAX_PIN+3];
 
-void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_2() { ObjList[2]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_3() { ObjList[3]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead2(); };	// gpio4/D2 is used to bitbang secondary RX/WL
-void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_0() { ObjList[0]->rxRead(); };        // temperature sensors DS18B0
+void ICACHE_RAM_ATTR sws_isr_1() { ObjList[1]->rxRead(); };        // TX serial standard out
+void ICACHE_RAM_ATTR sws_isr_2() { ObjList[2]->rxRead(); };        // TX2 gpio2 / Test scope
+void ICACHE_RAM_ATTR sws_isr_3() { ObjList[3]->rxRead(); };        // RX serial standard in
+void ICACHE_RAM_ATTR sws_isr_4() { ObjList[4]->rxRead2(); };	    // RX2 gpio4/D2 is used to bitbang secondary RX2/WL
+void ICACHE_RAM_ATTR sws_isr_5() { ObjList[5]->rxRead(); };        // gpio5 watermeter trigger in
 // Pin 6 to 11 can not be used
-void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
+void ICACHE_RAM_ATTR sws_isr_12() { ObjList[12]->rxRead(); };      // gpio12 Ledlight in
+void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };      // gpio13 Thermostate in
 // void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };   // gpio14/D5 is used to bitbang primary P1
 #if defined (USE_RXREAD58)
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead58(); };     // choose implementation of v58
@@ -84,13 +86,13 @@ void ICACHE_RAM_ATTR sws_isr_13() { ObjList[13]->rxRead(); };
 #elif defined (USE_RXREAD)   
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };       // choose original
 #else
-   #defined USE_RXREAD 0
+   #define USE_RXREAD 0
    #warning "Using the default  rxRead version"
    void ICACHE_RAM_ATTR sws_isr_14() { ObjList[14]->rxRead(); };       // choose original
 #endif
-void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };
-void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming
-void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxTriggerBit(); };  // use gpio14 for bittiming
+void ICACHE_RAM_ATTR sws_isr_15() { ObjList[15]->rxRead(); };        // gpio15 = waterklep Out
+void ICACHE_RAM_ATTR sws_isr_16() { ObjList[16]->rxTriggerBit(); };  // use gpio4  for bittiming GPIO16 BLEUED
+void ICACHE_RAM_ATTR sws_isr_17() { ObjList[17]->rxTriggerBit(); };  // use gpio14 for bittiming (Aanalog 0)
 
 // void ICACHE_RAM_ATTR rxTriggerBit_ISR(void); // store the ISR test routine in cache
 
@@ -529,13 +531,13 @@ unsigned long SoftwareSerial::peekBitPos() {
 
 
 
-// note: wait starts at approx 500
+// note: wait starts at approx cycle 500
 // getCycleCountIram = cycle counter, which increments with each clock cycle  (doc: v55d)
 // BYTE_MAXWAIT_1 was 7000, changed in v59b to 7100 (actually unneeded safeguards byte olverflow)
 // using wait to prevent overrunning when Clocks are slower (7000 works ok, 2021-05-05 22:01:29: testing #BYTE_MAXWAIT_1)
 // WAITIram4w is using m_wait for delay
 // not used v63b #define WAITIram5  { while (wait<BYTE_MAXWAIT_1 && SoftwareSerial::getCycleCountIram()-start < wait); wait += m_bitTime; }
-// at 115k2 --> m_bittime = 694 cycles , total byte 910 bits) is between 6930 en 6932 cycles 
+// 80Mhz at 115k2 Bd --> m_bittime = 694 cycles , total per byte (10 bits) is between 6930 en 6932 cycles 
 //                                        whiuch can be viewd by queuring the m_buffer_bits[] table
 
 
@@ -556,7 +558,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
   Do BitBang of "v59", store Byte in m_buffer[m_inPos] and check for P1 and
 */
 #define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+#if defined (USE_RXREAD)
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
+   #else
+   void SoftwareSerial::rxRead() {
+   #endif
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
    // Advance the starting point for the samples but compensate for the
@@ -564,6 +570,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
    // unsigned long wait = m_bitTime + m_bitTime/3 - m_bitWait;	//corrupts	// 425 115k2@80MHz
 
       // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;		// 497-501-505 // 425 115k2@80MHz /
+      // verified - unchanged - 30jul26 m_bitwait = 417 
+      //          since v69c:12aug25 via BITWAIT1 by USE_RXREAD58 due PROD_MODE in SoftwareSerial241.h
+      //          m_bitTime (80MHz/115k2) = 694 cycles --> resulting m_wait = 508 cycles between bits.
+      //          tot cycles per byte = 7100 (set by BYTE_MAXWAIT_1 )
       unsigned long m_wait = m_bitTime + m_bitTime/3 - m_bitWait;		// 497-501-505 // 425 115k2@80MHz /
       // stored as m_wait
 
@@ -614,12 +624,15 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
    // Serial.print("-"); // this blocks and make the routine inoperable
 }
 
-
 /*
-  Do BitBang serial port2, store Byte in m_buffer[m_inPos]
+  Do BitBang serial port2, store Byte in m_buffer[m_inPos] , alway used, f.e. for RX2 Warmtelink
 */
 #define WAITIram4w2  { while (SoftwareSerial::getCycleCountIram()-start <   wait &&   wait<BYTE_MAXWAIT_1);   wait += m_bitTime; }
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
+#if defined (USE_RXREAD2)
+void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() { 
+   #else
+   void SoftwareSerial::rxRead2() {
+   #endif
    ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
    // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
@@ -647,6 +660,21 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
       // wait = wait - (m_bitTime + m_bitTime/3 - 498) ; // no need to fully wait for end of stopbit and this finish the interrupt more quickly
       // wait = wait - 100;   // below 100 in production leads to more errors. In test (serial more reliable) value can lower than 400)
       //note: normal stopbit is LOW, inverted this (shoudl) shift to HIGH which may influence operations
+
+   // prepare for  time shifting, we need to know the amount fo cycles .....
+   // m_bitTime = m_bitTime - 2; // bwlo takes 2 cycles
+   // below does not fit into ICACHE
+   /*
+      m_bitTime = m_bitTime - 2;
+      if ((1U << (rec - 'a')) & 0x7F) {            // if (rec >= 'a' || rec < 'g')
+         if ((1U << (rec - 'a')) & 0b01010101) {   // if (rec == 'a' || rec == 'c' || rec == 'e' || rec == 'g')
+               m_bitTime = m_bitTime + m_bitTime/10;  // to early
+         } else {
+               m_bitTime = m_bitTime - m_bitTime/10;  // to late
+         }
+      }
+   */
+
    WAITIram4w2; // stopbit:  while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
    
    // Store the received value in the buffer unless we have an overflow
@@ -682,14 +710,20 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
       Two macros: one regular and the other monitor/follow input
    */
    #define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
+
    #define WAITIram4t58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000) { \
                if (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin)) \
                      GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4); \
                else  GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4); \
                            } ; wait += m_bitTime; }
    #define DSMR_READ() (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin))   // v63b use register read to save cycles.
+
 // --58 //------------------------------------------------------------
+#if defined (USE_RXREAD58)
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
+   #else
+   void SoftwareSerial::rxRead58() {
+   #endif
    // GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor LOW to HIGH = 112nS
    // GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor HIGH
 
@@ -725,13 +759,14 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    uint8_t bit_shift = 8;                 // v63b assume missing bit
    // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
-   unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1];                    // v63a_first try to get timnng
+   // f.e. 8308 
+   unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1]; // v63a_first try to get timing since last stop bit
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
    // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
    // ----------------------------------------------------------------------------------------------------------
 
    
-   if (m_bitWait % 2 & m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
+   if (m_bitWait % 2 && m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
       // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
       // if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
 
@@ -743,6 +778,31 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
       //             : 0;
       // bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift;
 
+     // f.e. 8308=     347 - (694*21/2)=7287 = 10
+     // <= 7300	1st Branch	4 -  ((6700 / 694) + 1) = 4 - (9 + 1) == <-8          clamped --> 1
+     // >= 7300	2nd Branch	4 - (((7300 - 6940) / 694) + 1) = 4 - (0 + 1) == >0   clamped --> 3
+     // >= 7700   2nd Branch	4 - (((7700 - 6940) / 694) + 1) = 4 - (1 + 1)  == >0  clamped --> 2
+     // dynamic bit compensation
+      
+      /*
+         1st branch) small gaps  347-7287  underflow  (interbit)
+                     suppose  348 --> ( 500/694)=0+1 8-1--> 7
+                     suppose  500 --> ( 500/694)=0+1 8-1--> 7
+                     suppose 1000 --> (1000/694)=1+1 8-2--> 6
+                     suppose 1500 --> (1500/694)=2+1 8-3--> 5
+               check 8981 -> 2041 --> (2041/694)=2+1 8-3--> 5
+               
+         2nd branch) long gaps 6940-11798 overflow (interbyte)  --> 8  
+                     suppose 7000 --> ( (7000-6940)=60/694=0  )+1  --> 8-1 = 7
+                     suppose 9000 --> (( 9000-6940)=2060/694=2)+1  --> 8-3 = 5
+                     suppose11500 --> ((11500-6940)=4560/694=6)+1  --> 8-7 = 1
+         else intergap --> normal start of message
+
+         now we have 8981 - (10*694) = 2041 / 694 = 2 + 1 = 3 --> 8-3=5
+
+         if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= ((bit_diff - m_bitTime/3 / m_bitTime) + 1;
+
+      */
       if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
       else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
       bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
@@ -833,7 +893,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    // m_buffer_bits[m_inPos] = start;                    // v63a_v63b - ByteTiming table
    // m_buffer_bits[m_inPos] = start % 1000000;  // limit range
-   m_buffer_bits[m_inPos] = start;  // limit range
+   
+   // m_buffer_bits[m_inPos]  = start;  // limit range
+   //   m_buffer_bits[m_inPos] &= ~bit_shift;     // set last 3 bits to mask value
+      m_buffer_bits[m_inPos] = (start & ~7) | bit_shift ;  // set last 3 bits to mask value
+   
+
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {  // this works best in production
       if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header
@@ -889,7 +954,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 */
 
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
+#if defined (USE_RXREAD59)
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
+   #else
+   void SoftwareSerial::rxRead59() {
+   #endif
  // cli();   // hold interrupts ( or noInterrupts() )
    // rxread taken from v59 ,  v62 clear interrupt rxPin moved to bottom
 
@@ -961,7 +1030,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
  // sei();   // resume interrupts   (or interrupts() )
 }
 
-
 #define WAITIram4t60 {   \
   unsigned long cc = SoftwareSerial::getCycleCountIram(); \
   while (SoftwareSerial::getCycleCountIram()-start < m_wait) \
@@ -974,7 +1042,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
   m_wait += m_bitTime; }
 #define WAITIram4p60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 // waittime (digwrite/cli.....sei) = 594-640
+#if defined (USE_RXREAD60)
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
+   #else
+   void SoftwareSerial::rxRead60() {
+   #endif
+
  digitalWrite(D4, m_d4_isr_state); // cycle down-up = 1.0µsec
  // cli();         // v62a 30jul25 trial and error
  ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
@@ -1071,6 +1144,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
 }
 
+
 /*
   Do BitBang serial port1, store Byte in m_buffer[m_inPos] and check for P1 and
 */
@@ -1078,8 +1152,11 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
 // #define BITTEST_BLUE_MARK     // finisch cycle Blueled with short spike its for scope
 // #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
 #define WAITIram4w61 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
+#if defined (USE_RXREAD61)
 void ICACHE_RAM_ATTR SoftwareSerial::rxRead61() {
-   
+   #else
+   void SoftwareSerial::rxRead61() {
+   #endif
    /* ---------------------------------------------------------------------------------------------------------
     - time claculated and measured by oscilloscoop:
                80Mhz --. approx 12.5 ns          per cycle or 80 cycles per microsecond. 

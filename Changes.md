@@ -6,6 +6,32 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.74a] - in between to save our work
+## [v21.74] - insert/add code to detect misreads of RS232
+	- added command tez/ter to print bittime table after fault condition Z/crc fault R/recovery via switchDebugCmd
+	-  - apparently the bitbang of byte completion takes too much time (f.e. 0x0a+0-0:96.1.1 --> 7688~h) giving runaway
+			perhaps the stopbit or start bit was not correctly detected....
+			SoftwareSerial241.cpp rxRead58: for i=0 8, read gpio WAITIram4w58 >>>> 7688 (11 bits)
+			(entering interrupt takes more time then normally anticipated via m_bitWait while trying to bitbang 10 bits
+				we simply cannot know when the serial interrupt actually started an assume a fixed amount
+				of time preceding the routine was entered)
+	- enhanced printed bittime table (added relative cycle & duration) in serial_Print_PeekBits()
+	- updated multi comments in program
+	- decrease IRAM cache size by only caching the the active serial read routine, currently actively used RXREAD58
+	-  - we have had aproblem where we ran out IRAM space because RXREAD59 RXREAD60 RXREAD61 were also loaded.
+	- test for compile using Arduino IDE. Note: copy/sync the cusomtized SoftwareSerial241.cpp/h to $HOME/Arduino/libraries/
+	- smartmasking: when maskarray grows too large due to new day or many changes, we reset the array to reinitialise
+	- - This can be switched off by/via de 'm' command. The state is shown  as before "m-inactive", "M-active"
+	- - When the arrau os below a certain threshold, we inactivate 
+	- notably reading "g" is surely an error, we addded some check during debug
+	- - when in debug a telegram contains misformed 'g' , we print prefix line with 'xlT#..' iso 'xlT=..'
+	- - we found that in about 1 on 10 cases, a "0" (zero) can misinterpreted causingchecksum error or even runaways on data. This behavior seems to develope in a few days. Perhaps a shift in meter-timing.
+	- fyi at 115k2 --> m_bittime = 694 cycles , total byte (910 bits) is between 6930 en 6932 cycles
+	- - verified - unchanged - 30jul26 m_bitwait = 417 (note: use values as set by RXREAD58)
+    - -       since v69c:12aug25 via BITWAIT1 by USE_RXREAD58 due PROD_MODE in SoftwareSerial241.h
+    - -       m_bitTime (80MHz/115k2) = 694 cycles --> resulting m_wait = 508 cycles between bits.
+    - -       maximum total cycles per byte = 7100 (set by BYTE_MAXWAIT_1 ) 
+## [v21.73] - tbd changes
 ## [v21.72] - reworked and improve restart capabilities (apr26)
 	- cleaned top directory
 	- - post_build.py moved to tools/post_build.py
@@ -212,3 +238,21 @@ create stable Versions-Vxx which when stable are merged into master.
 		-- Reset, noLogmqtt, doDebugserialout, doP1mqtt, 1-heatD8/2-off/3-leave/2-followD7
 - 25jun2018 00u00 - added Digital read D6 {LedLight1} for hotwater LedLight sensor
 - 24jun2018 00u00 - added analog read A0 (Ajson: {analogRead} for temperature sensor
+
+## Change Procedure
+Procedure Guide for changes:
+  0. set VSC/IDE to PlaformIO mode 
+  1. Commit running changes
+  2. update VERSION_NUMBER (in source #define VERSION_NUMBER "xx")
+  3. Update changelog ( this file Changes.md)
+  4. Create new Branch (Vxx)
+  5. compile check / test (PlatformIO build V and --> )
+  6. Commit changes to Git
+  7. Check PlatformIO  "env:p1meter-production_241(code-P1Meter)""
+  8. Check/ping NodeMCU upload IP address: .. platformio_p1meter_env.ini
+  9. Do not udaloed at the whole hour, this for openHAB proces
+  10. Upload to NodeMCU (--> PlatformIO Upload) , monitor progress
+
+when ready, mrge to master on github:
+  11. Create Pull and Merge request to master
+  12. create next version for changes
