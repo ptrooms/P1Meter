@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "74d" // number this version 30jul26 (master)
+#define VERSION_NUMBER "74f" // number this version 30jul26 (master)
 
 /* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -2991,6 +2991,7 @@ void readTelegramP1() {
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                  outputOnSerial = true;                     // v74f actuvate debugging when tracing timetable                     
               }
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
@@ -2999,6 +3000,7 @@ void readTelegramP1() {
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                  // outputOnSerial = true                     // v74f actuvate debugging when tracing timetable                                       
               }
           } 
         }
@@ -4217,10 +4219,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
+                    outputOnSerial = true;                    // v74f actuvate debugging when tracing timetable 
                     Serial.print((String) "_te1_"); 
                  }
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'r' ) {   // v74 set error exection condition
                     switchDebugCmd = 2;                       // v74 execute t16 when we have a _R fault condition
+                    outputOnSerial = true;                    // v74f actuvate debugging when tracing timetable                     
                     Serial.print((String) "_te2_"); 
                  }
             else if ((char)payload[1] == 's') {
@@ -4796,7 +4800,8 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
   process / hold Ledlightstatus indicating if Hotwater was tapped during this P1 interval
     LOW  = read (hold) state
     HIGH = reset/renew until LOW
-*/
+    processHotLedRead 
+    */
 bool processHotLedRead(bool notkeep_HoldState) {
   bool local_lightReadState = false;
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
@@ -4807,8 +4812,11 @@ bool processHotLedRead(bool notkeep_HoldState) {
     try to reset this condition
   */
  
-  /* v74c_to_v75This corrupts...... the reading of rs232
-  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // we have an error on the water sensor 
+  // n/a v74c_to_v75This  /v74f could corrupts, however later on we suspect printf() doing this in ICACHE
+  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // v74f we have/had vibration on the water sensor 
+      if (outputOnSerial) Serial.print((String) "WaterErrorISR!!"); // v74f
+      else Serial.print((String) "!W"); 
+
       if (local_lightReadState) {
         if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
           waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;   // try to reset
@@ -4818,7 +4826,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
         }
       }
   }
-  */ 
+  // */ 
 
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
@@ -6022,16 +6030,17 @@ void processTemperatures() {
   ISR read water sensor on default pin grpio4 and respect debouncetime approx 40mSec
 */
 void attachWaterInterrupt() {   // activate waterinerrupt sensor
-  if (useWaterTrigger1) {
-    attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
-    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
-  } else {
-    attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
-    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
+  if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_isrLoop)) { ; // v74d prevent error loop and delay until hot water is used
+      if (useWaterTrigger1) {
+        attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
+        if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
+      } else {
+        attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
+        if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
+      }
+      waterTriggerCnt = 1;          // indicate ISR has been activated
+    }
   }
-  waterTriggerCnt = 1;          // indicate ISR has been activated
-}
-
 /*
   ISR Detach WATERSENSOR_READ interrupt , setting waterTriggerCnt to 0
 */
@@ -6080,6 +6089,7 @@ void WaterTrigger0_ISR()
           if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
             detachWaterInterrupt();
             Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+            waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used
             // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
             // waterTriggerState = LOW;      // v41 v47 force to low to ease things
           }
@@ -6124,6 +6134,7 @@ void WaterTrigger1_ISR()
         if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           Serial.print( (String) ", Detach>200WaterISR1="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used          
           // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
           // waterTriggerState = LOW;      // v41 v47 force to low to ease things
         }
@@ -6161,6 +6172,7 @@ void WaterTrigger2_ISR()
         if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           if (outputOnSerial) Serial.print( (String) ", Detach>100WaterISR2"+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used          
           // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
           // waterTriggerState = LOW;      // v41 v47 force to low to ease things
         }
@@ -6756,6 +6768,25 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         /*
           These codesblocks below to achieve column formatted printing below will corrupt somehwere 
           so we use bove a more elementary approach.
+        */
+
+       /*
+          serials maps to /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/HardwareSerial.h
+            --> extern HardwareSerial Serial; using tx pin etc.etc
+
+          note printf() uses:
+                size_t Print::print(const Printable& x) {
+                  return x.printTo(*this);
+                }
+
+          esp8266 uses: /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/libc_replacements.c
+              int ICACHE_RAM_ATTR printf(const char* format, ...) {
+                  va_list arglist;
+                  va_start(arglist, format);
+                  int ret = ets_vprintf(ets_putc, format, arglist);
+                  va_end(arglist);
+                  return ret;
+              }
         */
 
         // using localised variables, rs232 code still unstable

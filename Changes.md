@@ -8,6 +8,12 @@ Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 ## [v21.75] - Fix instabilities
 	- water interrupt sometimes vibrating on sensor and causing massive interrupts to nowhere 
+## [v21.74f] - in between to save our work
+	- activated ISR protection routine for Water senor which may vibrate cuasing execessive loop & exception restarts
+	-	-	keywords waterErrorSwitch with WATER_ERROR_SWITCH_ok WATER_ERROR_SWITCH_hoton WATER_ERROR_SWITCH_isrLoop
+	-	-	when this condition occurs we disable the water interrupt until someone is tapping hotwater
+			which likely will move the sensor out of the woods. We then reactivate sensor
+
 ## [v21.74d] - in between to save our work
 	- corrected and revised bitttiming to resolve instability
 	- remove/changed printf() formatting in display timing table serial_Print_PeekBits, tbd for later
