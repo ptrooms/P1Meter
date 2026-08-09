@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "74d" // number this version 30jul26 (master)
+#define VERSION_NUMBER "74g" // number this version 30jul26 (master)
 
 /* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -114,8 +114,8 @@
 
 */
 
-
 /* change history
+  - v74g - print printcrcOutTable & printcrcOutTable as subroutine
   - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
         - masklimiter, improved masking
         - if we have CRC failure, we try to recover using the built if the next is already masked also
@@ -2991,6 +2991,7 @@ void readTelegramP1() {
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                  // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
@@ -2999,6 +3000,7 @@ void readTelegramP1() {
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                  // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
               }
           } 
         }
@@ -4075,22 +4077,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
          + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
          + " som>>");
       switchMaskingOut = false;
-      Serial.print((String) "\r\nsI=0\t");   // initialise
-      for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
-        if (isprint(telegram_crcIn[cnt])) {             // if printable
-            Serial.print(telegram_crcIn[cnt]);
-        } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
-            Serial.print("_");
-        } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
-            Serial.print((String) "\r\n"+ cnt +"\t>");
-        } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
-            Serial.print("|");
-            // break;
-        } else  {
-            Serial.print("?");                    // unprintable
-        }
-      }
-      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+      printCrcInTable();    // v74g split to subroutine 
     } else  if ((char)payload[0] == 'M') {       // v48 10jun25 print M-asking array
       
       if ((char)payload[1] == '+') setMaskLimitCnt++ ;                            // increase Mask limiter
@@ -4107,22 +4094,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
          + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
          + " Elen=" + p1ShortCnt                    // v74 number of errors length Input != Mask
          + " som>>");
-      Serial.print((String) "\r\nsM=0\t");   // initialise
-      for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
-        if (isprint(telegram_crcOut[cnt])) {             // if printable
-            Serial.print(telegram_crcOut[cnt]);
-        } else if (telegram_crcOut[cnt] == '\x0d') {     // carriage return
-            Serial.print("_");
-        } else if (telegram_crcOut[cnt] == '\x0a') {     // linefeed
-            Serial.print((String) "\r\n"+ cnt +"\t>");
-        } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
-            Serial.print("|");
-            // break;
-        } else  {
-            Serial.print("?");                    // unprintable
-        }
-      }
-      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+      printcrcOutTable();    // v74g split to subroutine          
     
     } else  if ( (char)payload[0] == 'S') {  // v52 serial stop activating P1
         if  (    (char)payload[1] == '0') p1SerialActive = !p1SerialActive;   // set number myself
@@ -4217,10 +4189,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
+                    // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable
                     Serial.print((String) "_te1_"); 
                  }
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'r' ) {   // v74 set error exection condition
                     switchDebugCmd = 2;                       // v74 execute t16 when we have a _R fault condition
+                    // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable
                     Serial.print((String) "_te2_"); 
                  }
             else if ((char)payload[1] == 's') {
@@ -6758,6 +6732,25 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           so we use bove a more elementary approach.
         */
 
+       /*
+          serials maps to /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/HardwareSerial.h
+            --> extern HardwareSerial Serial; using tx pin etc.etc
+
+          note printf() uses:
+                size_t Print::print(const Printable& x) {
+                  return x.printTo(*this);
+                }
+
+          esp8266 uses: /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/libc_replacements.c
+              int ICACHE_RAM_ATTR printf(const char* format, ...) {
+                  va_list arglist;
+                  va_start(arglist, format);
+                  int ret = ets_vprintf(ets_putc, format, arglist);
+                  va_end(arglist);
+                  return ret;
+              }
+        */
+
         // using localised variables, rs232 code still unstable
         /* 
           if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
@@ -6998,6 +6991,50 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   }    
 
   Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
+}
+
+/*
+    v74g 10aug26 Print the input array table split from command sequences
+*/
+void printCrcInTable() {
+  Serial.print((String) "\r\nsI=0\t");   // initialise
+  for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
+    if (isprint(telegram_crcIn[cnt])) {             // if printable
+        Serial.print(telegram_crcIn[cnt]);
+    } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
+        Serial.print("_");
+    } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
+        Serial.print((String) "\r\n"+ cnt +"\t>");
+    } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
+        Serial.print("|");
+        // break;
+    } else  {
+        Serial.print("?");                    // unprintable
+    }
+  }
+  Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+}
+
+/*
+    v74g 10aug26 Print the Masking array table split from command sequences
+*/
+void printcrcOutTable() {
+      Serial.print((String) "\r\nsM=0\t");   // initialise
+      for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
+        if (isprint(telegram_crcOut[cnt])) {             // if printable
+            Serial.print(telegram_crcOut[cnt]);
+        } else if (telegram_crcOut[cnt] == '\x0d') {     // carriage return
+            Serial.print("_");
+        } else if (telegram_crcOut[cnt] == '\x0a') {     // linefeed
+            Serial.print((String) "\r\n"+ cnt +"\t>");
+        } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
+            Serial.print("|");
+            // break;
+        } else  {
+            Serial.print("?");                    // unprintable
+        }
+      }
+      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
 }
 
 /*

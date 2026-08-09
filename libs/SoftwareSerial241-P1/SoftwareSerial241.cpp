@@ -1,5 +1,6 @@
 /*
-   v74d 09aug26 added/changed to add recovery RXREAD58 timing of rs232 is to late.
+   v74g 10aug26 extended bit dyanmic range 
+   v74d 10aug26 added/changed to add recovery RXREAD58 timing of rs232 is to late.
    v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
       currently operated and test for RX_READ58.
       Note: RXREAD & RXREAD2 is kep in IRAM
@@ -791,15 +792,17 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
         */
 
       /* first branch vaid when bit-diff > 508-925  (sweetspot = 694) 
-         //         900             508)          900             694= 925    302  508-206 (      900-694)
-         //         700             508)          700                  925    502  508-6   (      700-694) 
-         //        1200             508)         1200                  925
-         //         924             508)          924                  925    278  508-230 (      924-694) 
-         //         694             508)          694                  925    508  508-0   (      694-694) 
-         //         630             508)          630                  925    568  508--60 (      694-630) 
+         //        900     508)         900            694= 925      302  508-206 (      900-694)
+         //        700     508)         700                 925      502  508-6   (      700-694) 
+         //       1200     508)        1200                 925
+         //        924     508)         924                 925      278  508-230 (      924-694) 
+         //        694     508)         694                 925      508  508-0   (      694-694) 
+         // 4/3    630     508)         630                 925      568  508--60 (      694-630) 
+         // 5/3   1100     508)         630                1100      102  508-406 (     1100-694) 
          //
        */
-      if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*4)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
+      // if  (bit_diff > (wait) && (bit_diff < ((m_bitTime*4)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
+      if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*5)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
        /* 2nd branch doc/test
             2ndt branch) small gaps  347-7287  underflow  (interbit)
                         suppose  348 --> ( 500/694)=0+1 8-1--> 7

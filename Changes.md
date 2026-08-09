@@ -8,7 +8,10 @@ Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 ## [v21.75] - Fix instabilities
 	- water interrupt sometimes vibrating on sensor and causing massive interrupts to nowhere 
+## [v21.74g] - printcrcInTable & printcrcOutTable
+	-	as subroutine
 ## [v21.74d] - in between to save our work
+	- print debug timeing tbale will (re)activate debug output
 	- corrected and revised bitttiming to resolve instability
 	- remove/changed printf() formatting in display timing table serial_Print_PeekBits, tbd for later
 	- removed water trigger due vibration, see branch v75
