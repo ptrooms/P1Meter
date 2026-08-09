@@ -1,4 +1,6 @@
-/* v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
+/*
+   v74d 09aug26 added/changed to add recovery RXREAD58 timing of rs232 is to late.
+   v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
       currently operated and test for RX_READ58.
       Note: RXREAD & RXREAD2 is kep in IRAM
 
@@ -752,51 +754,92 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    
    // int8_t currentRSSI = wifi_station_get_rssi();  // wifi_station_get_rssi not availabe in this scope
 
+   //             508          694            231           417 
    unsigned long wait = (m_bitTime + (m_bitTime/3)) - m_bitWait;	// v63a 445 try this
+   uint8_t bit_shift = 8;                 // v63b assume missing bit
+
+   // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
+   // f.e. 8308 
+   unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1]; // v63a_first try to get timing since last stop bit
 
    /*
-      Compensate for missing bit which else would shift bits
+      Compensate for timing and missing bit which else would shift bits
    */
-   uint8_t bit_shift = 8;                 // v63b assume missing bit
-   // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
-   unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1];                    // v63a_first try to get timnng
-   // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
-   // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
-   // ----------------------------------------------------------------------------------------------------------
+   if (m_bitWait % 2 && m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
+       /* comments / tries / program notes / test / can be removed
 
-   
-   if (m_bitWait % 2 & m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
-      // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
-      // if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
+             // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
+            // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+            // ----------------------------------------------------------------------------------------------------------
 
-      // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
-      // if (bit_diff > 7287 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-6940)/694)  + 1); // compensate long 2 bits
+            // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
+            // if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
 
-      // bit_shift -= (bit_diff > m_bitTime/2  && bit_diff < m_bitTime*21/2) ? (bit_diff / m_bitTime + 1)
-      //             : (bit_diff > m_bitTime*8  && bit_diff < m_bitTime*17)   ? ((bit_diff - 10*m_bitTime) / m_bitTime + 1)
-      //             : 0;
-      // bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift;
+            // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
+            // if (bit_diff > 7287 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-6940)/694)  + 1); // compensate long 2 bits
 
-      if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
+            // bit_shift -= (bit_diff > m_bitTime/2  && bit_diff < m_bitTime*21/2) ? (bit_diff / m_bitTime + 1)
+            //             : (bit_diff > m_bitTime*8  && bit_diff < m_bitTime*17)   ? ((bit_diff - 10*m_bitTime) / m_bitTime + 1)
+            //             : 0;
+            // bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift;
+
+           // f.e. 8308=     347 - (694*21/2)=7287 = 10
+           // <= 7300	1st Branch	4 -  ((6700 / 694) + 1) = 4 - (9 + 1) == <-8          clamped --> 1
+           // >= 7300	2nd Branch	4 - (((7300 - 6940) / 694) + 1) = 4 - (0 + 1) == >0   clamped --> 3
+           // >= 7700   2nd Branch	4 - (((7700 - 6940) / 694) + 1) = 4 - (1 + 1)  == >0  clamped --> 2
+           // dynamic bit compensation
+        */
+
+      /* first branch vaid when bit-diff > 508-925  (sweetspot = 694) 
+         //         900             508)          900             694= 925    302  508-206 (      900-694)
+         //         700             508)          700                  925    502  508-6   (      700-694) 
+         //        1200             508)         1200                  925
+         //         924             508)          924                  925    278  508-230 (      924-694) 
+         //         694             508)          694                  925    508  508-0   (      694-694) 
+         //         630             508)          630                  925    568  508--60 (      694-630) 
+         //
+       */
+      if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*4)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
+       /* 2nd branch doc/test
+            2ndt branch) small gaps  347-7287  underflow  (interbit)
+                        suppose  348 --> ( 500/694)=0+1 8-1--> 7
+                        suppose  500 --> ( 500/694)=0+1 8-1--> 7
+                        suppose 1000 --> (1000/694)=1+1 8-2--> 6
+                        suppose 1500 --> (1500/694)=2+1 8-3--> 5
+                  check 8981 -> 2041 --> (2041/694)=2+1 8-3--> 5
+
+            now we have 8981 - (10*694) = 2041 / 694 = 2 + 1 = 3 --> 8-3=5
+            if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= ((bit_diff - m_bitTime/3 / m_bitTime) + 1;
+
+        */
+      else if (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
+       /*  3rd branch doc/test
+                   3rd branch) long gaps 6940-11798 overflow (interbyte)  --> 8  
+                        suppose 7000 --> ( (7000-6940)=60/694=0  )+1  --> 8-1 = 7
+                        suppose 9000 --> (( 9000-6940)=2060/694=2)+1  --> 8-3 = 5
+                        suppose11500 --> ((11500-6940)=4560/694=6)+1  --> 8-7 = 1
+
+        */
       else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
       bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
 
+      /* notes/save/can be removed
+            // if ( !((bit_diff > 6700 && bit_diff < 7171) || bit_diff > 10410) )   //  vaid only (6700 < diff < 7171 && > 10411
+            //      bit_shift = 8 - ((((bit_diff % 6940) / 694)) % 8); // compensate long  2-7 bits
 
-      // if ( !((bit_diff > 6700 && bit_diff < 7171) || bit_diff > 10410) )   //  vaid only (6700 < diff < 7171 && > 10411
-      //      bit_shift = 8 - ((((bit_diff % 6940) / 694)) % 8); // compensate long  2-7 bits
-
-      // if (!(bit_diff > 10411 && (bit_diff > 6700 || bit_diff < 7171))      // < (15*m_bitTime),  
-      //                                                                   // < (8*m_bitTime)+(m_bitTime/3) = (25*((m_bitTime/3)))
-      //                                                                   // > (8*m_bitTime)+(m_bitTime/3) = (31*((m_bitTime/3)))
-      //          bit-shift = 8 - ((bit_diff % 6940) / 694));
+            // if (!(bit_diff > 10411 && (bit_diff > 6700 || bit_diff < 7171))      // < (15*m_bitTime),  
+            //                                                                   // < (8*m_bitTime)+(m_bitTime/3) = (25*((m_bitTime/3)))
+            //                                                                   // > (8*m_bitTime)+(m_bitTime/3) = (31*((m_bitTime/3)))
+            //          bit-shift = 8 - ((bit_diff % 6940) / 694));
+         }
+         // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
+         
+         // if (bit_diff > 100 && bit_diff < 2776)) {    // 
+         //       bit_shift = bit_shift - ((bit_diff + bitTime) / m_bitTime);   // subtract number of missed bits
+         //       wait = wait + ((8 - bit_shift) * bitTime);                    // compensate expected wait
+         // }         
+      */
    }
-   // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
-   
-   // if (bit_diff > 100 && bit_diff < 2776)) {    // 
-   //       bit_shift = bit_shift - ((bit_diff + bitTime) / m_bitTime);   // subtract number of missed bits
-   //       wait = wait + ((8 - bit_shift) * bitTime);                    // compensate expected wait
-   // }         
-   
    /*
       Read Data bits after StartBit
    */
@@ -867,7 +910,12 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    */
    // m_buffer_bits[m_inPos] = start;                    // v63a_v63b - ByteTiming table
    // m_buffer_bits[m_inPos] = start % 1000000;  // limit range
-   m_buffer_bits[m_inPos] = start;  // limit range
+   
+   // m_buffer_bits[m_inPos]  = start;  // limit range
+   //   m_buffer_bits[m_inPos] &= ~bit_shift;     // set last 3 bits to mask value
+      m_buffer_bits[m_inPos] = (start & ~7) | bit_shift ;  // set last 3 bits to mask value
+   
+
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {  // this works best in production
       if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header
