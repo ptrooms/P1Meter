@@ -4,6 +4,8 @@
 
 #define VERSION_NUMBER "74" // number this version 30jul26 (master)
 
+// master version v74 10aug26 13u35
+
 /* Procedure Guide for changes:
   0. set VSC/IDE to PlaformIO mode 
   1. Commit running changes
