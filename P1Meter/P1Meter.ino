@@ -4215,10 +4215,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
+                    outputOnSerial  = true;  // v74e activate debugging
                     Serial.print((String) "_te1_"); 
                  }
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'r' ) {   // v74 set error exection condition
                     switchDebugCmd = 2;                       // v74 execute t16 when we have a _R fault condition
+                    outputOnSerial  = true;  // v74e activate debugging                    
                     Serial.print((String) "_te2_"); 
                  }
             else if ((char)payload[1] == 's') {
