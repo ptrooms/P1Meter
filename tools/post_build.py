@@ -41,8 +41,9 @@ def after_build(source, target, env):
     
     """ 
     Puty disassmbly in the main directory 
+    Not in source as that will assemble too
     """
-    src_lst=env.subst("\"P1Meter/${PROGNAME}.asm\"")
+    src_lst=env.subst("\"${PROGNAME}.asm\"")
 
     #--disassembler-options=no-aliases,numeric
     # objdump = esptool
