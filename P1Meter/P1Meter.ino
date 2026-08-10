@@ -1406,6 +1406,7 @@ int  telegram_crcOut_len = 0;         // myLength of this record
 // RX2 buffer on RX/TX Gpio4/2 , use a small buffer 128 as GJ meter read are on request
 #define MAXLINELENGTH2 256
 char dummyh4[MAXLINELENGTH2+32];        // v57c-3 after this somewhat stable
+char dummyh5[MAXLINELENGTH2+512];        // v74g ?? try 
 
 char telegram2[MAXLINELENGTH2+32];        // RX2 serial databuffer during outside P1 loop Plus overflow
 char telegram2_org[MAXLINELENGTH2+32];    // RX2 serial databuffer during outside P1 loop Plus overflow v54
