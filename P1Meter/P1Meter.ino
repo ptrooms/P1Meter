@@ -9,10 +9,10 @@
 
 /* Procedure Guide for changes:
   0. set VSC/IDE to PlaformIO mode 
-  1. Commit running changes
-  2. update VERSION_NUMBER
-  3. Update changelog
-  4. Create new Branch
+  1. Commit running changes (sync and optionally merge with master)
+  2. update VERSION_NUMBER (see here line above)
+  3. Update changelog /home/pafoxp/code-P1Meter/Changes.md
+  4. Create new Branch (vscode , left down menu branch)
   5. compile check (PlatformIO build V)
   6. Commit changes to Git
   7. Check PlatformIO  "env:p1meter-production_241(code-P1Meter)""
@@ -119,6 +119,7 @@
 
 
 /* change history
+  - v74g - print printcrcOutTable & printcrcOutTable as subroutine
   - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
         - masklimiter, improved masking
         - if we have CRC failure, we try to recover using the built if the next is already masked also
@@ -4780,6 +4781,24 @@ bool processHotLedRead(bool notkeep_HoldState) {
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
   else local_lightReadState = false; // read D6 and keep until mqtt
 
+  /*
+    when water ISR routine is disabled and hot is turned on, perhas the water sensor is more stable
+    try to reset this condition
+  */
+ 
+  /* v74c_to_v75This corrupts...... the reading of rs232
+  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // we have an error on the water sensor 
+      if (local_lightReadState) {
+        if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;   // try to reset
+          waterErrorSwitch |=  WATER_ERROR_SWITCH_hoton;     // indicate we have ON activated
+        } else {
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // switch off hoton
+        }
+      }
+  }
+  */ 
+
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
     if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
@@ -6032,6 +6051,11 @@ void WaterTrigger0_ISR()
           // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
           waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
+          // v74a: on 08aug26 we have exceesive messages and the esp8266 did not start.
+          //        we needed to reset hte watersensor itself.
+          //        liky the water sensor is vibrating
+          //  not really a solution but we can insert code to delay the use until a later time.
+          //
           if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
             detachWaterInterrupt();
             Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
