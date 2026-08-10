@@ -1,6 +1,8 @@
 import os
 Import("env")  # type: ignore : Import is not defined in pylance 
 
+# modified to put  target assembly into P1Meter
+
 # using: https://forum.pjrc.com/index.php?threads/useful-script-for-generating-objdump-results-from-platformio.73834/
 
 # https://docs.platformio.org/en/latest/projectconf/advanced_scripting.html
@@ -38,6 +40,12 @@ def after_build(source, target, env):
     
     src_elf=env.subst("\"${BUILD_DIR}/${PROGNAME}.elf\"")
     src_lst=env.subst("\"${BUILD_DIR}/${PROGNAME}.asm\"")
+    
+    """ 
+    Puty disassmbly in the main directory 
+    Not in source as that will assemble too
+    """
+    src_lst=env.subst("\"${PROGNAME}.asm\"")
 
     #--disassembler-options=no-aliases,numeric
     # objdump = esptool
