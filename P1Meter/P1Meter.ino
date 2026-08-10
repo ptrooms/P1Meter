@@ -2,7 +2,10 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "74" // number this version 30jul26 (master)
+#define VERSION_NUMBER "74" // number this version 10aug26 18u07 (deviated master)
+    // switchDebugCmd , timetable presentation ([rintf, variable definitions)
+
+// master version v74 10aug26 13u35
 
 /* Procedure Guide for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -117,6 +120,7 @@
 
 /* change history
   - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
+        - masklimiter, improved masking
         - if we have CRC failure, we try to recover using the built if the next is already masked also
             mskio=49:4/3\X := we read a "4" , we had a '3' and the next is "X" masked: we keep as read
             mskio=325:g/6  := we read a "g" , we had a '6' and the next is not masked: we use as not masked
@@ -4202,6 +4206,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                       printf_port_state_isr();
                       Serial.println((String)"");
                  }
+
             else if ((char)payload[1] == 't') {   // print m_buffer_time[M_TIME_BIT_...] table entries
                       Serial.println((String)"\n\rT-imer Task: ");
                       serial_Print_PeekTime(1,M_TIME_ENTRIES);
