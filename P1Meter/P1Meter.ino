@@ -1283,10 +1283,6 @@ bool preserve_lightReadState_for_mqtt  = LOW;      // v70a preserve Highest Ledl
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
-
-
-
-
 long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
@@ -4825,6 +4821,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
       }
   }
   */ 
+
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
     if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
@@ -6034,8 +6031,6 @@ void attachWaterInterrupt() {   // activate waterinerrupt sensor
     attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
     if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
   }
-
-
   waterTriggerCnt = 1;          // indicate ISR has been activated
 }
 
@@ -6087,7 +6082,6 @@ void WaterTrigger0_ISR()
           if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
             detachWaterInterrupt();
             Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
-
             // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
             // waterTriggerState = LOW;      // v41 v47 force to low to ease things
           }
@@ -6132,7 +6126,6 @@ void WaterTrigger1_ISR()
         if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           Serial.print( (String) ", Detach>200WaterISR1="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
-
           // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
           // waterTriggerState = LOW;      // v41 v47 force to low to ease things
         }
@@ -6951,6 +6944,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
 }
+
 /*
     v74g 10aug26 Print the input array table split from command sequences
 */
@@ -6972,6 +6966,7 @@ void printCrcInTable() {
   }
   Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
 }
+
 /*
     v74g 10aug26 Print the Masking array table split from command sequences
 */
