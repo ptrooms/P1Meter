@@ -6871,6 +6871,48 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
 }
+/*
+    v74g 10aug26 Print the input array table split from command sequences
+*/
+void printCrcInTable() {
+  Serial.print((String) "\r\nsI=0\t");   // initialise
+  for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
+    if (isprint(telegram_crcIn[cnt])) {             // if printable
+        Serial.print(telegram_crcIn[cnt]);
+    } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
+        Serial.print("_");
+    } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
+        Serial.print((String) "\r\n"+ cnt +"\t>");
+    } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
+        Serial.print("|");
+        // break;
+    } else  {
+        Serial.print("?");                    // unprintable
+    }
+  }
+  Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+}
+/*
+    v74g 10aug26 Print the Masking array table split from command sequences
+*/
+void printcrcOutTable() {
+      Serial.print((String) "\r\nsM=0\t");   // initialise
+      for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
+        if (isprint(telegram_crcOut[cnt])) {             // if printable
+            Serial.print(telegram_crcOut[cnt]);
+        } else if (telegram_crcOut[cnt] == '\x0d') {     // carriage return
+            Serial.print("_");
+        } else if (telegram_crcOut[cnt] == '\x0a') {     // linefeed
+            Serial.print((String) "\r\n"+ cnt +"\t>");
+        } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
+            Serial.print("|");
+            // break;
+        } else  {
+            Serial.print("?");                    // unprintable
+        }
+      }
+      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+}
 
 /*
   Convert and print binary  (recursive)
