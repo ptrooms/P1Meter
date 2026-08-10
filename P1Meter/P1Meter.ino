@@ -1204,7 +1204,7 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 // bool outputOnSerial  = true;    // "D" debug default output in Testmode
 // ---------------------------------------------------------------------------------------------------
 #define MASKING_LIMIT 18         // Number of masked positions after we sw
-int  switchDebugCmd   = 0;       // execute a debug after a certain condition
+// int  switchDebugCmd   = 0;       // execute a debug after a certain condition
                                  //  switchDebugCmd=1  onze execute t16 command after a _Z fault
 bool switchMaskingOut = true;    // every time we have an OK CRC out record we flipback the previously masked "X" position
 bool switchMaskingCmd = true;    // 'm' in/activate switchMaskingOut
@@ -2984,22 +2984,26 @@ void readTelegramP1() {
         } else {
           if (validCrcInFound) {
               Serial.print((String) "R");  // v52 count Recoveries _R -R
-              p1RecoverCnt++ ; 
+              p1RecoverCnt++ ;
+              /*
               if (switchDebugCmd == 2) {            // v74 add fault analysis
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
+              */
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
+              /*
               if (switchDebugCmd == 1) {            // v74 add fault analysis
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
               }
+              */
           } 
         }
 
@@ -4214,7 +4218,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                      }
 
                  } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
-          
+            /*
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
                     outputOnSerial  = true;  // v74e activate debugging
@@ -4225,6 +4229,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                     outputOnSerial  = true;  // v74e activate debugging                    
                     Serial.print((String) "_te2_"); 
                  }
+            */
             else if ((char)payload[1] == 's') {
                       Serial.println((String)"\n\rT-imer Porstate: ");
                       printf_port_state_isr();
@@ -4240,7 +4245,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             else                                 serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
 
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
-          Serial.println((String)"\r\n? (bell) \a Help commands"  + __FILE__ 
+          Serial.println((String)"\r\n? Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
                                                         + ", compiled " __DATE__ + " " + __TIME__ );
           // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
@@ -4266,7 +4271,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
-          Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
+          // Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
+          Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -6721,8 +6727,8 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp, temp0, temp1 = 0UL;               // check duplicates          
-    unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
+    unsigned long temp = 0UL;               // check duplicates          
+
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
     // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
@@ -6732,37 +6738,37 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + "\t-------------time:" + micros()
                   );
 
-     // print timer table, when in request > then buffer, skip this
-      /*
-        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
-           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
-      */
-    // bm ----> print serial_Print_PeekBits bittime table
+    // print timer table, when in request > then buffer, skip this
+
+
+
+
+
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
-      if (i > 0) {
-          Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
+      if (i > 0) {    
+
           temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
           if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
                  temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
                  temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
-                                  Serial.printf("%.4d~" , temp     );      // variation
-          else  if (temp <= 9999) Serial.printf("%.4d " , temp     );      // normal
-          else  if (temp <= 9999999) Serial.printf("_%.3d " , temp/10000     );      // large
-          else                       Serial.printf("__%.2d " , temp/100000000);      // excessive
+                                  Serial.printf("\t%4d~" , temp     );      // variation
+          else  if (temp <= 9999) Serial.printf("\t%4d " , temp     );      // normal
+          else                    Serial.printf("\t_%3d " , temp/1000);      // excessive
+
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
        }
-       /*
-        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
-           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
 
-        Print time data Lines (position , mSec):
-        data  0 -    0.0000:C  /KFM5KAIFA-METER<|
-       */
+
+
+
+
+
+
 
       if ( (i % 8) == 0) {
           temp = mySerial1.peekBit(i);
-          if (i > 0) Serial.printf("\t(l=%8d)", (temp - mySerial1.peekBit(i-8) ) ); // finish previous line with total)
+
 
           // Serial.print((String) "\r\n" + i + "="); 
           Serial.printf("\r\n %3d=>", i);
@@ -6770,15 +6776,15 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           if (temp > 999999999UL) { Serial.printf("%3d", (temp / 1000000000UL)); temp = temp - ((temp / 1000000000UL) * 1000000000UL); 
                                     Serial.print("."); }
                                else Serial.print( "    ");
-          if (temp >    999999UL) { Serial.printf("%.3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
+          if (temp >    999999UL) { Serial.printf("%3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
                                     Serial.print("."); }
                                else Serial.print( "    ");
-          if (temp >       999UL) { Serial.printf("%.3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
+          if (temp >       999UL) { Serial.printf("%3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
                                     Serial.print("."); }
                                else Serial.print( "    ");
-                                    Serial.printf("%.3d", (temp));
-          // Serial.print("> ");
-          Serial.printf(" #%10d >",( mySerial1.peekBit(i) - temp0s));
+                                    Serial.printf("%3d", (temp));
+          Serial.print("> ");
+
 
           // mySerial1.peekBit(i) + "> " );  // next line time
        }
@@ -6790,8 +6796,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
-    temp0 = mySerial1.peekBit(0);  // get zero reference
-    temp1 = temp0;                 // get zero reference
+    int temp0 = mySerial1.peekBit(0);  // get zero reference
+    int temp1 = temp0;                 // get zero reference
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
@@ -6799,7 +6805,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         if (i == 0)  Serial.printf("\r\n data%3d - %9.4f:C\t", i, (float) 0.0000);
         else if (convert_p1_print( mySerial1.peekByte(i-1)) == '|' || convert_p1_print( mySerial1.peekByte(i-1)) == '!')
-                 Serial.printf("\r\n data%.3d - %9.4f:C\t", i, 
+                 Serial.printf("\r\n data%3d - %9.4f:C\t", i, 
                       (float)((((mySerial1.peekBit(i) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
 
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
@@ -6809,7 +6815,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare ?
 
               // Serial.print((String) "\r\n dataM"+ j + ":\t");  
-              Serial.printf("\r\n data%.3d:m\t\t", j);                  // print masked line 
+              Serial.printf("\r\n data%3d:m\t\t", j);                  // print masked line 
               
               for (int m = j; m <= i; m++ )  {
                   Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
@@ -6817,7 +6823,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               }
 
               // Serial.print((String) "\r\n dataC"+ j + ":\t");  
-              Serial.printf("\r\n data%.3d:d (%.3d)\t", j, m_len);                  // print differnce pointer lines
+              Serial.printf("\r\n data%3d:d (%3d)\t", j, m_len);                  // print differnce pointer lines
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
                 if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
                     telegram_crcOut[m] == 'X') 
@@ -6872,8 +6878,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         */
         Serial.print((String) "\t <I> Check binary Read (scope-time): 0  to " +  (bit_sequence * -1) );
         int cnt = 0;
-        temp0 = mySerial1.peekBit(0);  // get zero reference
-        temp1 = mySerial1.peekBit(0);  // get zero previous
+        int temp0 = mySerial1.peekBit(0);  // get zero reference
+        int temp1 = mySerial1.peekBit(0);  // get zero previous
         for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
           if ( m == 0 ||
               mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
@@ -6915,7 +6921,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   if (bit_port == 2) {
     unsigned long temp = 0UL;    
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial2Baudrate;
-    Serial.print((String) "\r\n Print bitTimeCycle ("+ l_bitTime + ") sequences "+ 
+    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial2.peekBitPos()
                   + "-------------time:" + micros()
