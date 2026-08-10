@@ -6,7 +6,10 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
-## [v21.74a] - in between to save our work
+## [v21.74m] - master banch that is unstable
+	- code has instbalities and we are going abandon this master/v74g by original v74 which
+		- has code updated from som improvement.
+## [v21.74a] - in between to save our work, abondoned
 ## [v21.74] - insert/add code to detect misreads of RS232
 	- added command tez/ter to print bittime table after fault condition Z/crc fault R/recovery via switchDebugCmd
 	-  - apparently the bitbang of byte completion takes too much time (f.e. 0x0a+0-0:96.1.1 --> 7688~h) giving runaway
