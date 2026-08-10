@@ -38,6 +38,11 @@ def after_build(source, target, env):
     
     src_elf=env.subst("\"${BUILD_DIR}/${PROGNAME}.elf\"")
     src_lst=env.subst("\"${BUILD_DIR}/${PROGNAME}.asm\"")
+    
+    """ 
+    Puty disassmbly in the main directory 
+    """
+    src_lst=env.subst("\"P1Meter/${PROGNAME}.asm\"")
 
     #--disassembler-options=no-aliases,numeric
     # objdump = esptool
