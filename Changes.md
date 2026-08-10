@@ -6,10 +6,21 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
-## [v21.75] - Fix instabilities
-	- water interrupt sometimes vibrating on sensor and causing massive interrupts to nowhere 
-## [v21.74a] - in between to save our work
-	- merged to master
+## [v21.75] - new master branch rebased from v74 that is stable
+		10aug26 will be used to continue new work changes
+		Note1: ../libs/SoftwareSerial241-P1/SoftwareSerial241.cpp has bit improvements and works OK
+		Note2: challenges to P1Meter/P1Meter.ino are
+			- debugging of timetable (v74g) (if activated causes istalility)
+			- added ISR protection (v74g) if watersensor is vibrating (, code causes instability)
+			- investigating what code placement can cause instability
+ 		renamed v74 as master:
+		-  git checkout v74
+ 		-  git reset --hard HEAD
+ 		-  git push --force origin master
+## [v21.74m] - master branch that is unstable
+	- code has instbalities and we are going abandon this master/v74g by original v74 which
+		- has code updated from some improvement.
+## [v21.74a] - in between to save our work, abondoned
 ## [v21.74] - insert/add code to detect misreads of RS232
 	- added command tez/ter to print bittime table after fault condition Z/crc fault R/recovery via switchDebugCmd
 	-  - apparently the bitbang of byte completion takes too much time (f.e. 0x0a+0-0:96.1.1 --> 7688~h) giving runaway
