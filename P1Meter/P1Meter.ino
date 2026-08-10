@@ -6727,8 +6727,8 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp = 0UL;               // check duplicates          
-
+    unsigned long temp, temp0, temp1 = 0UL;               // check duplicates          
+    unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
     // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
@@ -6738,37 +6738,37 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + "\t-------------time:" + micros()
                   );
 
-    // print timer table, when in request > then buffer, skip this
-
-
-
-
-
+     // print timer table, when in request > then buffer, skip this
+      /*
+        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
+           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
+      */
+    // bm ----> print serial_Print_PeekBits bittime table
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
-      if (i > 0) {    
-
+      if (i > 0) {
+          Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
           temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
           if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
                  temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
                  temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
-                                  Serial.printf("\t%4d~" , temp     );      // variation
-          else  if (temp <= 9999) Serial.printf("\t%4d " , temp     );      // normal
-          else                    Serial.printf("\t_%3d " , temp/1000);      // excessive
-
+                                  Serial.printf("%.4d~" , temp     );      // variation
+          else  if (temp <= 9999) Serial.printf("%.4d " , temp     );      // normal
+          else  if (temp <= 9999999) Serial.printf("_%.3d " , temp/10000     );      // large
+          else                       Serial.printf("__%.2d " , temp/100000000);      // excessive
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
        }
+       /*
+        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
+           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
 
-
-
-
-
-
-
+        Print time data Lines (position , mSec):
+        data  0 -    0.0000:C  /KFM5KAIFA-METER<|
+       */
 
       if ( (i % 8) == 0) {
           temp = mySerial1.peekBit(i);
-
+          if (i > 0) Serial.printf("\t(l=%8d)", (temp - mySerial1.peekBit(i-8) ) ); // finish previous line with total)
 
           // Serial.print((String) "\r\n" + i + "="); 
           Serial.printf("\r\n %3d=>", i);
@@ -6776,15 +6776,15 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           if (temp > 999999999UL) { Serial.printf("%3d", (temp / 1000000000UL)); temp = temp - ((temp / 1000000000UL) * 1000000000UL); 
                                     Serial.print("."); }
                                else Serial.print( "    ");
-          if (temp >    999999UL) { Serial.printf("%3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
+          if (temp >    999999UL) { Serial.printf("%.3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
                                     Serial.print("."); }
                                else Serial.print( "    ");
-          if (temp >       999UL) { Serial.printf("%3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
+          if (temp >       999UL) { Serial.printf("%.3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
                                     Serial.print("."); }
                                else Serial.print( "    ");
-                                    Serial.printf("%3d", (temp));
-          Serial.print("> ");
-
+                                    Serial.printf("%.3d", (temp));
+          // Serial.print("> ");
+          Serial.printf(" #%10d >",( mySerial1.peekBit(i) - temp0s));
 
           // mySerial1.peekBit(i) + "> " );  // next line time
        }
@@ -6796,8 +6796,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
-    int temp0 = mySerial1.peekBit(0);  // get zero reference
-    int temp1 = temp0;                 // get zero reference
+    temp0 = mySerial1.peekBit(0);  // get zero reference
+    temp1 = temp0;                 // get zero reference
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
@@ -6805,7 +6805,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         if (i == 0)  Serial.printf("\r\n data%3d - %9.4f:C\t", i, (float) 0.0000);
         else if (convert_p1_print( mySerial1.peekByte(i-1)) == '|' || convert_p1_print( mySerial1.peekByte(i-1)) == '!')
-                 Serial.printf("\r\n data%3d - %9.4f:C\t", i, 
+                 Serial.printf("\r\n data%.3d - %9.4f:C\t", i, 
                       (float)((((mySerial1.peekBit(i) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
 
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
@@ -6815,7 +6815,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare ?
 
               // Serial.print((String) "\r\n dataM"+ j + ":\t");  
-              Serial.printf("\r\n data%3d:m\t\t", j);                  // print masked line 
+              Serial.printf("\r\n data%.3d:m\t\t", j);                  // print masked line 
               
               for (int m = j; m <= i; m++ )  {
                   Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
@@ -6823,7 +6823,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               }
 
               // Serial.print((String) "\r\n dataC"+ j + ":\t");  
-              Serial.printf("\r\n data%3d:d (%3d)\t", j, m_len);                  // print differnce pointer lines
+              Serial.printf("\r\n data%.3d:d (%.3d)\t", j, m_len);                  // print differnce pointer lines
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
                 if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
                     telegram_crcOut[m] == 'X') 
@@ -6878,8 +6878,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         */
         Serial.print((String) "\t <I> Check binary Read (scope-time): 0  to " +  (bit_sequence * -1) );
         int cnt = 0;
-        int temp0 = mySerial1.peekBit(0);  // get zero reference
-        int temp1 = mySerial1.peekBit(0);  // get zero previous
+        temp0 = mySerial1.peekBit(0);  // get zero reference
+        temp1 = mySerial1.peekBit(0);  // get zero previous
         for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
           if ( m == 0 ||
               mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
@@ -6921,7 +6921,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   if (bit_port == 2) {
     unsigned long temp = 0UL;    
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial2Baudrate;
-    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
+    Serial.print((String) "\r\n Print bitTimeCycle ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial2.peekBitPos()
                   + "-------------time:" + micros()
