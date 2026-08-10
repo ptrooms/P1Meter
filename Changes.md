@@ -6,6 +6,8 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.75a] - test printing differences
+		- program is less stable then master upon v75a is based
 ## [v21.75] - new master branch rebased from v74 that is stable
 		10aug26 will be used to continue new work changes
 		Note1: ../libs/SoftwareSerial241-P1/SoftwareSerial241.cpp has bit improvements and works OK
