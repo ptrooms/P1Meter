@@ -760,9 +760,16 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    unsigned long wait = (m_bitTime + (m_bitTime/3)) - m_bitWait;	// v63a 445 try this
    uint8_t bit_shift = 8;                 // v63b assume missing bit
 
+
+
+
+
    // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    // f.e. 8308 
    unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1]; // v63a_first try to get timing since last stop bit
+
+
+
 
    /*
       Compensate for timing and missing bit which else would shift bits
@@ -773,10 +780,8 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
              // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
             // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
             // ----------------------------------------------------------------------------------------------------------
-
             // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
             // if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
-
             // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
             // if (bit_diff > 7287 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-6940)/694)  + 1); // compensate long 2 bits
 
@@ -824,6 +829,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
                         suppose11500 --> ((11500-6940)=4560/694=6)+1  --> 8-7 = 1
 
         */
+
       else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
       bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
 
@@ -844,6 +850,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
          // }         
       */
    }
+
+
+
+
+
+
+
    /*
       Read Data bits after StartBit
    */
