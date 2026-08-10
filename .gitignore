@@ -31,8 +31,9 @@ P1Meter/*.ino*
 .cache
 build
 build_output
-firmware.map
-firmware.asm
+# temporaily disabled to detect changes....
+firmware*.map
+firmware*.asm
 P1Meter/P1Meter.ino.cpp
 P1Meter*.bin
 P1Meter*.bin.gz
