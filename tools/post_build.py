@@ -1,6 +1,8 @@
 import os
 Import("env")  # type: ignore : Import is not defined in pylance 
 
+# modified to put  target assembly into P1Meter
+
 # using: https://forum.pjrc.com/index.php?threads/useful-script-for-generating-objdump-results-from-platformio.73834/
 
 # https://docs.platformio.org/en/latest/projectconf/advanced_scripting.html
