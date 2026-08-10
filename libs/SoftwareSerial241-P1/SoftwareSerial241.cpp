@@ -1,4 +1,5 @@
-/* v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
+/* v75 rebased , no code changes since v74g/v74m
+   v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
    v74g 10aug26 extended bit dyanmic range 
    v74d 10aug26 added/changed to add recovery RXREAD58 timing of rs232 is to late.
    v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
@@ -762,6 +763,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    // unsigned long bit_diff = (start % 1000000 ) - m_buffer_bits[m_inPos];                    // v63a_first try to get timnng
    // f.e. 8308 
    unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1]; // v63a_first try to get timing since last stop bit
+
    /*
       Compensate for timing and missing bit which else would shift bits
    */
@@ -771,14 +773,18 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
              // if (bit_diff > 100 && bit_diff < 2313) bit_shift--;    // take one bit less
             // if (bit_diff > 100 && bit_diff < 2313) bit_shift = (bit_shift / m_bitTime) + 1;    // take 1-3 bit less
             // ----------------------------------------------------------------------------------------------------------
+
             // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
             // if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
+
             // if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
             // if (bit_diff > 7287 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-6940)/694)  + 1); // compensate long 2 bits
+
             // bit_shift -= (bit_diff > m_bitTime/2  && bit_diff < m_bitTime*21/2) ? (bit_diff / m_bitTime + 1)
             //             : (bit_diff > m_bitTime*8  && bit_diff < m_bitTime*17)   ? ((bit_diff - 10*m_bitTime) / m_bitTime + 1)
             //             : 0;
             // bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift;
+
            // f.e. 8308=     347 - (694*21/2)=7287 = 10
            // <= 7300	1st Branch	4 -  ((6700 / 694) + 1) = 4 - (9 + 1) == <-8          clamped --> 1
            // >= 7300	2nd Branch	4 - (((7300 - 6940) / 694) + 1) = 4 - (0 + 1) == >0   clamped --> 3
@@ -838,13 +844,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
          // }         
       */
    }
-
-
-
-
-
-
-
    /*
       Read Data bits after StartBit
    */
@@ -920,6 +919,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    //   m_buffer_bits[m_inPos] &= ~bit_shift;     // set last 3 bits to mask value
       m_buffer_bits[m_inPos] = (start & ~7) | bit_shift ;  // set last 3 bits to mask value
    
+
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {  // this works best in production
       if (rec == '/') { // 26mar21 Ptro P1 messageing has started by header

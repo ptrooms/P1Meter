@@ -2,16 +2,14 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "74" // number this version 30jul26 (master)
+#define VERSION_NUMBER "75" // number this version 10aug26 (master, rebaed from stable v74)
 
-// master version v74 10aug26 13u35
-
-/* Procedure Guide for changes:
+/* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
-  1. Commit running changes
-  2. update VERSION_NUMBER
-  3. Update changelog
-  4. Create new Branch
+  1. Commit running changes (sync and optionally merge with master)
+  2. update VERSION_NUMBER (see here line above)
+  3. Update changelog /home/pafoxp/code-P1Meter/Changes.md
+  4. Create new Branch (vscode , left down menu branch)
   5. compile check (PlatformIO build V)
   6. Commit changes to Git
   7. Check PlatformIO  "env:p1meter-production_241(code-P1Meter)""
@@ -118,6 +116,8 @@
 
 
 /* change history
+  - v75  - stable for 1250 read and 50 errors of which Rcvr=360 and Elenght errors=19
+  - v74  merged to maser.
   - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
         - masklimiter, improved masking
         - if we have CRC failure, we try to recover using the built if the next is already masked also
@@ -2989,6 +2989,7 @@ void readTelegramP1() {
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                  // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
@@ -2997,6 +2998,7 @@ void readTelegramP1() {
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                  // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
               }
           } 
         }
@@ -4802,6 +4804,24 @@ bool processHotLedRead(bool notkeep_HoldState) {
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
   else local_lightReadState = false; // read D6 and keep until mqtt
 
+  /*
+    when water ISR routine is disabled and hot is turned on, perhas the water sensor is more stable
+    try to reset this condition
+  */
+ 
+  /* v74c_to_v75This corrupts...... the reading of rs232
+  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // we have an error on the water sensor 
+      if (local_lightReadState) {
+        if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;   // try to reset
+          waterErrorSwitch |=  WATER_ERROR_SWITCH_hoton;     // indicate we have ON activated
+        } else {
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // switch off hoton
+        }
+      }
+  }
+  */ 
+
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
     if (!loopbackRx2Tx2 && blue_led2_HotWater) digitalWrite(BLUE_LED2, local_lightReadState); // debug readstate0
@@ -6054,6 +6074,11 @@ void WaterTrigger0_ISR()
           // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
           waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
+          // v74a: on 08aug26 we have exceesive messages and the esp8266 did not start.
+          //        we needed to reset hte watersensor itself.
+          //        liky the water sensor is vibrating
+          //  not really a solution but we can insert code to delay the use until a later time.
+          //
           if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
             detachWaterInterrupt();
             Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
@@ -6919,6 +6944,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
 }
+
 /*
     v74g 10aug26 Print the input array table split from command sequences
 */
@@ -6940,6 +6966,7 @@ void printCrcInTable() {
   }
   Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
 }
+
 /*
     v74g 10aug26 Print the Masking array table split from command sequences
 */
