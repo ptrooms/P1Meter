@@ -151,8 +151,8 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
    if (receivePin == 4 || receivePin == 14 ) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
-      // m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
-      m_buffer = (uint8_t*)os_malloc(m_buffSize);     // v75b4 https://www.bbs.espressif.com/viewtopic.php?t=621
+      m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+      // m_buffer = (uint8_t*)os_malloc(m_buffSize);     // v75b4 https://www.bbs.espressif.com/viewtopic.php?t=621
                                                       // requires #include "mem.h" in SoftwareSerial241.h 
                                        // https://www.guru99.com/difference-between-malloc-and-calloc.html
                                        // malloc allocates a single block of uninitialized memory

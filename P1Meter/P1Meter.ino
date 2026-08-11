@@ -1,3 +1,6 @@
+#define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
+#define DEBUG_ESP_OOM 1          // v75b5  playing around
+
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
@@ -1608,6 +1611,7 @@ extern "C"
 void setup()
 {
     asm(".global _printf_float");            // include floating point support
+
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
 // used for debug diagnostics wifi but gpio5 does not monitor wifi in Arduino/NONOS
 //  #ifdef COP_MODE           // set for Arduino to prevent default production compilation
