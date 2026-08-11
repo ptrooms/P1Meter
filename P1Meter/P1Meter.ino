@@ -6739,12 +6739,12 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + "\t-------------time:" + micros()
                   );
 
-    // print timer table, when in request > then buffer, skip this
-
-
-
-
-
+     // print timer table, when in request > then buffer, skip this
+      /*
+        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
+           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
+      */
+    // bm ----> print serial_Print_PeekBits bittime table
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {    
@@ -6759,13 +6759,13 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
        }
+       /*
+        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
+           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
 
-
-
-
-
-
-
+        Print time data Lines (position , mSec):
+        data  0 -    0.0000:C  /KFM5KAIFA-METER<|
+       */
 
       if ( (i % 8) == 0) {
           temp = mySerial1.peekBit(i);
@@ -6797,8 +6797,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
-    temp0 = mySerial1.peekBit(0);  // get zero reference , v75b defined
-    temp1 = temp0;                 // get zero reference , v75b defined 
+    temp0 = mySerial1.peekBit(0);  // get zero reference
+    temp1 = temp0;                 // get zero reference
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
