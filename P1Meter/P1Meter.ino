@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b3" // number this version 10aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b4" // number this version 10aug26 (master, rebaed from stable v74)
 /*
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
@@ -16,7 +16,18 @@
       ESP8266-free-space: 2809856                                                                                                                    
       ESP8266-sketch-size: 333024 . 
       ESP8266-FreeHeap: 20512  
- v75b3 - switchDebugCmd for input and function
+ v75b3 - switchDebugCmd for input and function, look to be unstable...... 215/47
+      Firmware version: p1-(Aug 11 2026 19:08:46).
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 333232
+      ESP8266-FreeHeap: 20480
+  v75b4 - switchDebugCmd function disabled, tez/printcommand retained
+      Firmware version: p1-(Aug 11 2026 19:50:05).
+      consider:  using '?' on element 'e'  we have freeheal displayed
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 333104
+      ESP8266-FreeHeap: 20408
+
  */
 
 /* Procedure Guide tldr; for changes:
@@ -3000,25 +3011,25 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) "R");  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
-
+              /*
               if (switchDebugCmd == 2) {            // v74 add fault analysis
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
-
+              */
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
-
+              /*
               if (switchDebugCmd == 1) {            // v74 add fault analysis
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
               }
-
+              */
           } 
         }
 
