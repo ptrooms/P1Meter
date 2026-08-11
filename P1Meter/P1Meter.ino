@@ -2,8 +2,22 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b" // number this version 10aug26 (master, rebaed from stable v74)
-// 75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
+#define VERSION_NUMBER "75b3" // number this version 10aug26 (master, rebaed from stable v74)
+/*
+  75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
+       Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
+  v75b1 - serial_Print_PeekBits , variable initialised at top of routine. 845/35 fault
+      Firmware version: p1-(Aug 11 2026 15:19:03). 
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 332960
+      ESP8266-FreeHeap: 20544
+  v75b2 - switchDebugCmd initialised and printed to console, not yet set for input or function 442/31fault:= stable
+      p1-(Aug 11 2026 17:47:17)
+      ESP8266-free-space: 2809856                                                                                                                    
+      ESP8266-sketch-size: 333024 . 
+      ESP8266-FreeHeap: 20512  
+ v75b3 - switchDebugCmd for input and function
+ */
 
 /* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -1205,7 +1219,7 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 // bool outputOnSerial  = true;    // "D" debug default output in Testmode
 // ---------------------------------------------------------------------------------------------------
 #define MASKING_LIMIT 18         // Number of masked positions after we sw
-// int  switchDebugCmd   = 0;       // execute a debug after a certain condition
+int  switchDebugCmd   = 0;       // execute a debug after a certain condition
                                  //  switchDebugCmd=1  onze execute t16 command after a _Z fault
 bool switchMaskingOut = true;    // every time we have an OK CRC out record we flipback the previously masked "X" position
 bool switchMaskingCmd = true;    // 'm' in/activate switchMaskingOut
@@ -2986,25 +3000,25 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) "R");  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
-              /*
+
               if (switchDebugCmd == 2) {            // v74 add fault analysis
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                  // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
+                  outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
-              */
+
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
-              /*
+
               if (switchDebugCmd == 1) {            // v74 add fault analysis
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
               }
-              */
+
           } 
         }
 
@@ -4219,7 +4233,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                      }
 
                  } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
-            /*
+
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
                     outputOnSerial  = true;  // v74e activate debugging
@@ -4230,7 +4244,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                     outputOnSerial  = true;  // v74e activate debugging                    
                     Serial.print((String) "_te2_"); 
                  }
-            */
+
             else if ((char)payload[1] == 's') {
                       Serial.println((String)"\n\rT-imer Porstate: ");
                       printf_port_state_isr();
@@ -4272,8 +4286,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
-          // Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
-          Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
+          Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
+          // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
