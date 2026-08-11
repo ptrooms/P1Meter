@@ -2,7 +2,8 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75" // number this version 10aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b" // number this version 10aug26 (master, rebaed from stable v74)
+// 75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
 
 /* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -6727,8 +6728,8 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp = 0UL;               // check duplicates          
-
+    unsigned long temp, temp0, temp1 = 0UL;               // check duplicates          
+    unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
     // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
@@ -6796,8 +6797,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
-    int temp0 = mySerial1.peekBit(0);  // get zero reference
-    int temp1 = temp0;                 // get zero reference
+    temp0 = mySerial1.peekBit(0);  // get zero reference , v75b defined
+    temp1 = temp0;                 // get zero reference , v75b defined 
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
