@@ -1,4 +1,6 @@
-/* v75 rebased , no code changes since v74g/v74m
+/*
+   v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
+   v75 rebased , no code changes since v74g/v74m
    v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
    v74g 10aug26 extended bit dyanmic range 
    v74d 10aug26 added/changed to add recovery RXREAD58 timing of rs232 is to late.
@@ -149,7 +151,9 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
    if (receivePin == 4 || receivePin == 14 ) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
-      m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+      // m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+      m_buffer = (uint8_t*)os_malloc(m_buffSize);     // v75b4 https://www.bbs.espressif.com/viewtopic.php?t=621
+                                                      // requires #include "mem.h" in SoftwareSerial241.h 
                                        // https://www.guru99.com/difference-between-malloc-and-calloc.html
                                        // malloc allocates a single block of uninitialized memory
                                        // calloc allocates multiple blocks of memory and initializes them to zero.

@@ -1,5 +1,6 @@
 /*
 SoftwareSerial.h 05aug26 v74 using PROD_MODE which uses RXREAD58 with BITWAIT1 417 (leadtime to ISR)
+   v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
 
 Note: RXREAD2 must tbe cached for bitbang in order to BitBank read the Warmtelink ().
       we can enforce this in code SoftwareSerial241.cpp but choose to do this here... in void()
@@ -29,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SoftwareSerial_h
 #include <inttypes.h>
 #include <Stream.h>
+#include "mem.h"              // v74b reqwuired for os_malloc()
 
 // #define BITTEST_BLUE_SYNC     // RXREAD61+ activate Blueled on rythme of ISR
 // #define BITTEST_BLUE_MARK     // RXREAD61+ finisch cycle Blueled with short spike its for scope

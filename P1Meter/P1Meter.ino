@@ -2,7 +2,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b4" // number this version 10aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b5" // number this version 11aug26 (master, rebaed from stable v74)
 /*
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
@@ -21,13 +21,19 @@
       ESP8266-free-space: 2809856
       ESP8266-sketch-size: 333232
       ESP8266-FreeHeap: 20480
-  v75b4 - switchDebugCmd function disabled, tez/printcommand retained
+  v75b4 - switchDebugCmd function disabled, tez/printcommand retained LGTM 220/9
       Firmware version: p1-(Aug 11 2026 19:50:05).
-      consider:  using '?' on element 'e'  we have freeheal displayed
+      consider:  using '?' on element 'e'  we have freeheal displayed (18824,  18656, 18544, 18656)
       ESP8266-free-space: 2809856
       ESP8266-sketch-size: 333104
       ESP8266-FreeHeap: 20408
+  v75b5 - investigate memory corruption or fragmentation
+      fyi: repaint stack with ESP.resetFreeContStack(); // tbd is from arudiono
+      display free stack: getFreeContStack()    // 2.4.2 function, not supported on ours
 
+      change malloc() to os_malloc() per advise of https://www.bbs.espressif.com/viewtopic.php?t=621
+                         in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp , which require
+                         #include "mem.h"  in libs/SoftwareSerial241-P1/SoftwareSerial241.h
  */
 
 /* Procedure Guide tldr; for changes:
@@ -102,6 +108,67 @@
       set timings, trace line and "loopCnt % 10"
       If no data: do forced processGpio() functions, publishP1ToMqtt();  
       OTA handle
+
+*/
+
+/*
+  fyi:  The heap (at end and Stack at begin of free memory).
+  ESP.getFreeHeap() returns the available space in between the heap and the stack.
+
+  Static assigned RAM, 
+    wich contains the global and 'static' defined variables. 
+    It grows up from the bottom of RAM and is assigned during compiletime, and so 
+    the compiler can tell you how much space it occupies. 
+    Unfortunately this part is named 'dynamic RAM' in the IDE.
+
+  The Stack. ( Total stack size is only 4K.)
+    This area grows and shrinks when using function calls. 
+    It contains the return addresses and dynamic variables local to a function (created 
+    when calling the function and deleted with return). It is assigned downwards from 
+    the end of the RAM and grows with every function call and shrinks with the return.
+
+  The Heap. 
+    This is the RAM area between the statically assigned variables and the 
+    stack. RAM space assigned with 'new' and deleted with 'delete' is allocated in 
+    this area. It starts at the end of the static area and grows up - 
+    and must at no time come in conflict with the stack. The size of the heap is'nt really 
+    fixed, because the upper limit is defined by the lower limit of the stack, which is dynamic.
+
+    The heap is fully dynamic. 
+    a buffer related to an object may be moved (like the String class does when it runs out
+    of space) and this can cause fragmentation.
+
+
+  Depends on your program.
+       Only variables/memory you reserve with 'new' occupy heap space And 
+       also variables local to a function and the stack reduce the 'free' space.
+      If you define your arrays and structures global, the belong to the 'dynamic' memory.
+
+  Use the F() macro to save on RAM ?    s += F("Free memory: "); // This stores literals in progmem.
+
+  What really grinds my gears is that whenever I changed an absolutely insignificant thing, 
+  the problem seems to decrease. So I made conclusions which was always put back on the table... B
+  cause I didn't know the problem was much more fucked up than I though.
+
+  Recently I had a program running without less corrupted datas. I review my code and only add a 
+  Serial.println() in a unused function to debug a potential bug. By adding this line, I get a l
+  ot more corrupted data between ESP and SIM808. I reboot, same. I try to flash back the program without 
+  the Serial.println(), the problem disapear. I re-add this line, re-flash, the problem shows up again.
+  This Serial.println() wasn't even called in the boot process.
+  So in fact, I just changed 2 chars and it makes my whole program to be unstable.
+
+
+  There are 2 stacks: the sys and cont. https://github.com/esp8266/Arduino/issues/5148
+  The sys is used by the sdk, and is als the one in use in certain callbacks, like Ticker. 
+  The cont is the one used in our Arduino setup() and loop(), as well as all functions called from them.
+    The cont is 4KB in size, and used to be allocated on the heap. 
+  However, some research found that the sys stack is very big, something like 9 or 10KB, 
+    and most of it is unused after boot. 
+    So we moved the cont stack on top of the sys stack, and that frees up 4KB additional heap.
+    If you use wps in your project, this optimization is automagically reverted, 
+      and the cont stack goes back to heap. 
+      The reason for this is that wps seems to make large use of the sys stack.
+
 
 */
 
@@ -1519,6 +1586,25 @@ void command_testH6(){    // v57c-2
 
 }
 
+
+/*
+// Doest not work on our platformio, lild error.
+// ESP getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) Arduino esp8266 core: 2_4_1
+
+extern "C"
+{
+#include <cont.h>
+	extern cont_t* g_pcont;
+	void DebugFreeStack()
+	{
+		register uint32_t *sp asm("a1");
+		int freestack = 4 * (sp - g_pcont->stack);
+		// Serial.printf("current free stack = %d\n", freestack);
+		Serial.printf("%d", freestack);
+	}
+}
+*/
+
 void setup()
 {
     asm(".global _printf_float");            // include floating point support
@@ -1833,6 +1919,10 @@ void setup()
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
   Serial.println ("ESP8266-getChipId: "+    String(ESP.getChipId()));             // sudden crash...
   Serial.println ("ESP8266-FreeHeap: "+     String(ESP.getFreeHeap()));
+    // Serial.println ("ESP.getFreeContStack: "+ String(ESP.getFreeContStack()));      // v75b4 (2.4.1) // 2.4.2 function
+  // Serial.print ("ESP.getFreeContStack: "); DebugFreeStack(); Serial.print ("\r\n"); // v75b4 local implmentation
+  
+  
 
   /*
     Print whih RX read we are using
@@ -3011,25 +3101,25 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) "R");  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
-              /*
+
               if (switchDebugCmd == 2) {            // v74 add fault analysis
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
-              */
+
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
-              /*
+
               if (switchDebugCmd == 1) {            // v74 add fault analysis
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
               }
-              */
+
           } 
         }
 
@@ -4284,7 +4374,10 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
           Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
           Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-          Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
+          Serial.println((String)"e 1/2 force exception "
+                          + "( heap:" + ESP.getFreeHeap() +")"
+                          // + "( stack:" + ESP.getFreeContStack() + ")"      // v75b4 (2.4.1) // 2.4.2 function
+                        );   // v52: display FreeHeap
           Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
           Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
                                     + " serial1=" +  serial1Baudrate
