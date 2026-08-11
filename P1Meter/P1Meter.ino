@@ -5,7 +5,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b5" // number this version 11aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b6" // number this version 11aug26 (master, rebaed from stable v74)
 /*
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
@@ -37,6 +37,14 @@
       change malloc() to os_malloc() per advise of https://www.bbs.espressif.com/viewtopic.php?t=621
                          in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp , which require
                          #include "mem.h"  in libs/SoftwareSerial241-P1/SoftwareSerial241.h
+      played around with DEBUG options as these seem to use umm_malloc() that checks for OOM
+          https://github.com/esp8266/Arduino/blob/master/cores/esp8266/heap.cpp
+          note RTOS functions are not availabel for Arduino... https://docs.espressif.com/projects/esp8266-rtos-sdk/en/latest/api-reference/system/mem_alloc.html
+        perhaps we suffer from memory fragmentation.... 
+        other also suffer from malloc().... https://github.com/esp8266/Arduino/issues/10
+
+      activated swtichDebug function.... not stable
+  v75b6 kept os_malloc() , deactuvated switchDebufCmd fucntionality.      
  */
 
 /* Procedure Guide tldr; for changes:
@@ -3105,25 +3113,25 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) "R");  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
-
+              /*
               if (switchDebugCmd == 2) {            // v74 add fault analysis
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
-
+              */
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
-
+              /*
               if (switchDebugCmd == 1) {            // v74 add fault analysis
                   // switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
                   // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
               }
-
+              */
           } 
         }
 

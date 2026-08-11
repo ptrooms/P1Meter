@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SoftwareSerial_h
 #include <inttypes.h>
 #include <Stream.h>
-#include "mem.h"              // v74b reqwuired for os_malloc()
+#include "mem.h"              // v74b5+ reqwuired for os_malloc()
 
 // #define BITTEST_BLUE_SYNC     // RXREAD61+ activate Blueled on rythme of ISR
 // #define BITTEST_BLUE_MARK     // RXREAD61+ finisch cycle Blueled with short spike its for scope
