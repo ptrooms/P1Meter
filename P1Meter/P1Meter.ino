@@ -18,7 +18,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b6" // number this version 11aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b7" // number this version 11aug26 (master, rebaed from stable v74)
 /*
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
