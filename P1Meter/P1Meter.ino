@@ -104,10 +104,19 @@
         ESP8266-sketch-size: 333184
         ESP8266-FreeHeap: 20480
 
+        ESP8266-free-space: 2809856
+
+
+
       DUMMYTABLE_CODE1+2 table=32  elf: 942.540 bin: 333.248    -->  looks very stable
         ESP8266-free-space: 2809856
         ESP8266-sketch-size: 333248
         ESP8266-FreeHeap: 20376
+
+      DUMMYTABLE_CODE1+2 table=256  elf: 942.540 bin: 333.248    -->  looks very stable
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333248
+        ESP8266-FreeHeap: 20256  (18568)
 
 
 
