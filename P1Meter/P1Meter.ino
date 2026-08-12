@@ -3,11 +3,11 @@
 #define DEBUG_ESP_OOM 1          // v75b5  playing around
 
 #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
-#define DUMMYCODE1    // v75b7  for adding dummy code to end of loop{}
-#define DUMMYCODE2    // v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE3    // v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE4    // v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE5    // v75b7  for adding dummy code to end of loop{}
+#define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
+#define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
+#define DUMMYCODE3    // v75b10f v75b10c  for adding dummy code to end of loop{}
+// #define DUMMYCODE4    // v75b10c  for adding dummy code to end of loop{}
+// #define DUMMYCODE5    // v75b10c  for adding dummy code to end of loop{}
 // #define DUMMYCODE6    // v75b7  for adding dummy code to end of loop{}
 // #define DUMMYCODE7    // v75b7  for adding dummy code to end of loop{}
 // #define DUMMYCODE8    // v75b7  for adding dummy code to end of loop{}
@@ -126,6 +126,8 @@
       Is tsbale bu an incoming ISR loakcout, can cause restart......
       last mqtt record.... "currentTime":"113113" "WaterCnt":42, "WaterHotCnt":25,
       strange: 12aug26  wdt-reset restart reason 0x00000001  epc1=0x401022c5..... "currentTime":"113134"
+              ../.platformio/packages/framework-arduinoespressif8266@1.20401.3/tools/sdk/lib/libpp.a(wdev.o)
+              0x0000000040101f84                wDev_ProcessFiq
       perhaps an unstable ISR as I was water tapping at that moment 2026-08-12 11:31:38.568 ...... assembly
               401022b6:	fe6421               	l32r	a2, 40101c48 <trc_NeedRTS+0x238>
               401022b9:	fe6431               	l32r	a3, 40101c4c <trc_NeedRTS+0x23c>
@@ -135,12 +137,30 @@
               401022c5:	ffff06               	j	401022c5 <wDev_ProcessFiq+0x341>
               Note: this causes a watschdogreset......
       v75b10 - add ISR water switch stability
-              ESP8266-free-space: 2809856
-              ESP8266-sketch-size: 333248
-              ESP8266-FreeHeap: 20256
-              bin : 333.248 , elf: 942.540
-              - - adding fields waterErrorSwitch & conditions from v75g, is OK, no problem, stable
-            - add code in processHotLedRead() - testing field
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333248
+                ESP8266-FreeHeap: 20256
+                bin : 333.248 , elf: 942.540
+              - adding fields waterErrorSwitch & conditions from v75g, is OK
+              - no problem, very stable as of start
+            - v75b10b add code in processHotLedRead() - testing field
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333280
+                ESP8266-FreeHeap: 20240
+                bin : 333.280 , elf: 942.588
+              - some minor instability sta start and somewhat more Recoveries ... 
+            - v75b10c adding DUMMYCODE3 improves things significantly, NO Z faults
+                bin : 333.344 , elf: 942.652
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333344
+                ESP8266-FreeHeap: 20240
+            - v75b10d adding DUMMYCODE4 few Z-faults, somewhat more Recoveries and a RX2 readmiss
+                bin : 333.408
+            - v75b10e adding DUMMYCODE5 few Z-faults, somewhat more Recoveries and a RX2 delayed after20
+                bin : 333.472
+            - v75b10f revert back to v75b10c only DUMMYCODE1+2+3 (some slow start to catchup), thereafter perfect
+                bin : 333.344
+
  */
 
 /* Procedure Guide tldr; for changes:
