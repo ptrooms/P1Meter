@@ -18,7 +18,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b9" // number this version 11aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b10" // number this version 11aug26 (master, rebaed from stable v74)
 /*
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
@@ -123,6 +123,7 @@
         retry with DUMMYTABLE_CODE1-5 --> unstable
 
     v75b9 - reverted back to DUMMYTABLE_CODE1+2 table=256  without function switchDebugCmd
+      Is tsbale bu an incoming ISR loakcout, can cause restart......
       last mqtt record.... "currentTime":"113113" "WaterCnt":42, "WaterHotCnt":25,
       strange: 12aug26  wdt-reset restart reason 0x00000001  epc1=0x401022c5..... "currentTime":"113134"
       perhaps an unstable ISR as I was water tapping at that moment 2026-08-12 11:31:38.568 ...... assembly
@@ -133,7 +134,13 @@
               401022c2:	0000c0               	callx0	a0
               401022c5:	ffff06               	j	401022c5 <wDev_ProcessFiq+0x341>
               Note: this causes a watschdogreset......
-
+      v75b10 - add ISR water switch stability
+              ESP8266-free-space: 2809856
+              ESP8266-sketch-size: 333248
+              ESP8266-FreeHeap: 20256
+              bin : 333.248 , elf: 942.540
+              - - adding fields waterErrorSwitch & conditions from v75g, is OK, no problem, stable
+            - add code in processHotLedRead() - testing field
  */
 
 /* Procedure Guide tldr; for changes:
@@ -1476,6 +1483,10 @@ bool preserve_lightReadState_for_mqtt  = LOW;      // v70a preserve Highest Ledl
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
+int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
+     #define WATER_ERROR_SWITCH_ok      0x0f  // v75 <= 0x0F we have no faults
+     #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off
+     #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
 long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
@@ -5083,7 +5094,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
     try to reset this condition
   */
  
-  /* v74c_to_v75This corrupts...... the reading of rs232
+  // v75b10 12aug25 /* v74c_to_v75This corrupts...... the reading of rs232
   if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // we have an error on the water sensor 
       if (local_lightReadState) {
         if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
@@ -5094,7 +5105,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
         }
       }
   }
-  */ 
+  // v75b10 12aug26 */ 
 
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
