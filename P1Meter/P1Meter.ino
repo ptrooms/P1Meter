@@ -18,7 +18,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b8" // number this version 11aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b9" // number this version 11aug26 (master, rebaed from stable v74)
 /*
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
@@ -123,6 +123,16 @@
         retry with DUMMYTABLE_CODE1-5 --> unstable
 
     v75b9 - reverted back to DUMMYTABLE_CODE1+2 table=256  without function switchDebugCmd
+      last mqtt record.... "currentTime":"113113" "WaterCnt":42, "WaterHotCnt":25,
+      strange: 12aug26  wdt-reset restart reason 0x00000001  epc1=0x401022c5..... "currentTime":"113134"
+      perhaps an unstable ISR as I was water tapping at that moment 2026-08-12 11:31:38.568 ...... assembly
+              401022b6:	fe6421               	l32r	a2, 40101c48 <trc_NeedRTS+0x238>
+              401022b9:	fe6431               	l32r	a3, 40101c4c <trc_NeedRTS+0x23c>
+              401022bc:	81a442               	movi	a4, 0x481
+              401022bf:	f99a01               	l32r	a0, 40100928 <ppTxqUpdateBitmap+0x28>
+              401022c2:	0000c0               	callx0	a0
+              401022c5:	ffff06               	j	401022c5 <wDev_ProcessFiq+0x341>
+              Note: this causes a watschdogreset......
 
  */
 
