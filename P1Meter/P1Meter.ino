@@ -18,7 +18,7 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b7" // number this version 11aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75b8" // number this version 11aug26 (master, rebaed from stable v74)
 /*
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
@@ -118,7 +118,11 @@
         ESP8266-sketch-size: 333248
         ESP8266-FreeHeap: 20256  (18568)
 
+    v75b8 - retry switchDebugCmd with DUMMYTABLE_CODE1+2 table=256 --> untstable
+        retry with only DUMMYTABLE_CODE1 --> unstable
+        retry with DUMMYTABLE_CODE1-5 --> unstable
 
+    v75b9 - reverted back to DUMMYTABLE_CODE1+2 table=256  without function switchDebugCmd
 
  */
 
