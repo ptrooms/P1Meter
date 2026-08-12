@@ -1,5 +1,18 @@
+
 #define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
 #define DEBUG_ESP_OOM 1          // v75b5  playing around
+
+#define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
+#define DUMMYCODE1    // v75b7  for adding dummy code to end of loop{}
+#define DUMMYCODE2    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE3    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE4    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE5    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE6    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE7    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE8    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE9    // v75b7  for adding dummy code to end of loop{}
+
 
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
@@ -31,6 +44,9 @@
       ESP8266-sketch-size: 333104
       ESP8266-FreeHeap: 20408
   v75b5 - investigate memory corruption or fragmentation
+      ESP8266-free-space: 2809856                                                                                                                  
+      ESP8266-sketch-size: 333248
+      ESP8266-FreeHeap: 20376
       fyi: repaint stack with ESP.resetFreeContStack(); // tbd is from arudiono
       display free stack: getFreeContStack()    // 2.4.2 function, not supported on ours
 
@@ -45,6 +61,56 @@
 
       activated swtichDebug function.... not stable
   v75b6 kept os_malloc() , deactuvated switchDebufCmd fucntionality.      
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 333120 
+      ESP8266-FreeHeap: 20512       ('e' 18560)
+      elfsize= 942.444 , bin 333.120
+      tbd: try to get the heap below 20408..... see what happens....
+  v75b7 added dummy code and allocation #ifdef DUMMYTABLE_LENGTH char dummyTable[DUMMYTABLE_LENGTH]; 
+      elfsize = 942.382 with dummy code 942.444 / 942.476   bin: 333.152 / 333184
+      ESP8266-free-space: 2809856,2809856
+      ESP8266-sketch-size: 333152,333184
+      ESP8266-FreeHeap: 20152,20256,  (18568,18400)
+      
+      DUMMYTABLE_LENGTH 256 with manual code at end of loop() sure unstable
+      
+      with DUMMYTABLE_LENGTH 32  elf 942.476  bin 333.184 --> looks unstable....
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333184
+        ESP8266-FreeHeap: 20480
+
+      with DUMMYTABLE_LENGTH 1  elf 942.476  bin 333.184 --> looks unstable....
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333184 
+        ESP8266-FreeHeap: 20512
+
+      no DUMMYTABLE_CODE  elf: 942.384 bin: 333.120     -->  looks stable
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333120
+        ESP8266-FreeHeap: 20512
+
+      no DUMMYTABLE_CODE table=256  elf: 942.384 bin: 333.120     -->  looks stable
+        ESP8266-free-space: 2809856                                                                                                                                                                               
+        ESP8266-sketch-size: 333120
+        ESP8266-FreeHeap: 20512   (18152)
+
+      no DUMMYTABLE_CODE table=32  elf: 942.384 bin: 333.120     -->  looks stable
+        ESP8266-free-space: 2809856                                                                                                                                                                               
+        ESP8266-sketch-size: 333120
+        ESP8266-FreeHeap: 20512   (heap: 18152)
+
+      DUMMYTABLE_CODE1 table=32  elf: 942.476 bin: 333.184     -->  ??
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333184
+        ESP8266-FreeHeap: 20480
+
+      DUMMYTABLE_CODE1+2 table=32  elf: 942.540 bin: 333.248    -->  looks very stable
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333248
+        ESP8266-FreeHeap: 20376
+
+
+
  */
 
 /* Procedure Guide tldr; for changes:
@@ -1435,6 +1501,9 @@ int filteredValueAdc = 0; // average between previous and and published
     Global variables use 33044 bytes (40%) of dynamic memory, leaving 48876 bytes for local variables. Maximum is 81920 bytes.
 */
 
+#ifdef DUMMYTABLE_LENGTH
+char dummyTable[DUMMYTABLE_LENGTH];       // v75b7 enforce memory reservation.....
+#endif
 
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 // char dummy2[17];       // add some spare bytes, v55b remove
@@ -2842,7 +2911,52 @@ void loop()
 
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == VERBOSE_ON) Serial.print(">"); // exit loop to check if we have left the building
+  
+  /*
+    Enforce nulll operation tot generate code for using dummyTable as verboseleven will never be 999
+  */
+
+  #if(defined DUMMYCODE1)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[0] + dummyTable[1] ); // v75b7
+      #warning 1 extra dummy code
+  #endif
+  #if(defined DUMMYCODE2)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[1] + dummyTable[2] ); // v75b7
+      #warning 2 extra dummy code  
+  #endif
+  #if(defined DUMMYCODE3)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[2] + dummyTable[3] ); // v75b7
+      #warning 3 extra dummy code
+  #endif
+  #if(defined DUMMYCODE4)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[3] + dummyTable[4] ); // v75b7
+      #warning 4 extra dummy code
+  #endif
+  #if(defined DUMMYCODE5)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[4] + dummyTable[5] ); // v75b7
+      #warning 5 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE6)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[5] + dummyTable[6] ); // v75b7
+      #warning 6 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE7)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[6] + dummyTable[7] ); // v75b7
+      #warning 7 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE8)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[7] + dummyTable[8] ); // v75b7
+      #warning 8 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE9)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[9] + dummyTable[9] ); // v75b7
+      #warning 9 extra dummy code  
+  #endif
+
+  
+
 }
+
 
 /* 
   Reconnect lost mqtt connection
