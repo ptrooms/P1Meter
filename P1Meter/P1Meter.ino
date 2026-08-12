@@ -160,6 +160,44 @@
                 bin : 333.472
             - v75b10f revert back to v75b10c only DUMMYCODE1+2+3 (some slow start to catchup), thereafter perfect
                 bin : 333.344
+                this version has #define DUMMYCODE3 which stabilises the v75b10b which had waterErrorSwitch
+                    code activated on routine bool processHotLedRead(bool notkeep_HoldState)
+            - v75b10g  - activating processHotLedRead() as with v75b10b
+                new base line as we cannot find sourcecode for v75b10b.....
+                Firmware version: p1-(Aug 12 2026 17:14:17).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333344
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+
+            - v75b10h  - removed #define DUMMYCODE3     - stable, with some minor Z's
+                Note: source/program is identical to P1Meter_v75b10f.ino_save
+                Firmware version: p1-(Aug 12 2026 17:27:21).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333280
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+
+            - v75b10i - removed #define DUMMYCODE2      - stable, with some more Z's
+                Firmware version: p1-(Aug 12 2026 17:35:57).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333216
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+
+            - v75b10j - removed #define DUMMYCODE1      -  undecided stable , have some retries
+                Firmware version: p1-(Aug 12 2026 17:43:12).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333152
+                ESP8266-FreeHeap: 20496
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+            - v75b10k - re-added DUMMYCODE1-3           -  very stable
+              accidentally cleaned platform workspace, save binaries lost
+                Firmware version: p1-(Aug 12 2026 17:55:02).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333344
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
 
  */
 
