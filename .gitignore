@@ -32,12 +32,12 @@ P1Meter/*.ino*
 build
 build_output
 # temporaily disabled to detect changes....
-firmware*.map
-firmware*.asm
+firmware*.map*
+firmware*.asm*
 P1Meter/P1Meter.ino.cpp
 P1Meter*.bin
 P1Meter*.bin.gz
-P1Meter*.map
+P1Meter*.map*
 platformio_override.ini
 platformio_P1Meter_cenv.ini
 telegram0crlf.txt
