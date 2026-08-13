@@ -2,6 +2,7 @@
 #define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
 #define DEBUG_ESP_OOM 1          // v75b5  playing around
 
+// v75c keep below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 for stability.
 #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
 #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
 #define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
@@ -18,8 +19,10 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75b10" // number this version 11aug26 (master, rebaed from stable v74)
-/*
+#define VERSION_NUMBER "75c" // number this version 11aug26 (master, rebaed from stable v74)
+/* v75c code documentation
+*/
+/* v75b code documentation
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
   v75b1 - serial_Print_PeekBits , variable initialised at top of routine. 845/35 fault
@@ -210,7 +213,7 @@
             reverted activae code back to 
             - v75b10k - re-added DUMMYCODE1-3           -  very stable. Mark this to v75b branch
 
- */
+*/
 
 /* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -385,6 +388,11 @@
 
 
 /* change history
+  - v75c  - 13aug26 02u13 change to improve table fragmentation to prevent overflows.....
+          - perhaps we have overlows and our technique to surround with areas might not work.
+  - v75b  - stablised based on master
+  - v75a  - abandoned
+  - v75  - to master (11aug26)
   - v75  - stable for 1250 read and 50 errors of which Rcvr=360 and Elenght errors=19
   - v74  merged to maser.
   - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
