@@ -192,12 +192,23 @@
                 ESP8266-FreeHeap: 20496
                 Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
             - v75b10k - re-added DUMMYCODE1-3           -  very stable
+              Note: we still have de ISR water vibration problem !!!!
               accidentally cleaned platform workspace, save binaries lost
                 Firmware version: p1-(Aug 12 2026 17:55:02).
                 ESP8266-free-space: 2809856
                 ESP8266-sketch-size: 333344
                 ESP8266-FreeHeap: 20240
                 Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+            - v75b10l -  added DUMMYCODE4 check          -  partially stable, few Z errors
+                Firmware version: p1-(Aug 12 2026 22:23:31).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333408
+                ESP8266-FreeHeap: 20136                             
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+                // now testing where DUMMYCODE4 changes by modifying one operand
+                // see analysis /home/pafoxp/code-P1Meter/p1-analyse-v74b10l.txt
+            reverted activae code back to 
+            - v75b10k - re-added DUMMYCODE1-3           -  very stable. Mark this to v75b branch
 
  */
 
@@ -3003,9 +3014,14 @@ void loop()
 
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == VERBOSE_ON) Serial.print(">"); // exit loop to check if we have left the building
-  
+   
   /*
     Enforce nulll operation tot generate code for using dummyTable as verboseleven will never be 999
+  */
+  /*
+      asm(
+        "NOP;"
+      );
   */
 
   #if(defined DUMMYCODE1)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
@@ -3021,7 +3037,13 @@ void loop()
       #warning 3 extra dummy code
   #endif
   #if(defined DUMMYCODE4)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[3] + dummyTable[4] ); // v75b7
+    /*
+        asm(
+        "NOP;"
+        "NOP;"
+        );
+    */        
+      if (verboseLevel == 998)  Serial.println((String) dummyTable[3] + dummyTable[4] ); // v75b7
       #warning 4 extra dummy code
   #endif
   #if(defined DUMMYCODE5)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
