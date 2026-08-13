@@ -1,4 +1,9 @@
-/* v75 rebased , no code changes since v74g/v74m
+/*
+   v75d - malloc() changed calloc() for initialisation
+         - tables have somewhat moere ending space to prevent overflows
+         - if port is closed the destory routine will print a message.
+   v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
+   v75 rebased , no code changes since v74g/v74m
    v74 05aug26 we have reduced IRAM memomry by only add ICACHE_RAM_ATTR for active USE_RXREADxx SoftwareSerial::rxRead58()
    v74g 10aug26 extended bit dyanmic range 
    v74d 10aug26 added/changed to add recovery RXREAD58 timing of rs232 is to late.
@@ -149,7 +154,10 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
    if (receivePin == 4 || receivePin == 14 ) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
-      m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+      // m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+      // m_buffer = (uint8_t*)os_malloc(m_buffSize+32);     // v75b4 https://www.bbs.espressif.com/viewtopic.php?t=621
+      m_buffer = (uint8_t*)calloc(m_buffSize+32,sizeof(uint8_t));     // v75c, initialise to 0
+                                                      // requires #include "mem.h" in SoftwareSerial241.h 
                                        // https://www.guru99.com/difference-between-malloc-and-calloc.html
                                        // malloc allocates a single block of uninitialized memory
                                        // calloc allocates multiple blocks of memory and initializes them to zero.
@@ -157,11 +165,11 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
                                        // *1 = heap =20472   *2 = heap 15872 *3 = heap 11024      
       
       m_buffer_timePos  = M_TIME_START;
-      m_buffer_time = (unsigned long*)calloc(M_TIME_ENTRIES, sizeof(unsigned long));               // v58d_ss241 ytimer positions
+      m_buffer_time = (unsigned long*)calloc(M_TIME_ENTRIES+2, sizeof(unsigned long));               // v58d_ss241 ytimer positions
       m_buffer_time[M_TIME_START]  = GET_CYCLE_COUNT;   // initialise
       m_buffer_bits = (unsigned long*)calloc((m_buffSize)*1, sizeof(unsigned long));    // v58d_ss241 2-10 bit-transitions 
       // m_buffer_bitValue = 0;
-      m_buffer_bitValue = M_BIT_CYCLE_VALUE  // initialise this 
+      m_buffer_bitValue = M_BIT_CYCLE_VALUE  // initialise this (getCycleCountIram() % 4096);
 
       // --> if (m_buffer != NULL && m_buffer_time[0] == 0UL) {  causes boot loop
 
@@ -212,7 +220,8 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    if (isValidGPIOpin(receivePin)) {
       m_rxPin = receivePin;
       m_buffSize = buffSize;
-      m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+      // m_buffer = (uint8_t*)malloc(m_buffSize);     // https://cplusplus.com/reference/cstdlib/malloc/
+      m_buffer = (uint8_t*)calloc(m_buffSize+32,sizeof(uint8_t));     // v75c, initialise to 0
                                        // https://www.guru99.com/difference-between-malloc-and-calloc.html
                                        // malloc allocates a single block of uninitialized memory
                                        // calloc allocates multiple blocks of memory and initializes them to zero.
@@ -220,7 +229,8 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
                                        // *1 = heap =20472   *2 = heap 15872 *3 = heap 11024      
       
       m_buffer_timePos  = M_TIME_START;
-      m_buffer_time = (unsigned long*)calloc(M_TIME_ENTRIES, sizeof(unsigned long));               // v58d_ss241 ytimer positions
+      // m_buffer_time = (unsigned long*)calloc(M_TIME_ENTRIES, sizeof(unsigned long));               // v58d_ss241 ytimer positions
+      m_buffer_time = (unsigned long*)calloc(M_TIME_ENTRIES+2, sizeof(unsigned long));               // v58d_ss241 ytimer positions
       m_buffer_time[M_TIME_START]  = GET_CYCLE_COUNT;   // initialise
       //  m_buffer_bits = (unsigned long*)calloc((m_buffSize)*1, sizeof(unsigned long));    // v58d_ss241 2-10 bit-transitions 
       m_buffer_bits = (unsigned long*)calloc((m_buffSize+1)*1, sizeof(unsigned long));    // v61b_ss241 +1 2-10 bit-transitions 
@@ -259,7 +269,7 @@ SoftwareSerial::~SoftwareSerial() {    // P1meter never called as we keep the bu
       free(m_buffer_time);
    if (m_buffer_bits)          // v59b
       free(m_buffer_bits);
-
+   Serial.println((String) "SoftwareSerial freed().");
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
@@ -292,6 +302,7 @@ void SoftwareSerial::begin(long speed) {
 */
 
 void SoftwareSerial::begin(long speed, int recordtype) {
+   // str1 and str2 are simulation, terminated by 0xff
    const char * str1 = "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n\xFF";                 
    const char * str2 = "_/VALID-VI\\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
    // Serial.print((String) "\r\nBegin port" + m_rxPin  + " cycle" + GET_CYCLE_COUNT + "\r\n");
@@ -300,7 +311,7 @@ void SoftwareSerial::begin(long speed, int recordtype) {
    m_highSpeed = speed > 9600;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
    Serial.print((String) (portActive() ? "!" : "@") ); // v58b/v59 diagnose
-   if (recordtype == SERIAL_RECORDTYPE_PORT ) {
+   if (recordtype == SERIAL_RECORDTYPE_PORT ) {                // use real port
          Serial.print((String) "\b" +  (m_rxPin == 14 ? "p" : "w" ) );         // v59 print indication which port to activate
          if (!m_rxEnabled) enableRx(true);
          else Serial.print((String) "\b" +  (m_rxPin == 14 ? "P" : "W" ));    // v59 print indication thingy was already active
@@ -309,7 +320,7 @@ void SoftwareSerial::begin(long speed, int recordtype) {
          // note: plain use will calll somethign else and produeces
          this->begin(speed);   // do normal serial
          */
-      } else {
+      } else {                                                 // use/simulate data generated power 1=P1/str1, 2=RX/str2
          Serial.print((String) "\b\tuse@");  
          // char *  str = warning: deprecated conversion from string constant to 'char*'
          // corrected to const char * str

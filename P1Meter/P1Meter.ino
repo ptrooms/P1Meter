@@ -1,8 +1,234 @@
+
+#define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
+#define DEBUG_ESP_OOM 1          // v75b5  playing around
+
+// v75c keep below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 for stability.
+// #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
+// #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE3    // v75b10f v75b10c  for adding dummy code to end of loop{}
+// #define DUMMYCODE4    // v75b10c  for adding dummy code to end of loop{}
+// #define DUMMYCODE5    // v75b10c  for adding dummy code to end of loop{}
+// #define DUMMYCODE6    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE7    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE8    // v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE9    // v75b7  for adding dummy code to end of loop{}
+
+
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75" // number this version 10aug26 (master, rebaed from stable v74)
+#define VERSION_NUMBER "75d" // number this version 11aug26 (master, rebased from stable v74)
+/* code documentation 75d 75c
+      v75d 13aug26 initial version - improved on buffers, deactivated DUMMYTABLE_LENGTH & DUMMYCODE1-3, looks stable.
+          Firmware version: p1-(Aug 13 2026 12:29:47).                                            
+          ESP getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
+          Arduino esp8266 core: 2_4_1                                                           
+          ESP8266-free-space: 2809856                                                           
+          ESP8266-sketch-size: 333200                                                            
+          ESP8266-FreeHeap: 20288                           
+      v75c 13aug26 initial version    - DUMMYTABLE_LENGTH & DUMMYCODE1-3 (without buffer/field changes)
+        Firmware version: p1-(Aug 13 2026 03:55:28).
+        ESP getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333392
+        ESP8266-FreeHeap: 19928
+        Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+        fault 275/3036 elen: 216 recover 1202
+*/
+/* v75b code documentation
+  75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
+       Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
+  v75b1 - serial_Print_PeekBits , variable initialised at top of routine. 845/35 fault
+      Firmware version: p1-(Aug 11 2026 15:19:03). 
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 332960
+      ESP8266-FreeHeap: 20544
+  v75b2 - switchDebugCmd initialised and printed to console, not yet set for input or function 442/31fault:= stable
+      p1-(Aug 11 2026 17:47:17)
+      ESP8266-free-space: 2809856                                                                                                                    
+      ESP8266-sketch-size: 333024 . 
+      ESP8266-FreeHeap: 20512  
+ v75b3 - switchDebugCmd for input and function, look to be unstable...... 215/47
+      Firmware version: p1-(Aug 11 2026 19:08:46).
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 333232
+      ESP8266-FreeHeap: 20480
+  v75b4 - switchDebugCmd function disabled, tez/printcommand retained LGTM 220/9
+      Firmware version: p1-(Aug 11 2026 19:50:05).
+      consider:  using '?' on element 'e'  we have freeheal displayed (18824,  18656, 18544, 18656)
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 333104
+      ESP8266-FreeHeap: 20408
+  v75b5 - investigate memory corruption or fragmentation
+      ESP8266-free-space: 2809856                                                                                                                  
+      ESP8266-sketch-size: 333248
+      ESP8266-FreeHeap: 20376
+      fyi: repaint stack with ESP.resetFreeContStack(); // tbd is from arudiono
+      display free stack: getFreeContStack()    // 2.4.2 function, not supported on ours
+
+      change malloc() to os_malloc() per advise of https://www.bbs.espressif.com/viewtopic.php?t=621
+                         in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp , which require
+                         #include "mem.h"  in libs/SoftwareSerial241-P1/SoftwareSerial241.h
+      played around with DEBUG options as these seem to use umm_malloc() that checks for OOM
+          https://github.com/esp8266/Arduino/blob/master/cores/esp8266/heap.cpp
+          note RTOS functions are not availabel for Arduino... https://docs.espressif.com/projects/esp8266-rtos-sdk/en/latest/api-reference/system/mem_alloc.html
+        perhaps we suffer from memory fragmentation.... 
+        other also suffer from malloc().... https://github.com/esp8266/Arduino/issues/10
+
+      activated swtichDebug function.... not stable
+  v75b6 kept os_malloc() , deactuvated switchDebufCmd fucntionality.      
+      ESP8266-free-space: 2809856
+      ESP8266-sketch-size: 333120 
+      ESP8266-FreeHeap: 20512       ('e' 18560)
+      elfsize= 942.444 , bin 333.120
+      tbd: try to get the heap below 20408..... see what happens....
+  v75b7 added dummy code and allocation #ifdef DUMMYTABLE_LENGTH char dummyTable[DUMMYTABLE_LENGTH]; 
+      elfsize = 942.382 with dummy code 942.444 / 942.476   bin: 333.152 / 333184
+      ESP8266-free-space: 2809856,2809856
+      ESP8266-sketch-size: 333152,333184
+      ESP8266-FreeHeap: 20152,20256,  (18568,18400)
+      
+      DUMMYTABLE_LENGTH 256 with manual code at end of loop() sure unstable
+      
+      with DUMMYTABLE_LENGTH 32  elf 942.476  bin 333.184 --> looks unstable....
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333184
+        ESP8266-FreeHeap: 20480
+
+      with DUMMYTABLE_LENGTH 1  elf 942.476  bin 333.184 --> looks unstable....
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333184 
+        ESP8266-FreeHeap: 20512
+
+      no DUMMYTABLE_CODE  elf: 942.384 bin: 333.120     -->  looks stable
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333120
+        ESP8266-FreeHeap: 20512
+
+      no DUMMYTABLE_CODE table=256  elf: 942.384 bin: 333.120     -->  looks stable
+        ESP8266-free-space: 2809856                                                                                                                                                                               
+        ESP8266-sketch-size: 333120
+        ESP8266-FreeHeap: 20512   (18152)
+
+      no DUMMYTABLE_CODE table=32  elf: 942.384 bin: 333.120     -->  looks stable
+        ESP8266-free-space: 2809856                                                                                                                                                                               
+        ESP8266-sketch-size: 333120
+        ESP8266-FreeHeap: 20512   (heap: 18152)
+
+      DUMMYTABLE_CODE1 table=32  elf: 942.476 bin: 333.184     -->  ??
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333184
+        ESP8266-FreeHeap: 20480
+
+        ESP8266-free-space: 2809856
+
+
+
+      DUMMYTABLE_CODE1+2 table=32  elf: 942.540 bin: 333.248    -->  looks very stable
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333248
+        ESP8266-FreeHeap: 20376
+
+      DUMMYTABLE_CODE1+2 table=256  elf: 942.540 bin: 333.248    -->  looks very stable
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333248
+        ESP8266-FreeHeap: 20256  (18568)
+
+    v75b8 - retry switchDebugCmd with DUMMYTABLE_CODE1+2 table=256 --> untstable
+        retry with only DUMMYTABLE_CODE1 --> unstable
+        retry with DUMMYTABLE_CODE1-5 --> unstable
+
+    v75b9 - reverted back to DUMMYTABLE_CODE1+2 table=256  without function switchDebugCmd
+      Is tsbale bu an incoming ISR loakcout, can cause restart......
+      last mqtt record.... "currentTime":"113113" "WaterCnt":42, "WaterHotCnt":25,
+      strange: 12aug26  wdt-reset restart reason 0x00000001  epc1=0x401022c5..... "currentTime":"113134"
+              ../.platformio/packages/framework-arduinoespressif8266@1.20401.3/tools/sdk/lib/libpp.a(wdev.o)
+              0x0000000040101f84                wDev_ProcessFiq
+      perhaps an unstable ISR as I was water tapping at that moment 2026-08-12 11:31:38.568 ...... assembly
+              401022b6:	fe6421               	l32r	a2, 40101c48 <trc_NeedRTS+0x238>
+              401022b9:	fe6431               	l32r	a3, 40101c4c <trc_NeedRTS+0x23c>
+              401022bc:	81a442               	movi	a4, 0x481
+              401022bf:	f99a01               	l32r	a0, 40100928 <ppTxqUpdateBitmap+0x28>
+              401022c2:	0000c0               	callx0	a0
+              401022c5:	ffff06               	j	401022c5 <wDev_ProcessFiq+0x341>
+              Note: this causes a watschdogreset......
+      v75b10 - add ISR water switch stability
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333248
+                ESP8266-FreeHeap: 20256
+                bin : 333.248 , elf: 942.540
+              - adding fields waterErrorSwitch & conditions from v75g, is OK
+              - no problem, very stable as of start
+            - v75b10b add code in processHotLedRead() - testing field
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333280
+                ESP8266-FreeHeap: 20240
+                bin : 333.280 , elf: 942.588
+              - some minor instability sta start and somewhat more Recoveries ... 
+            - v75b10c adding DUMMYCODE3 improves things significantly, NO Z faults
+                bin : 333.344 , elf: 942.652
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333344
+                ESP8266-FreeHeap: 20240
+            - v75b10d adding DUMMYCODE4 few Z-faults, somewhat more Recoveries and a RX2 readmiss
+                bin : 333.408
+            - v75b10e adding DUMMYCODE5 few Z-faults, somewhat more Recoveries and a RX2 delayed after20
+                bin : 333.472
+            - v75b10f revert back to v75b10c only DUMMYCODE1+2+3 (some slow start to catchup), thereafter perfect
+                bin : 333.344
+                this version has #define DUMMYCODE3 which stabilises the v75b10b which had waterErrorSwitch
+                    code activated on routine bool processHotLedRead(bool notkeep_HoldState)
+            - v75b10g  - activating processHotLedRead() as with v75b10b
+                new base line as we cannot find sourcecode for v75b10b.....
+                Firmware version: p1-(Aug 12 2026 17:14:17).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333344
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+
+            - v75b10h  - removed #define DUMMYCODE3     - stable, with some minor Z's
+                Note: source/program is identical to P1Meter_v75b10f.ino_save
+                Firmware version: p1-(Aug 12 2026 17:27:21).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333280
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+
+            - v75b10i - removed #define DUMMYCODE2      - stable, with some more Z's
+                Firmware version: p1-(Aug 12 2026 17:35:57).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333216
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+
+            - v75b10j - removed #define DUMMYCODE1      -  undecided stable , have some retries
+                Firmware version: p1-(Aug 12 2026 17:43:12).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333152
+                ESP8266-FreeHeap: 20496
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+            - v75b10k - re-added DUMMYCODE1-3           -  very stable
+              Note: we still have de ISR water vibration problem !!!!
+              accidentally cleaned platform workspace, save binaries lost
+                Firmware version: p1-(Aug 12 2026 17:55:02).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333344
+                ESP8266-FreeHeap: 20240
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+            - v75b10l -  added DUMMYCODE4 check          -  partially stable, few Z errors
+                Firmware version: p1-(Aug 12 2026 22:23:31).
+                ESP8266-free-space: 2809856
+                ESP8266-sketch-size: 333408
+                ESP8266-FreeHeap: 20136                             
+                Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+                // now testing where DUMMYCODE4 changes by modifying one operand
+                // see analysis /home/pafoxp/code-P1Meter/p1-analyse-v74b10l.txt
+            reverted activae code back to 
+            - v75b10k - re-added DUMMYCODE1-3           -  very stable. Mark this to v75b branch
+
+*/
 
 /* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -79,6 +305,67 @@
 
 */
 
+/*
+  fyi:  The heap (at end and Stack at begin of free memory).
+  ESP.getFreeHeap() returns the available space in between the heap and the stack.
+
+  Static assigned RAM, 
+    wich contains the global and 'static' defined variables. 
+    It grows up from the bottom of RAM and is assigned during compiletime, and so 
+    the compiler can tell you how much space it occupies. 
+    Unfortunately this part is named 'dynamic RAM' in the IDE.
+
+  The Stack. ( Total stack size is only 4K.)
+    This area grows and shrinks when using function calls. 
+    It contains the return addresses and dynamic variables local to a function (created 
+    when calling the function and deleted with return). It is assigned downwards from 
+    the end of the RAM and grows with every function call and shrinks with the return.
+
+  The Heap. 
+    This is the RAM area between the statically assigned variables and the 
+    stack. RAM space assigned with 'new' and deleted with 'delete' is allocated in 
+    this area. It starts at the end of the static area and grows up - 
+    and must at no time come in conflict with the stack. The size of the heap is'nt really 
+    fixed, because the upper limit is defined by the lower limit of the stack, which is dynamic.
+
+    The heap is fully dynamic. 
+    a buffer related to an object may be moved (like the String class does when it runs out
+    of space) and this can cause fragmentation.
+
+
+  Depends on your program.
+       Only variables/memory you reserve with 'new' occupy heap space And 
+       also variables local to a function and the stack reduce the 'free' space.
+      If you define your arrays and structures global, the belong to the 'dynamic' memory.
+
+  Use the F() macro to save on RAM ?    s += F("Free memory: "); // This stores literals in progmem.
+
+  What really grinds my gears is that whenever I changed an absolutely insignificant thing, 
+  the problem seems to decrease. So I made conclusions which was always put back on the table... B
+  cause I didn't know the problem was much more fucked up than I though.
+
+  Recently I had a program running without less corrupted datas. I review my code and only add a 
+  Serial.println() in a unused function to debug a potential bug. By adding this line, I get a l
+  ot more corrupted data between ESP and SIM808. I reboot, same. I try to flash back the program without 
+  the Serial.println(), the problem disapear. I re-add this line, re-flash, the problem shows up again.
+  This Serial.println() wasn't even called in the boot process.
+  So in fact, I just changed 2 chars and it makes my whole program to be unstable.
+
+
+  There are 2 stacks: the sys and cont. https://github.com/esp8266/Arduino/issues/5148
+  The sys is used by the sdk, and is als the one in use in certain callbacks, like Ticker. 
+  The cont is the one used in our Arduino setup() and loop(), as well as all functions called from them.
+    The cont is 4KB in size, and used to be allocated on the heap. 
+  However, some research found that the sys stack is very big, something like 9 or 10KB, 
+    and most of it is unused after boot. 
+    So we moved the cont stack on top of the sys stack, and that frees up 4KB additional heap.
+    If you use wps in your project, this optimization is automagically reverted, 
+      and the cont stack goes back to heap. 
+      The reason for this is that wps seems to make large use of the sys stack.
+
+
+*/
+
 /* tbd 
   change record/idś to definitions like "/KFM5KAIFA-METER"
   change \r\n to \r\n to 
@@ -116,6 +403,13 @@
 
 
 /* change history
+  - v75c  - 13aug26 02u13 change to improve table fragmentation to prevent overflows.....
+          - perhaps we have overlows and our technique to surround with areas might not work.
+  - v75b  - stablised based on master
+  - v75a  - abandoned
+  - v75  - to master (11aug26)
+*/  
+/*  
   - v75  - stable for 1250 read and 50 errors of which Rcvr=360 and Elenght errors=19
   - v74  merged to maser.
   - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
@@ -474,8 +768,7 @@ woes in Wifi/Lamx layer
 #endif
 
 
-// ARDUINO_ESP8266_RELEASE
-/* ----------------------------------------------------------------------------------------------------------
+/* ARDUINO_ESP8266_RELEASE ------------------------------------------------------------------------------
 
   ident-  id  no Mode/settings wifi Pafo SSIDx ipaddress-device
   t... - "t1" 11 TEST_MODE test live at SSID5 192.168.1.125
@@ -520,6 +813,7 @@ woes in Wifi/Lamx layer
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
 
+/*
 // *
 // * * * * * L O G  B O O K
 // *
@@ -1115,9 +1409,9 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature DS18B20(&oneWire);
 int numberOfDsb18b20Devices;              // Number of temperature devices found
-DeviceAddress devAddr[ONE_WIRE_MAX_DEV];  // An array device temperature sensors
-float tempDev[ONE_WIRE_MAX_DEV];          // Saving the last measurement of temperature
-float tempDevLast[ONE_WIRE_MAX_DEV];      // Previous temperature measurement
+DeviceAddress devAddr[ONE_WIRE_MAX_DEV+1];  // An array device temperature sensors
+float tempDev[ONE_WIRE_MAX_DEV+1];          // Saving the last measurement of temperature
+float tempDevLast[ONE_WIRE_MAX_DEV+1];      // Previous temperature measurement
 long lastTempReadTime;                    // The last measurement
 const int durationTemp = 5000;            // The frequency of temperature measurement
 // -----------------------------------------
@@ -1204,7 +1498,7 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 // bool outputOnSerial  = true;    // "D" debug default output in Testmode
 // ---------------------------------------------------------------------------------------------------
 #define MASKING_LIMIT 18         // Number of masked positions after we sw
-// int  switchDebugCmd   = 0;       // execute a debug after a certain condition
+int  switchDebugCmd   = 0;       // execute a debug after a certain condition
                                  //  switchDebugCmd=1  onze execute t16 command after a _Z fault
 bool switchMaskingOut = true;    // every time we have an OK CRC out record we flipback the previously masked "X" position
 bool switchMaskingCmd = true;    // 'm' in/activate switchMaskingOut
@@ -1246,13 +1540,13 @@ bool validTelegramCRCFound  = false;     // Set by DdecodeTelegram if Message CR
 bool validTelegram2CRCFound = false;    // v46 Set by readTelegram2 to check validity of RX2 record
 // P1smartmeter timestate messages
 long currentTime   =  210402;        // Meter reading Electrics - datetime  0-0:1.0.0(180611210402S)
-char currentTimeS[] = "210401";      // same in String format time, will be overriden by Telegrams
-const char dummy5[] = {0x0000};    // prevent overwrite
+char currentTimeS[7] = "210401";      // same in String format time, will be overriden by Telegrams
+const char dummy5[2] = {0x0000};    // prevent overwrite
 
 // v45 below values from full record 
 long currentTime2    =  210402;       // Meter reading Electrics - datetime  0-0:1.0.0(180611210402S)
-char currentTimeS2[] = "210401";      // same in String format time, will be overriden by Telegrams
-const char dummy6[]  = {0x0000};      // prevent overwrite
+char currentTimeS2[7] = "210401";      // same in String format time, will be overriden by Telegrams
+const char dummy6[2]  = {0x0000};      // prevent overwrite
 long powerConsumptionLowTariff2  = 0; // Meter reading Electrics - consumption low tariff in watt hours
 long powerConsumptionHighTariff2 = 0; // Meter reading Electrics - consumption high tariff  in watt hours
 long powerProductionLowTariff2   = 0; // Meter reading Electrics - return low tariff  in watt hours
@@ -1283,6 +1577,10 @@ bool preserve_lightReadState_for_mqtt  = LOW;      // v70a preserve Highest Ledl
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
+int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
+     #define WATER_ERROR_SWITCH_ok      0x0f  // v75 <= 0x0F we have no faults
+     #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off
+     #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
 long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
@@ -1331,12 +1629,15 @@ int filteredValueAdc = 0; // average between previous and and published
     Global variables use 33044 bytes (40%) of dynamic memory, leaving 48876 bytes for local variables. Maximum is 81920 bytes.
 */
 
+#ifdef DUMMYTABLE_LENGTH
+char dummyTable[DUMMYTABLE_LENGTH];       // v75b7 enforce memory reservation.....
+#endif
 
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
 // char dummy2[17];       // add some spare bytes, v55b remove
 // const char dummy2a[] = {0x0000};    // prevent overwrite, v55b remove
 char telegram[MAXLINELENGTH+32];       // telegram maxsize bytes for P1 meter
-char telegramLast[3];               // used to catch P1meter line termination bracket
+char telegramLast[3+13];               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
 //DebugCRC int  testTelegramPos  = 0;          // where are we
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
@@ -1493,9 +1794,29 @@ void command_testH6(){    // v57c-2
 
 }
 
+
+/*
+// Doest not work on our platformio, lild error.
+// ESP getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) Arduino esp8266 core: 2_4_1
+
+extern "C"
+{
+#include <cont.h>
+	extern cont_t* g_pcont;
+	void DebugFreeStack()
+	{
+		register uint32_t *sp asm("a1");
+		int freestack = 4 * (sp - g_pcont->stack);
+		// Serial.printf("current free stack = %d\n", freestack);
+		Serial.printf("%d", freestack);
+	}
+}
+*/
+
 void setup()
 {
     asm(".global _printf_float");            // include floating point support
+
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
 // used for debug diagnostics wifi but gpio5 does not monitor wifi in Arduino/NONOS
 //  #ifdef COP_MODE           // set for Arduino to prevent default production compilation
@@ -1807,6 +2128,10 @@ void setup()
   Serial.println ("ESP8266-sdk-version: "+  String(ESP.getSdkVersion()));
   Serial.println ("ESP8266-getChipId: "+    String(ESP.getChipId()));             // sudden crash...
   Serial.println ("ESP8266-FreeHeap: "+     String(ESP.getFreeHeap()));
+    // Serial.println ("ESP.getFreeContStack: "+ String(ESP.getFreeContStack()));      // v75b4 (2.4.1) // 2.4.2 function
+  // Serial.print ("ESP.getFreeContStack: "); DebugFreeStack(); Serial.print ("\r\n"); // v75b4 local implmentation
+  
+  
 
   /*
     Print whih RX read we are using
@@ -2714,7 +3039,63 @@ void loop()
 
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == VERBOSE_ON) Serial.print(">"); // exit loop to check if we have left the building
+   
+  /*
+    Enforce nulll operation tot generate code for using dummyTable as verboseleven will never be 999
+  */
+  /*
+      asm(
+        "NOP;"
+      );
+  */
+
+  #if(defined DUMMYCODE1)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[0] + dummyTable[1] ); // v75b7
+      #warning 1 extra dummy code
+  #endif
+  #if(defined DUMMYCODE2)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[1] + dummyTable[2] ); // v75b7
+      #warning 2 extra dummy code  
+  #endif
+  #if(defined DUMMYCODE3)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[2] + dummyTable[3] ); // v75b7
+      #warning 3 extra dummy code
+  #endif
+  #if(defined DUMMYCODE4)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+    /*
+        asm(
+        "NOP;"
+        "NOP;"
+        );
+    */        
+      if (verboseLevel == 998)  Serial.println((String) dummyTable[3] + dummyTable[4] ); // v75b7
+      #warning 4 extra dummy code
+  #endif
+  #if(defined DUMMYCODE5)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[4] + dummyTable[5] ); // v75b7
+      #warning 5 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE6)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[5] + dummyTable[6] ); // v75b7
+      #warning 6 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE7)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[6] + dummyTable[7] ); // v75b7
+      #warning 7 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE8)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[7] + dummyTable[8] ); // v75b7
+      #warning 8 extra dummy code      
+  #endif
+  #if(defined DUMMYCODE9)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
+      if (verboseLevel > 999)  Serial.println((String) dummyTable[9] + dummyTable[9] ); // v75b7
+      #warning 9 extra dummy code  
+  #endif
+
+  
+
 }
+
 
 /* 
   Reconnect lost mqtt connection
@@ -2990,7 +3371,7 @@ void readTelegramP1() {
                   switchDebugCmd = 0;               // v74 reset this condition
                   Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
                   serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                  // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
+                  outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
               }
               */
           } else {
@@ -4218,7 +4599,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                      }
 
                  } // note: actual number of bytes is < MAXLINELENGT up to byte '!'
-            /*
+
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
                     outputOnSerial  = true;  // v74e activate debugging
@@ -4229,7 +4610,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                     outputOnSerial  = true;  // v74e activate debugging                    
                     Serial.print((String) "_te2_"); 
                  }
-            */
+
             else if ((char)payload[1] == 's') {
                       Serial.println((String)"\n\rT-imer Porstate: ");
                       printf_port_state_isr();
@@ -4258,7 +4639,10 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
           Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
           Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-          Serial.println((String)"e 1/2 force exception ( heap:"+ ESP.getFreeHeap() +")" );   // v52: display FreeHeap
+          Serial.println((String)"e 1/2 force exception "
+                          + "( heap:" + ESP.getFreeHeap() +")"
+                          // + "( stack:" + ESP.getFreeContStack() + ")"      // v75b4 (2.4.1) // 2.4.2 function
+                        );   // v52: display FreeHeap
           Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
           Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
                                     + " serial1=" +  serial1Baudrate
@@ -4271,8 +4655,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                                          + (blue_led2_HotWater ? "Y" : "N") );
           Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
                                                                   + ", mode:" + loopbackRx2Mode );
-          // Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
-          Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
+          Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
+          // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
           Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
@@ -4815,7 +5199,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
     try to reset this condition
   */
  
-  /* v74c_to_v75This corrupts...... the reading of rs232
+  // v75b10 12aug25 /* v74c_to_v75This corrupts...... the reading of rs232
   if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // we have an error on the water sensor 
       if (local_lightReadState) {
         if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
@@ -4826,7 +5210,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
         }
       }
   }
-  */ 
+  // v75b10 12aug26 */ 
 
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
@@ -6727,8 +7111,8 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp = 0UL;               // check duplicates          
-
+    unsigned long temp, temp0, temp1 = 0UL;               // check duplicates          
+    unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
     // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
@@ -6738,12 +7122,12 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + "\t-------------time:" + micros()
                   );
 
-    // print timer table, when in request > then buffer, skip this
-
-
-
-
-
+     // print timer table, when in request > then buffer, skip this
+      /*
+        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
+           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
+      */
+    // bm ----> print serial_Print_PeekBits bittime table
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {    
@@ -6758,13 +7142,13 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
        }
+       /*
+        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
+           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
 
-
-
-
-
-
-
+        Print time data Lines (position , mSec):
+        data  0 -    0.0000:C  /KFM5KAIFA-METER<|
+       */
 
       if ( (i % 8) == 0) {
           temp = mySerial1.peekBit(i);
@@ -6796,8 +7180,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
-    int temp0 = mySerial1.peekBit(0);  // get zero reference
-    int temp1 = temp0;                 // get zero reference
+    temp0 = mySerial1.peekBit(0);  // get zero reference
+    temp1 = temp0;                 // get zero reference
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
