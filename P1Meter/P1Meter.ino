@@ -408,8 +408,6 @@
   - v75b  - stablised based on master
   - v75a  - abandoned
   - v75  - to master (11aug26)
-*/  
-/*  
   - v75  - stable for 1250 read and 50 errors of which Rcvr=360 and Elenght errors=19
   - v74  merged to maser.
   - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
@@ -768,7 +766,8 @@ woes in Wifi/Lamx layer
 #endif
 
 
-/* ARDUINO_ESP8266_RELEASE ------------------------------------------------------------------------------
+// ARDUINO_ESP8266_RELEASE
+/* ----------------------------------------------------------------------------------------------------------
 
   ident-  id  no Mode/settings wifi Pafo SSIDx ipaddress-device
   t... - "t1" 11 TEST_MODE test live at SSID5 192.168.1.125
@@ -813,7 +812,6 @@ woes in Wifi/Lamx layer
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
 
-/*
 // *
 // * * * * * L O G  B O O K
 // *
@@ -1409,9 +1407,9 @@ unsigned int currentCRC = 0;    // add CRC routine to calculate CRC of data
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature DS18B20(&oneWire);
 int numberOfDsb18b20Devices;              // Number of temperature devices found
-DeviceAddress devAddr[ONE_WIRE_MAX_DEV+1];  // An array device temperature sensors
-float tempDev[ONE_WIRE_MAX_DEV+1];          // Saving the last measurement of temperature
-float tempDevLast[ONE_WIRE_MAX_DEV+1];      // Previous temperature measurement
+DeviceAddress devAddr[ONE_WIRE_MAX_DEV];  // An array device temperature sensors
+float tempDev[ONE_WIRE_MAX_DEV];          // Saving the last measurement of temperature
+float tempDevLast[ONE_WIRE_MAX_DEV];      // Previous temperature measurement
 long lastTempReadTime;                    // The last measurement
 const int durationTemp = 5000;            // The frequency of temperature measurement
 // -----------------------------------------
@@ -1540,13 +1538,13 @@ bool validTelegramCRCFound  = false;     // Set by DdecodeTelegram if Message CR
 bool validTelegram2CRCFound = false;    // v46 Set by readTelegram2 to check validity of RX2 record
 // P1smartmeter timestate messages
 long currentTime   =  210402;        // Meter reading Electrics - datetime  0-0:1.0.0(180611210402S)
-char currentTimeS[7] = "210401";      // same in String format time, will be overriden by Telegrams
-const char dummy5[2] = {0x0000};    // prevent overwrite
+char currentTimeS[] = "210401";      // same in String format time, will be overriden by Telegrams
+const char dummy5[] = {0x0000};    // prevent overwrite
 
 // v45 below values from full record 
 long currentTime2    =  210402;       // Meter reading Electrics - datetime  0-0:1.0.0(180611210402S)
-char currentTimeS2[7] = "210401";      // same in String format time, will be overriden by Telegrams
-const char dummy6[2]  = {0x0000};      // prevent overwrite
+char currentTimeS2[] = "210401";      // same in String format time, will be overriden by Telegrams
+const char dummy6[]  = {0x0000};      // prevent overwrite
 long powerConsumptionLowTariff2  = 0; // Meter reading Electrics - consumption low tariff in watt hours
 long powerConsumptionHighTariff2 = 0; // Meter reading Electrics - consumption high tariff  in watt hours
 long powerProductionLowTariff2   = 0; // Meter reading Electrics - return low tariff  in watt hours
@@ -1637,7 +1635,7 @@ char dummyTable[DUMMYTABLE_LENGTH];       // v75b7 enforce memory reservation...
 // char dummy2[17];       // add some spare bytes, v55b remove
 // const char dummy2a[] = {0x0000};    // prevent overwrite, v55b remove
 char telegram[MAXLINELENGTH+32];       // telegram maxsize bytes for P1 meter
-char telegramLast[3+13];               // used to catch P1meter line termination bracket
+char telegramLast[3];               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
 //DebugCRC int  testTelegramPos  = 0;          // where are we
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
