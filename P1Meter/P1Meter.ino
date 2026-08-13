@@ -3,10 +3,10 @@
 #define DEBUG_ESP_OOM 1          // v75b5  playing around
 
 // v75c keep below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 for stability.
-#define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
-#define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
-#define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
-#define DUMMYCODE3    // v75b10f v75b10c  for adding dummy code to end of loop{}
+// #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
+// #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
+// #define DUMMYCODE3    // v75b10f v75b10c  for adding dummy code to end of loop{}
 // #define DUMMYCODE4    // v75b10c  for adding dummy code to end of loop{}
 // #define DUMMYCODE5    // v75b10c  for adding dummy code to end of loop{}
 // #define DUMMYCODE6    // v75b7  for adding dummy code to end of loop{}
@@ -19,8 +19,23 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75c" // number this version 11aug26 (master, rebaed from stable v74)
-/* v75c code documentation
+#define VERSION_NUMBER "75d" // number this version 11aug26 (master, rebased from stable v74)
+/* code documentation 75d 75c
+      v75d 13aug26 initial version - improved on buffers, deactivated DUMMYTABLE_LENGTH & DUMMYCODE1-3, looks stable.
+          Firmware version: p1-(Aug 13 2026 12:29:47).                                            
+          ESP getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
+          Arduino esp8266 core: 2_4_1                                                           
+          ESP8266-free-space: 2809856                                                           
+          ESP8266-sketch-size: 333200                                                            
+          ESP8266-FreeHeap: 20288                           
+      v75c 13aug26 initial version    - DUMMYTABLE_LENGTH & DUMMYCODE1-3 (without buffer/field changes)
+        Firmware version: p1-(Aug 13 2026 03:55:28).
+        ESP getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
+        ESP8266-free-space: 2809856
+        ESP8266-sketch-size: 333392
+        ESP8266-FreeHeap: 19928
+        Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
+        fault 275/3036 elen: 216 recover 1202
 */
 /* v75b code documentation
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master

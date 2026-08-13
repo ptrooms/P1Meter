@@ -1,5 +1,5 @@
 /*
-   v75c - malloc() changed calloc() for initialisation
+   v75d - malloc() changed calloc() for initialisation
          - tables have somewhat moere ending space to prevent overflows
          - if port is closed the destory routine will print a message.
    v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
