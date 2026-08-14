@@ -27,11 +27,11 @@
     | DUMMY_SWITCHCMD_Z2  = 333.216  problem startting & z-faults
     & DUMMY_SWITCHCMD_Z2  = 333.264  heavy Z-faults
   */
-  // #define DUMMY_SWITCHCMD_Z   // use/activate code to start debug printing after a Z_ read fault
-  // #define DUMMY_SWITCHCMD_Z0  // use/activate within switchSerialDebug If condition
+  #define DUMMY_SWITCHCMD_Z   // use/activate code to start debug printing after a Z_ read fault
+  #define DUMMY_SWITCHCMD_Z0  // use/activate within switchSerialDebug If condition
                                 // else without Z1 and Z2: switchDebugCmd = 0
-  // #define DUMMY_SWITCHCMD_Z1  // use/activate within switchSerialDebug Serial.print((String) "\r\n Z fault ");
-  // #define DUMMY_SWITCHCMD_Z2  // use/activate within switchSerialDebug serial_Print_PeekBits(1, 1024);
+  #define DUMMY_SWITCHCMD_Z1  // use/activate within switchSerialDebug Serial.print((String) "\r\n Z fault ");
+  #define DUMMY_SWITCHCMD_Z2  // use/activate within switchSerialDebug serial_Print_PeekBits(1, 1024);
   // --------------------------------------------------------------------------------------------------------------
   // stable with NOP's on  without: 333.216 and DUMMY_SWITCHCMD_Z:333.568  delta 352 of wich 2 slack
   //    in between less stable to very unstable
@@ -39,7 +39,7 @@
   #define DUMMY_SWITCHCMD_R   // add 80bytes use/activate code to start debug printing after a R_ recovery fault
 //  eof test & investigage intability at switchDebugCmd in readTelegramP1() v75d
 
-// #define DUMMY_CNTHEAP 0  // v75d1 test cntHeapStart/Finish definition 0 / 1-loop{}start  / 2loop{}end / 3-both
+#define DUMMY_CNTHEAP 0  // v75d1 test cntHeapStart/Finish definition 0 / 1-loop{}start  / 2loop{}end / 3-both
                             // as to date executing ESP.getFreeHeap() leads to instability at using rs232
   // cntHeapFinish && cntHeapStart are now laways defined, extra code soze = 
 // below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 to test insert/code stability. v75c keep 
@@ -2715,7 +2715,7 @@ void loop()
   // cntHeapStart++;
   // cntHeapFinish++;
   #if defined(DUMMY_CNTHEAP) && ( DUMMY_CNTHEAP == 1 || DUMMY_CNTHEAP == 3 )
-    NOP_MACRO512  // try if this stabilises
+    // NOP_MACRO512  // try if this stabilises
     #warning Using DUMMY_CNTHEAP  begin of loop
     cntHeapStart = ESP.getFreeHeap();   // v75d1 start
     // cntHeapStart++;
@@ -3184,7 +3184,7 @@ void loop()
 
   #if defined(DUMMY_CNTHEAP) && ( DUMMY_CNTHEAP == 2 || DUMMY_CNTHEAP == 3)    
    #warning Using DUMMY_CNTHEAP  end of loop
-   NOP_MACRO512  // try if this stabilises
+   // NOP_MACRO512  // try if this stabilises
    cntHeapFinish = ESP.getFreeHeap();    // v75d1, fubar
     // cntHeapStart++;
     // cntHeapFinish++; // v75d1
@@ -3468,8 +3468,8 @@ void readTelegramP1() {
         allowOtherActivities = true;      // v56c resume finished processing of this P1 record.
 
         #ifndef DUMMY_SWITCHCMD_Z   // if not testing for override space
-                NOP_MACRO354              // insert 2+352 NOP's
-                NOP_MACRO512              // insert 512 NOP's
+                // NOP_MACRO354              // insert 2+352 NOP's
+                // NOP_MACRO512              // insert 512 NOP's
         #endif
         // NOP_MACRO354               // insert 2+352 NOP's
 
