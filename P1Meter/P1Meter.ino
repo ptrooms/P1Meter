@@ -41,6 +41,7 @@
 
 // #define DUMMY_CNTHEAP 0  // v75d1 test cntHeapStart/Finish definition 0 / 1-loop{}start  / 2loop{}end / 3-both
                             // as to date executing ESP.getFreeHeap() leads to instability at using rs232
+  // cntHeapFinish && cntHeapStart are now laways defined, extra code soze = 
 // below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 to test insert/code stability. v75c keep 
 // #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
 // #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
@@ -1561,11 +1562,11 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 #define VERBOSE_ON   1    // tbd
 #define VERBOSE_OFF  0    // tbd
 #ifdef TEST_MODE
-  bool outputOnSerial  = true;    // "D" debug default output in Testmode
-  int  verboseLevel    = VERBOSE_MQTT;
+  bool volatile outputOnSerial  = true;    // "D" debug default output in Testmode
+  int  volatile verboseLevel    = VERBOSE_MQTT;
 #else
-  bool outputOnSerial  = false;   // "D" No debug default output in production
-  int  verboseLevel    = VERBOSE_P1;       // Verbose level, all messages
+  bool volatile outputOnSerial  = false;   // "D" No debug default output in production
+  int  volatile verboseLevel    = VERBOSE_P1;       // Verbose level, all messages
 #endif
 
 
@@ -1581,9 +1582,9 @@ int  switchDebugCmd   = 0;       // execute a debug after a certain condition
 bool switchMaskingOut = true;    // every time we have an OK CRC out record we flipback the previously masked "X" position
 bool switchMaskingCmd = true;    // 'm' in/activate switchMaskingOut
 int  setMaskLimitCnt  = 18;      // number of mask poisition in masking array, per default this will reset.
-bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
-bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
-bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
+volatile bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
+volatile bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
+volatile bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
 int  loopbackRx2Mode  = 0;       // '0' Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc, 6=print
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
@@ -1659,7 +1660,7 @@ int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering
      #define WATER_ERROR_SWITCH_ok      0x0f  // v75 <= 0x0F we have no faults
      #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off
      #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
-long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
+volatile long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
 bool waterReadState    = LOW; // switchsetting
@@ -2711,6 +2712,8 @@ void setup()
 
 void loop()
 { 
+  // cntHeapStart++;
+  // cntHeapFinish++;
   #if defined(DUMMY_CNTHEAP) && ( DUMMY_CNTHEAP == 1 || DUMMY_CNTHEAP == 3 )
     NOP_MACRO512  // try if this stabilises
     #warning Using DUMMY_CNTHEAP  begin of loop
@@ -3192,8 +3195,9 @@ void loop()
           "NOP;"
           );
     */
-  #endif   
+  #endif  
 
+  // cntHeapFinish++;
 }
 
 
@@ -3280,6 +3284,7 @@ void readTelegramP1() {
 
   unsigned long p1Debounce_time = millis() - p1TriggerTime;		// mSec - p1TriggerTime  set by this() and updated while reading P1 data
   
+  // cntHeapStart++; // test 14aug26_13u43 what it does
   
 
   if (p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
@@ -3710,6 +3715,7 @@ void readTelegramP1() {
     }
   } // while serial available
   // Serial.println("startend..");
+  // cntHeapFinish++; // test 14aug26_13u43 what it does
 } // void readTelegram
 
 
@@ -6409,7 +6415,8 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
 */
 bool CheckData()        // 
 {
-
+  // long local_cntHeapStart     = 0; 
+  // local_cntHeapStart++; // test 14aug26_13u43 what it does
   if (firstRun)  {      // at start initialise and set olddata to new data
     SetOldValues();
     firstRun = false;
@@ -6417,6 +6424,7 @@ bool CheckData()        //
   }
 
   if (outputMqttLog) {  // if we LOG status old values not yet set
+    // local_cntHeapStart++;
     // char msgpub[MAXLINELENGTH];
     char output[MAXLINELENGTH];
     memset(output, 0, sizeof(output));      // init v55b
@@ -6507,11 +6515,13 @@ bool CheckData()        //
     char output[32];     // use snprintf to format data
     memset(output, 0, sizeof(output));      // init v55b
     String msg = "";      // initialise data
+    // String msg = "local_cntHeapStart: %lu, ";      //  test 14aug26_13u43 what it does
     msg.concat("CurrentPowerConsumption: %lu");       // format data
     // rm char msgpub[32];     // allocate a message buffer    
     // rm msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
     // rm sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
     sprintf(output, msg.c_str(), CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    // sprintf(output, msg.c_str(), local_cntHeapStart, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
     // rm if (client.connected()) client.publish(mqttPower, output);  
     publishMqtt(mqttPower, output);  // publish outputpower
   }
