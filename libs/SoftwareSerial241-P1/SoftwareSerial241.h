@@ -237,14 +237,14 @@ private:
    int m_rxPin, m_txPin, m_txEnablePin;
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
-   bool m_invert;
+   volatile  bool m_invert;
    #ifdef RXREAD58
-      bool m_P1active;                 // Ptro 28mar21 to support P1 messageing 
+      volatile bool m_P1active;        // v75d ,  Ptro 28mar21 to support P1 messageing 
    #else
       volatile bool m_P1active;        // Ptro 28mar21 to support P1 messageing, volatile v59b used in ISR
    #endif
    bool m_port_state;               // v59 contains status of (in)activated ISR
-   bool m_overflow;        // volatile v59b , used in ISR
+   volatile  bool m_overflow;        // volatile v59b , used in ISR
    volatile unsigned long m_bitTime;  // volatile v60a, used in ISR
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
@@ -254,22 +254,22 @@ private:
    #else
       volatile unsigned int m_inPos, m_outPos;
    #endif
-   int m_buffSize;
-   uint8_t *m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
+   volatile int m_buffSize;
+   uint8_t * volatile m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
-   unsigned long *m_buffer_bits;         // 4096-value time-array  index m_inPos, m_outPos;
-   unsigned int m_buffer_bits_inPos;        // position in buffer
-   unsigned int m_buffer_bits_outPos;        // position in buffer
+   unsigned long * volatile m_buffer_bits;         // 4096-value time-array  index m_inPos, m_outPos;
+   volatile unsigned int m_buffer_bits_inPos;        // position in buffer
+   volatile unsigned int m_buffer_bits_outPos;        // position in buffer
    
-   int          m_buffer_bitValue;       // Last time detected index by 
+   volatile int          m_buffer_bitValue;       // Last time detected index by 
    
-   unsigned long *m_buffer_time;         // time-array
-   unsigned int m_buffer_timePos;        // position in buffer
+   unsigned long * volatile m_buffer_time;         // time-array
+   volatile unsigned int m_buffer_timePos;        // position in buffer
    
       
    // unsigned long m_wait = m_bitTime + m_bitTime/3 - 500;
    // 497-501-505 // 425 115k2@80MHz 
-   unsigned long m_wait; 
+   volatile unsigned long m_wait; 
 
    bool m_d4_isr_state;        // v61b track ISR state
 

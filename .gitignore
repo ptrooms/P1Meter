@@ -43,6 +43,8 @@ platformio_P1Meter_cenv.ini
 telegram0crlf.txt
 # my local save/play files
 p1-analyse-*.txt
+# no objects
+*.o
 
 ## local ######
 *.ods#

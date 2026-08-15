@@ -1,8 +1,48 @@
 
-#define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
-#define DEBUG_ESP_OOM 1          // v75b5  playing around
+// #define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
+// #define DEBUG_ESP_OOM 1          // v75b5  playing around
 
-// v75c keep below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 for stability.
+
+/*  sof test & investigage intability at switchDebugCmd function in readTelegramP1() v75d
+  // ---------------------------------------------------------------------------------------------test switches
+  debug analysis why code runs untable if these are/used activated in readTelegramP1() line 3437
+      test logic.
+             z0    if (switchDebugCmd == 1) {            // v74 add fault analysis
+             !z0-3       switchDebugCmd = 0;               // v74 reset this condition
+             z1          Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
+             z2          serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                       // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
+                   }
+  switch usage v75d1 (set 3 character >> 75x << to eliminate extra bytes when using 75d1.... )
+  
+  none = 333.200 almost no read faults.....  2 errors to 100  size 333.200
+    DUMMY_SWITCHCMD_Z   = 333.264 add  64 adds major errors
+    DUMMY_SWITCHCMD_R   = 333.280 add  80 bytes tbd 
+    DUMMY_SWITCHCMD_Z+R = 333.328 add 128 frequent Z-fault starts to appear (4 in 10 records
+  
+  // code initial without Z testing Initial 333.200 without R
+    DUMMY_SWITCHCMD_Z     = 333.200  (only do switchDebugCmd = 0;)  1:10 2:10  good
+    + DUMMY_SWITCHCMD_Z0  = 333.200  optimized without Z1/Z2/ (null if) runs OK
+    | DUMMY_SWITCHCMD_Z1  = 333.248  initial Z-faults & more
+    | DUMMY_SWITCHCMD_Z2  = 333.216  problem startting & z-faults
+    & DUMMY_SWITCHCMD_Z2  = 333.264  heavy Z-faults
+  */
+  #define DUMMY_SWITCHCMD_Z   // use/activate code to start debug printing after a Z_ read fault
+  #define DUMMY_SWITCHCMD_Z0  // use/activate within switchSerialDebug If condition
+                                // else without Z1 and Z2: switchDebugCmd = 0
+  #define DUMMY_SWITCHCMD_Z1  // use/activate within switchSerialDebug Serial.print((String) "\r\n Z fault ");
+  #define DUMMY_SWITCHCMD_Z2  // use/activate within switchSerialDebug serial_Print_PeekBits(1, 1024);
+  // --------------------------------------------------------------------------------------------------------------
+  // stable with NOP's on  without: 333.216 and DUMMY_SWITCHCMD_Z:333.568  delta 352 of wich 2 slack
+  //    in between less stable to very unstable
+  // --------------------------------------------------------------------------------------------------------------
+  #define DUMMY_SWITCHCMD_R   // add 80bytes use/activate code to start debug printing after a R_ recovery fault
+//  eof test & investigage intability at switchDebugCmd in readTelegramP1() v75d
+
+#define DUMMY_CNTHEAP 0  // v75d1 test cntHeapStart/Finish definition 0 / 1-loop{}start  / 2loop{}end / 3-both
+                            // as to date executing ESP.getFreeHeap() leads to instability at using rs232
+  // cntHeapFinish && cntHeapStart are now laways defined, extra code soze = 
+// below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 to test insert/code stability. v75c keep 
 // #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
 // #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
 // #define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
@@ -13,14 +53,24 @@
 // #define DUMMYCODE7    // v75b7  for adding dummy code to end of loop{}
 // #define DUMMYCODE8    // v75b7  for adding dummy code to end of loop{}
 // #define DUMMYCODE9    // v75b7  for adding dummy code to end of loop{}
-
+// -------------------------------------------------------------------------------------------------test switches
 
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75d" // number this version 11aug26 (master, rebased from stable v74)
-/* code documentation 75d 75c
+#define VERSION_NUMBER "75e" // number this version 11aug26 (master, rebased from stable v74)
+/* code documentation 75e 75d 75c
+      v75e  15aug26 - improved visulisation of datatables
+        - errorwater switch function, holduntil hotwater is tapped
+        - chanmged tez/ter functionlity details.
+        - adding visulalisation in Serial_Print_PeekBits(1, 1024); to
+        - detect corrupted RS232 data *a-g* in telegram.
+      v75d  14aug26 - solved instbility by using volatiles on variables used in ISR
+        - re-added improved printed RS232 timetable
+        - re-added switchDebugCommand function (print table after a R or Z fault)
+        - mentioned in https://gathering.tweakers.net/forum/list_message/85928530
+      v75d1 13aug26 reactivated switchDebugCmd , to check stability..... after improvement of 75d=master
       v75d 13aug26 initial version - improved on buffers, deactivated DUMMYTABLE_LENGTH & DUMMYCODE1-3, looks stable.
           Firmware version: p1-(Aug 13 2026 12:29:47).                                            
           ESP getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
@@ -1274,6 +1324,40 @@ woes in Wifi/Lamx layer
 // D9   = 2;
 // D10  = 2;
 
+#define NOP_MACRO354 asm( \   // used to seprrate function in switchcmd......
+              "NOP;NOP;" \ //  32
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  32
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  64
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  96
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 128
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 160
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 196
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 224
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 256
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 288
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 320
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 352
+  );
+
+#define NOP_MACRO512 asm( \   // used to seprate functions......
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  64
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  96
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 128
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 160
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 196
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 224
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 256
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  64
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  96
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 128
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 160
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 196
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 224
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 256
+  );
+
 const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
 
 #ifndef ARDUINO_ESP8266_RELEASE 
@@ -1487,25 +1571,29 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 #define VERBOSE_ON   1    // tbd
 #define VERBOSE_OFF  0    // tbd
 #ifdef TEST_MODE
-  bool outputOnSerial  = true;    // "D" debug default output in Testmode
-  int  verboseLevel    = VERBOSE_MQTT;
+  bool volatile outputOnSerial  = true;    // "D" debug default output in Testmode
+  int  volatile verboseLevel    = VERBOSE_MQTT;
 #else
-  bool outputOnSerial  = false;   // "D" No debug default output in production
-  int  verboseLevel    = VERBOSE_P1;       // Verbose level, all messages
+  bool volatile outputOnSerial  = false;   // "D" No debug default output in production
+  int  volatile verboseLevel    = VERBOSE_P1;       // Verbose level, all messages
 #endif
 
 
 // bool outputOnSerial  = true;    // "D" debug default output in Testmode
 // ---------------------------------------------------------------------------------------------------
 #define MASKING_LIMIT 18         // Number of masked positions after we sw
+#if defined(DUMMY_CNTHEAP)     // v75testing
+  long cntHeapStart     = 0;       // v75d1 heap at start of loop()
+  long cntHeapFinish    = 0;       // v75d1 heap at finish of loop()
+#endif
 int  switchDebugCmd   = 0;       // execute a debug after a certain condition
                                  //  switchDebugCmd=1  onze execute t16 command after a _Z fault
 bool switchMaskingOut = true;    // every time we have an OK CRC out record we flipback the previously masked "X" position
 bool switchMaskingCmd = true;    // 'm' in/activate switchMaskingOut
 int  setMaskLimitCnt  = 18;      // number of mask poisition in masking array, per default this will reset.
-bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
-bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
-bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
+volatile bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
+volatile bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
+volatile bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
 int  loopbackRx2Mode  = 0;       // '0' Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc, 6=print
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
@@ -1577,11 +1665,12 @@ bool preserve_lightReadState_for_mqtt  = LOW;      // v70a preserve Highest Ledl
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
-int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
+volatile int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
      #define WATER_ERROR_SWITCH_ok      0x0f  // v75 <= 0x0F we have no faults
-     #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off
+     #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off was activated
+     #define WATER_ERROR_SWITCH_done    0x02  // v75    0x02 = error has been displayed
      #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
-long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
+volatile long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
 bool waterReadState    = LOW; // switchsetting
@@ -2633,6 +2722,15 @@ void setup()
 
 void loop()
 { 
+  // cntHeapStart++;
+  // cntHeapFinish++;
+  #if defined(DUMMY_CNTHEAP) && ( DUMMY_CNTHEAP == 1 || DUMMY_CNTHEAP == 3 )
+    // NOP_MACRO512  // try if this stabilises
+    #warning Using DUMMY_CNTHEAP  begin of loop
+    cntHeapStart = ESP.getFreeHeap();   // v75d1 start
+    // cntHeapStart++;
+  #endif   
+  
   if (verboseLevel == VERBOSE_ON) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
   // note this loop( ) routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
@@ -2961,6 +3059,8 @@ void loop()
       // report to error mqtt, // V20 candidate for a callable error routine
       // tbd: consider to NOT send values
       // char mqttOutput[128]; // v51 not used as we do 
+      // v75d1: Long term fix - Don't use String class
+
       String mqttMsg = "{";  // start of Json
       mqttMsg.concat("\"error\":001 ,\"msg\":\"P1 rj11 serial not reading\""); 
       // String mqttMsg = "Error, "; // build mqtt frame 
@@ -3039,7 +3139,7 @@ void loop()
 
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == VERBOSE_ON) Serial.print(">"); // exit loop to check if we have left the building
-   
+
   /*
     Enforce nulll operation tot generate code for using dummyTable as verboseleven will never be 999
   */
@@ -3060,7 +3160,7 @@ void loop()
   #if(defined DUMMYCODE3)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
       if (verboseLevel > 999)  Serial.println((String) dummyTable[2] + dummyTable[3] ); // v75b7
       #warning 3 extra dummy code
-  #endif
+  #endif  
   #if(defined DUMMYCODE4)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
     /*
         asm(
@@ -3068,7 +3168,7 @@ void loop()
         "NOP;"
         );
     */        
-      if (verboseLevel == 998)  Serial.println((String) dummyTable[3] + dummyTable[4] ); // v75b7
+      if (verboseLevel == 999)  Serial.println((String) dummyTable[3] + dummyTable[4] ); // v75b7
       #warning 4 extra dummy code
   #endif
   #if(defined DUMMYCODE5)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
@@ -3092,8 +3192,22 @@ void loop()
       #warning 9 extra dummy code  
   #endif
 
-  
+  #if defined(DUMMY_CNTHEAP) && ( DUMMY_CNTHEAP == 2 || DUMMY_CNTHEAP == 3)    
+   #warning Using DUMMY_CNTHEAP  end of loop
+   // NOP_MACRO512  // try if this stabilises
+   cntHeapFinish = ESP.getFreeHeap();    // v75d1, fubar
+    // cntHeapStart++;
+    // cntHeapFinish++; // v75d1
+    // cntHeapFinish = 0; // v75d1
+    /*
+          asm(
+          "NOP;"
+          "NOP;"
+          );
+    */
+  #endif  
 
+  // cntHeapFinish++;
 }
 
 
@@ -3179,10 +3293,14 @@ void doCritical() {
 void readTelegramP1() {
 
   unsigned long p1Debounce_time = millis() - p1TriggerTime;		// mSec - p1TriggerTime  set by this() and updated while reading P1 data
-  // if (p1SerialActive && p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
+  
+  // cntHeapStart++; // test 14aug26_13u43 what it does
+  
+
   if (p1Debounce_time > p1TriggerDebounce ) { // debounce_time (mSec
     // yield();                // allow time to others
     mqtt_local_yield();
+    asm("NOP;"); // test
     if (outputOnSerial) {   // indicate on console
       Serial.print((String) " !!>" + millis() + " yield due " + p1TriggerTime + "< exceeded !!" ); // myLength processed previous line
     }
@@ -3359,6 +3477,12 @@ void readTelegramP1() {
         // print validity status of processed for debug reasons.
         allowOtherActivities = true;      // v56c resume finished processing of this P1 record.
 
+        #ifndef DUMMY_SWITCHCMD_Z   // if not testing for override space
+                // NOP_MACRO354              // insert 2+352 NOP's
+                // NOP_MACRO512              // insert 512 NOP's
+        #endif
+        // NOP_MACRO354               // insert 2+352 NOP's
+
         Serial.print((String) (telegram_errIn_cnt > 0 ? '-' : '_'));
         if (validTelegramCRCFound) {
               Serial.print((String) "C");      // print checked OK _C -C
@@ -3366,25 +3490,201 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) "R");  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
-              /*
-              if (switchDebugCmd == 2) {            // v74 add fault analysis
-                  switchDebugCmd = 0;               // v74 reset this condition
-                  Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
-                  serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                  outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
-              }
-              */
+              #if defined(DUMMY_SWITCHCMD_R) // v75d1 test              
+                 if (switchDebugCmd == 2) {            // v74 add fault analysis
+                     switchDebugCmd = 0;               // v74 reset this condition
+                     Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
+                     // serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                     serial_Print_PeekBits(1,(-2 * MAXLINELENGTH)); // print mask compare
+                     serial_Print_PeekBits(1, 1024);       // print time table  
+                     serial_Print_PeekBits(1, 2048);       // print diff table
+                     // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
+                 }                    
+             #endif
           } else {
               Serial.print((String) "Z");  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
-              /*
-              if (switchDebugCmd == 1) {            // v74 add fault analysis
-                  // switchDebugCmd = 0;               // v74 reset this condition
-                  Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
-                  serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                  // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
-              }
-              */
+              #if defined(DUMMY_SWITCHCMD_Z) // v75d1 test              
+                 #if defined(DUMMY_SWITCHCMD_Z0) // v75d1 test
+                   if (switchDebugCmd == 1 || switchDebugCmd == 2) {            // v74 add fault analysis
+                 #else
+                    #ifndef DUMMY_SWITCHCMD_Z1
+                        #ifndef DUMMY_SWITCHCMD_Z2
+                          // NOP translates tp 16bit version NOP.N = 0xF03D
+                        
+                          // object  /home/pafoxp/code-P1Meter/P1Meter.ino.cpp_335.616.o
+                          // 0x0f9d4 - 0x1033C = 2408 --> 1204 instructions
+                          // Binary size 335.616 /home/pafoxp/code-P1Meter/firmware_335.616.bin
+                          // 0x00A7E0  3902 3DFO 3DFO 3DFO    3DFO 3DFO 3DFO 3DFO
+                          // 0x00B140  3DFO 3DFO 3DFO 217A    DE22 0200 DC72 2167
+                          // betwee 0x00B14C - 0x00A7E2 = 2410 --> 1+1204  NOP.N = 0xF03D
+
+                          asm(                    // + 8*2 bytes
+                          //  333.568  320/ 160 NOP's 
+                          //  333.248  32
+                          //  333.216  8 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
+                          //  333.216  5 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
+                          //  333.216  3 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
+                          //  333.216  2 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
+
+                          //  333.200  1 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
+                          //  333.200  NO DUMMY_SWITCHCMD_Z 
+                            "NOP;"   // 333.216   // Z-errors
+                            "NOP;"   // 333.216
+
+                            // 11 NOP/line  333.216 --> 333.568  -/-352  (stable)
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+                            
+                            // 10 NOP/line  333.216 --> 333.536  -/-320  3i/0s/2z/2r of 20
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+                            
+                            //  8 NOP/line  333.216 --> 333.472  -/-256  0i/2s/1z/3r of  27
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+
+                            //  7 NOP/line  333.216 --> 333.440  -/-224  0i/1s/3z/4r of  27
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+                            
+                            //  6 NOP/line  333.216 --> 333.408  -/-192  0i/6s/1z/3r of  27
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+                            
+                            //  5 NOP/line  333.216 --> 333.376  -/-160  0i/1s/1z/3r of  27
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+                            
+                            //  4 NOP/line  333.216 --> 333.344  -/-128  0i/5s/3z/6r of 27
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+                            
+                            //  4 NOP/line  333.216 --> 333.312  -/- 96  0i/10s/2z/4r of 27
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+
+                            //  4 NOP/line  333.216 --> 333.280  -/- 64  0i/4s/0z/9r of 29
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+
+                            //  4 NOP/line  333.216 --> 333.216  -/- 32  0i/10s/3z/4r of 28
+                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
+
+                            //  333.200  without 2Nops 0i/2s/0z/5r of 34  very stable
+                            // "NOP;NOP;"
+
+                            // adding block to (slack 333.200+2) base version 333.216 total size 333.568, very stable
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 288
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 320
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 352
+
+                          /* 
+                            // massive blocks to check where this is shown in object
+
+                            // add 256 333.824 stable
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256                            
+                            // add 256 334.080 stable
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256                            
+
+
+                            // add 334.592 stable 512
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
+
+
+                            // add 335.616 stable 1024
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
+                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
+                          */
+
+                          );
+                          // switchDebugCmd = 0;               // v74 reset this condition
+                          // #error ddddd
+                        #endif
+                    #endif
+                 #endif
+                      #if defined(DUMMY_SWITCHCMD_Z1) // v75d1 test              
+                        Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
+                      #endif
+                      #if defined(DUMMY_SWITCHCMD_Z2) // v75d1 test
+                         serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                       #endif
+                       // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable
+                 #if defined(DUMMY_SWITCHCMD_Z0) // v75d1 test
+                   }
+                 #endif
+
+               /**/
+              #else
+                  /// NOP_MACRO354               // insert 2+352 NOP's
+                  if (switchDebugCmd == 1) {            // v74 add fault analysis
+                     // NOP_MACRO354               // insert 2+352 NOP's
+                     // NOP_MACRO512               // insert 512 NOP's
+                     // switchDebugCmd = 0;               // v74 reset this condition
+                     Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
+                     serial_Print_PeekBits(1, 1024);   // v74 print timetable after this fault
+                     // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable
+                   }
+              #endif
           } 
         }
 
@@ -3428,6 +3728,7 @@ void readTelegramP1() {
     }
   } // while serial available
   // Serial.println("startend..");
+  // cntHeapFinish++; // test 14aug26_13u43 what it does
 } // void readTelegram
 
 
@@ -4371,19 +4672,25 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       */
 
     } else  if ((char)payload[0] == 'W') {
-      useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
-      detachWaterInterrupt();
       // detachInterrupt(WATERSENSOR_READ); // disconnect ISR
-      waterTriggerTime = micros();       // set our time
-      // waterTriggerCnt  = 1;              // indicate we are in detached mode
-      if (outputOnSerial) {
-        Serial.print("useWaterTrigger1=");
-        if (useWaterTrigger1) {
-          Serial.print("ON .");
-          // attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // trigger at every change
-        } else {
-          Serial.print("OFF .");
-          // attachInterrupt(WATERSENSOR_READ,  WaterTrigger_ISR, CHANGE); // trigger at every change
+      if       ((char)payload[1] == '0') waterErrorSwitch  = 0;                           // v75d 15aug26 reset state
+      else  if ((char)payload[1] == '1') {
+          waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop;  // v75d 15aug26 set ISR
+          detachWaterInterrupt();                          // v75d deactivate water trigger
+      } else {
+        useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
+        detachWaterInterrupt();
+        waterTriggerTime = micros();       // set our time
+        // waterTriggerCnt  = 1;              // indicate we are in detached mode
+        if (outputOnSerial) {
+          Serial.print("useWaterTrigger1=");
+          if (useWaterTrigger1) {
+            Serial.print("ON .");
+            // attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // trigger at every change
+          } else {
+            Serial.print("OFF .");
+            // attachInterrupt(WATERSENSOR_READ,  WaterTrigger_ISR, CHANGE); // trigger at every change
+          }
         }
       }
 
@@ -4460,22 +4767,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
          + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
          + " som>>");
       switchMaskingOut = false;
-      Serial.print((String) "\r\nsI=0\t");   // initialise
-      for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
-        if (isprint(telegram_crcIn[cnt])) {             // if printable
-            Serial.print(telegram_crcIn[cnt]);
-        } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
-            Serial.print("_");
-        } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
-            Serial.print((String) "\r\n"+ cnt +"\t>");
-        } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
-            Serial.print("|");
-            // break;
-        } else  {
-            Serial.print("?");                    // unprintable
-        }
-      }
-      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+      printCrcInTable();    // v74g split to subroutine 
     } else  if ((char)payload[0] == 'M') {       // v48 10jun25 print M-asking array
       
       if ((char)payload[1] == '+') setMaskLimitCnt++ ;                            // increase Mask limiter
@@ -4492,22 +4784,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
          + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
          + " Elen=" + p1ShortCnt                    // v74 number of errors length Input != Mask
          + " som>>");
-      Serial.print((String) "\r\nsM=0\t");   // initialise
-      for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
-        if (isprint(telegram_crcOut[cnt])) {             // if printable
-            Serial.print(telegram_crcOut[cnt]);
-        } else if (telegram_crcOut[cnt] == '\x0d') {     // carriage return
-            Serial.print("_");
-        } else if (telegram_crcOut[cnt] == '\x0a') {     // linefeed
-            Serial.print((String) "\r\n"+ cnt +"\t>");
-        } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
-            Serial.print("|");
-            // break;
-        } else  {
-            Serial.print("?");                    // unprintable
-        }
-      }
-      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+      printcrcOutTable();    // v74g split to subroutine          
     
     } else  if ( (char)payload[0] == 'S') {  // v52 serial stop activating P1
         if  (    (char)payload[1] == '0') p1SerialActive = !p1SerialActive;   // set number myself
@@ -4602,12 +4879,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
 
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
-                    outputOnSerial  = true;  // v74e activate debugging
+                    // outputOnSerial  = true;  // v74e activate debugging
                     Serial.print((String) "_te1_"); 
                  }
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'r' ) {   // v74 set error exection condition
                     switchDebugCmd = 2;                       // v74 execute t16 when we have a _R fault condition
-                    outputOnSerial  = true;  // v74e activate debugging                    
+                    // outputOnSerial  = true;  // v74e activate debugging                    
                     Serial.print((String) "_te2_"); 
                  }
 
@@ -4626,7 +4903,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             else                                 serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
 
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
-          Serial.println((String)"\r\n? Help commands"  + __FILE__ 
+          Serial.println((String)"\r\n? (bell) \a Help commands"  + __FILE__ 
                                                         + " version " + DEF_PROG_VERSION 
                                                         + ", compiled " __DATE__ + " " + __TIME__ );
           // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
@@ -4657,7 +4934,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                                   + ", mode:" + loopbackRx2Mode );
           Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
           // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
-          Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
+          Serial.println((String)"W on/OFF Watertrigger1 (Err="+waterErrorSwitch+") :" + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
           Serial.println((String)"Z zero counters " + 
@@ -4847,7 +5124,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // msg.concat(", \"Version\":1.3a }");
     msg.concat(", \"mqttCnt\":%u");      // as of 19nov19 include our message counter, v72 keep field name
 
-    msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
+    // msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
+    msg.concat( ((waterErrorSwitch != 0) ? "\", !WaterSwitch\":%u" : ", \"WaterSwitch\":%u")); // v75e 15aug26 print not sign in case of active error switch
 
     if (loopbackRx2Tx2) {
       msg.concat(", \"WaterTst\":%u");       // as of 25mar21 Use this Json to indicate Testmode
@@ -4938,7 +5216,10 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             // GasConsumption;
             mqttCnt_Out,                    // mqtt counter
 
-            waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
+            // waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
+            ((waterErrorSwitch != 0) ? waterErrorSwitch : waterReadState),    // v75e 15aug26 print active error switch
+
+
             waterReadCounter,           // Watersensor state 21mar21 number falldowns
             waterReadHotCounter,        // Watersensor state 26mar21 number during Hotwater
             HeatFlowConsumption,        // v39 28feb23 show HeatFlowConsumption RX2
@@ -5188,25 +5469,35 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
   process / hold Ledlightstatus indicating if Hotwater was tapped during this P1 interval
     LOW  = read (hold) state
     HIGH = reset/renew until LOW
-*/
+    processHotLedRead 
+    */
 bool processHotLedRead(bool notkeep_HoldState) {
   bool local_lightReadState = false;
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
-  else local_lightReadState = false; // read D6 and keep until mqtt
+  else local_lightReadState = false; // read D6 and keep until mqtt ( <== LedLight is ON)
 
   /*
-    when water ISR routine is disabled and hot is turned on, perhas the water sensor is more stable
+    when water ISR routine is disabled and hot is turned on, perhaps the water sensor is more stable
     try to reset this condition
   */
  
-  // v75b10 12aug25 /* v74c_to_v75This corrupts...... the reading of rs232
-  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // we have an error on the water sensor 
-      if (local_lightReadState) {
-        if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
-          waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;   // try to reset
-          waterErrorSwitch |=  WATER_ERROR_SWITCH_hoton;     // indicate we have ON activated
-        } else {
-          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // switch off hoton
+  // n/a v74c_to_v75This  /v74f could corrupts, however later on we suspect printf() doing this in ICACHE
+  if ( !(waterErrorSwitch & ~WATER_ERROR_SWITCH_ok)) {     // v74f we no problems with water sensor
+         waterErrorSwitch &= ~WATER_ERROR_SWITCH_done;     // v75e reset done 
+         waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // v75e reset hoton
+  } else {                                                 // v74f we have/had vibration on, try to re-initialise
+      if (!(waterErrorSwitch & WATER_ERROR_SWITCH_done)) {
+        if (outputOnSerial) Serial.print((String) "WaterErrorISR!!"); // v74f
+        else Serial.print((String) "!W"); 
+        waterErrorSwitch |=  WATER_ERROR_SWITCH_done;     // v75e indicate we have reported this
+      }
+
+      if (!local_lightReadState) {        // led light == ON
+        if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) { // Was HOTON inactive (while LED is on) ?
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;         // try to reset ISR fault
+          waterErrorSwitch |=  WATER_ERROR_SWITCH_hoton;           // indicate we have retry activated during 1st Hot water tapping
+        } else {                                                // /else HOTON active (while LED is on) ? 
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;           // switch off hoton retry (2cnd time we tap hotwater)
         }
       }
   }
@@ -6127,7 +6418,8 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
 */
 bool CheckData()        // 
 {
-
+  // long local_cntHeapStart     = 0; 
+  // local_cntHeapStart++; // test 14aug26_13u43 what it does
   if (firstRun)  {      // at start initialise and set olddata to new data
     SetOldValues();
     firstRun = false;
@@ -6135,6 +6427,7 @@ bool CheckData()        //
   }
 
   if (outputMqttLog) {  // if we LOG status old values not yet set
+    // local_cntHeapStart++;
     // char msgpub[MAXLINELENGTH];
     char output[MAXLINELENGTH];
     memset(output, 0, sizeof(output));      // init v55b
@@ -6225,11 +6518,13 @@ bool CheckData()        //
     char output[32];     // use snprintf to format data
     memset(output, 0, sizeof(output));      // init v55b
     String msg = "";      // initialise data
+    // String msg = "local_cntHeapStart: %lu, ";      //  test 14aug26_13u43 what it does
     msg.concat("CurrentPowerConsumption: %lu");       // format data
     // rm char msgpub[32];     // allocate a message buffer    
     // rm msg.toCharArray(msgpub, MAXLINELENGTH);                     // move it to format buffwer
     // rm sprintf(output, msgpub, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
     sprintf(output, msg.c_str(), CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
+    // sprintf(output, msg.c_str(), local_cntHeapStart, CurrentPowerConsumption); // insert datavalue  (Note if using multiple values use snprint)
     // rm if (client.connected()) client.publish(mqttPower, output);  
     publishMqtt(mqttPower, output);  // publish outputpower
   }
@@ -6414,16 +6709,17 @@ void processTemperatures() {
   ISR read water sensor on default pin grpio4 and respect debouncetime approx 40mSec
 */
 void attachWaterInterrupt() {   // activate waterinerrupt sensor
-  if (useWaterTrigger1) {
-    attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
-    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
-  } else {
-    attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
-    if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
+  if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_isrLoop)) { ; // v74d prevent error loop and delay until hot water is used
+      if (useWaterTrigger1) {
+        attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // establish trigger
+        if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to second WaterTrigger1_ISR routine");
+      } else {
+        attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, CHANGE); // establish trigger
+        if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR_READ + " to first WaterTrigger0_ISR routine");
+      }
+      waterTriggerCnt = 1;          // indicate ISR has been activated
+    }
   }
-  waterTriggerCnt = 1;          // indicate ISR has been activated
-}
-
 /*
   ISR Detach WATERSENSOR_READ interrupt , setting waterTriggerCnt to 0
 */
@@ -6472,6 +6768,7 @@ void WaterTrigger0_ISR()
           if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
             detachWaterInterrupt();
             Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+            waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used
             // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
             // waterTriggerState = LOW;      // v41 v47 force to low to ease things
           }
@@ -6516,6 +6813,7 @@ void WaterTrigger1_ISR()
         if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           Serial.print( (String) ", Detach>200WaterISR1="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used          
           // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
           // waterTriggerState = LOW;      // v41 v47 force to low to ease things
         }
@@ -6553,6 +6851,7 @@ void WaterTrigger2_ISR()
         if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           if (outputOnSerial) Serial.print( (String) ", Detach>100WaterISR2"+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+          waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used          
           // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
           // waterTriggerState = LOW;      // v41 v47 force to low to ease things
         }
@@ -7111,12 +7410,12 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp, temp0, temp1 = 0UL;               // check duplicates          
+    unsigned long temp,tempc1,tempc2,tempc3,tempc4 = 0UL;               // check duplicates          
     unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
     // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
-    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
+    Serial.print((String) "\r\n Print bitTimeA ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial1.peekBitPos()
                   + "\t-------------time:" + micros()
@@ -7128,31 +7427,118 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
            0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
       */
     // bm ----> print serial_Print_PeekBits bittime table
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
+    bool tmpdataFaultDetected = false;   // v75d on/off previous data contained Hash$gfault (character a-h)
+    
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {  // print bitTimeA character field
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
-      if (i > 0) {    
-
+      if (i > 0) {
+          Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
           temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
+          tempc1 = temp;
+          tempc2 = temp / 10000;
+          tempc3 = temp / 100000000;
           if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
                  temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
-                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
-                                  Serial.printf("\t%4d~" , temp     );      // variation
-          else  if (temp <= 9999) Serial.printf("\t%4d " , temp     );      // normal
-          else                    Serial.printf("\t_%3d " , temp/1000);      // excessive
+                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) ) tempc1 = temp;
+          else if (temp <= 9999)    tempc1 = temp  ;     // normal
+          else if (temp <= 9999999) tempc1 = tempc2;      // large
+          else                      tempc1 = tempc3;      // excessive
+          Serial.printf("%4d "  , tempc1);
+
+          /* These codeslocks, commented below to achieve column formatted printing below will corrupt somehwere 
+              
+              so we use bove a more elementary approach.
+              */
+
+                /*
+                  serials maps to /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/HardwareSerial.h
+                    --> extern HardwareSerial Serial; using tx pin etc.etc
+
+                  note printf() uses:
+                        size_t Print::print(const Printable& x) {
+                          return x.printTo(*this);
+                        }
+
+                  esp8266 uses: /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/libc_replacements.c
+                      int ICACHE_RAM_ATTR printf(const char* format, ...) {
+                          va_list arglist;
+                          va_start(arglist, format);
+                          int ret = ets_vprintf(ets_putc, format, arglist);
+                          va_end(arglist);
+                          return ret;
+                      }
+                */
+
+                // using localised variables, rs232 code still unstable
+                /* 
+                  if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
+                        temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                        temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+                                            Serial.print((String) temp  );     // variation                 
+                  else  if (temp <= 9999)    Serial.print((String) temp  );     // normal
+                  else  if (temp <= 9999999) Serial.print((String) tempc1);      // large
+                  else                       Serial.print((String) tempc2);      // excessive
+
+                */
+
+                // adding large formatted division, code unstable 
+                /*
+                                            Serial.printf("%4d~"  , temp     );     // variation                 
+                  else  if (temp <= 9999)    Serial.printf("%4d "  , temp     );     // normal
+                  else  if (temp <= 9999999) Serial.printf("_%3d " , tempc1);      // large
+                  else                       Serial.printf("__%2d ", tempc2);      // excessive
+                */
+
+                // using localised varibales,  code unstable
+                /* 
+                                Serial.printf("%4d~" , temp     );      // variation
+                  else  if (temp <= 9999) Serial.printf("%4d " , temp     );      // normal
+                  else  if (temp <= 9999999) Serial.printf("_%3d "  , tempc1   );      // large
+                  else                       Serial.printf("__%2d " , tempc2   );      // excessive
+                */
+
+                // original: < v74 no problem
+                /*
+                                          Serial.printf("%4d~" , temp     );      // variation
+                  else  if (temp <= 9998) Serial.printf("%3d " , temp     );      // normal
+                  else  if (temp <= 9999) Serial.printf("%3d " , temp/10  );      // normal
+                  else                    Serial.printf("_%2d " , temp/1000);      // excessive
+                  
+                */
+
+                //  wanted function, code corrupts
+                /*
+                                          Serial.printf("%4d~" , temp     );      // variation
+                  else  if (temp <= 9999) Serial.printf("%4d " , temp     );      // normal
+                  else  if (temp <= 9999999) Serial.printf("_%3d " , temp/10000     );      // large
+                  else                       Serial.printf("__%2d " , temp/100000000);      // excessive
+          */
 
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
-       }
-       /*
-        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
-           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
+          // if (mySerial1.peekByte(i-1) >= 'a'  && mySerial1.peekByte(i-1) <= 'f' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+        }
 
-        Print time data Lines (position , mSec):
-        data  0 -    0.0000:C  /KFM5KAIFA-METER<|
-       */
+
+      /* Print bitTime (694) sequences  serial port=1 #Inpos=781        -------------time:308199325
+            0=>  2.028.991.592 #         0 >     6864 /  6944 K  6928 F  6928 M  6928 5  6944 K  6928 A  6944 I  (l=   55408)
+            8=>  2.029.047.000 #     55408 >     6928 F  6928 A  6928 -  6944 M  6928 E  6928 T  6944 E  6928 R  (l=   55456)
+          ...
+          328=>  2.062.091.592 #  33100000 >     6928 .  6944 0  6928 (  6928 1  6928 0  7742 ) 66130 f  6928 0  (l=   55456) #
+          768=>  2.108.522.232 #  79530640 >     6928 *  6928 k  6944 W  6928 )  6928 <    31 |  6880 !  6944 B  (l=  366768)
+          ...
+          776=>  2.108.889.000 #  79897408 >     6928 0  6992 6  6880 E  6928 <    23 |  69
+      */
 
       if ( (i % 8) == 0) {
           temp = mySerial1.peekBit(i);
-
+          if (i > 0) {
+              Serial.printf("\t(l=%8d)", (temp - mySerial1.peekBit(i-8) ) ); // finish previous line with total)
+              if (tmpdataFaultDetected) {
+                  Serial.print(" #"); // finish line v75d indicate possible datafault  
+                  tmpdataFaultDetected = false;   // v75d reset fault error switch
+              }
+              // if (!(mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g') ) tmpdataFaultDetected = false;  // v75d indicate possible datafault
+           }              
 
           // Serial.print((String) "\r\n" + i + "="); 
           Serial.printf("\r\n %3d=>", i);
@@ -7160,54 +7546,103 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           if (temp > 999999999UL) { Serial.printf("%3d", (temp / 1000000000UL)); temp = temp - ((temp / 1000000000UL) * 1000000000UL); 
                                     Serial.print("."); }
                                else Serial.print( "    ");
-          if (temp >    999999UL) { Serial.printf("%3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
+          if (temp >    999999UL) { Serial.printf("%.3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
                                     Serial.print("."); }
                                else Serial.print( "    ");
-          if (temp >       999UL) { Serial.printf("%3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
+          if (temp >       999UL) { Serial.printf("%.3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
                                     Serial.print("."); }
                                else Serial.print( "    ");
-                                    Serial.printf("%3d", (temp));
-          Serial.print("> ");
-
+                                    Serial.printf("%.3d", (temp));
+          // Serial.print("> ");
+          Serial.printf(" #%10d >",( mySerial1.peekBit(i) - temp0s));
 
           // mySerial1.peekBit(i) + "> " );  // next line time
        }
 
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
+      if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
     }
 
    
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
-    temp0 = mySerial1.peekBit(0);  // get zero reference
-    temp1 = temp0;                 // get zero reference
+    int temp0 = mySerial1.peekBit(0);  // get zero reference
+    int temp1 = temp0;                 // get zero reference
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
+    /*
+          Print: input / mask /delta
+          data  0 -    0.0000:C  /KFM5KAIFA-METER<|
+          data000:m              /KFM5KAIFA-METER<|
+          data000:d (018
+          data018 -    1.4932:C  <|
+          data018:m              <|
+          data018:d (002)
+          data020 -   29.9280:C  1-3:0.2.8(42)<|
+          data020:m              1-3:0.2.8(42)<|
+          ...
+          data751 -  993.5988:C  1-0:22.7.0(0adaeadaeaead]hf| #
+          data751:m              1-0:22.7.0(00.000*kW)<|!____
+          data751:d (028)                    ^^^^^^^^^^^^^^^^
+    */
+    tmpdataFaultDetected = false;  // v75d indicate we have a possible datafault
     int j = 0;    // v61a: to print CRC character
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
-        if (i == 0)  Serial.printf("\r\n data%3d - %9.4f:C\t", i, (float) 0.0000);
-        else if (convert_p1_print( mySerial1.peekByte(i-1)) == '|' || convert_p1_print( mySerial1.peekByte(i-1)) == '!')
-                 Serial.printf("\r\n data%3d - %9.4f:C\t", i, 
+        /* A) print data input :
+            data  0 -    0.0000:C  /KFM5KAIFA-METER<|
+            data018 -    1.4924:C  <| 
+            data020 -   29.9194:C  1-3:0.2.8(42)<|
+            ...
+            data751 -  993.5988:C  1-0:22.7.0(0adaeadaeaead]hf| #
+            data774 -  998.6082:C  !
+
+        */
+        if (i == 0)  Serial.printf("\r\n dati%3d - %9.4f:C\t", i, (float) 0.0000);
+        else if (convert_p1_print( mySerial1.peekByte(i-1)) == '|' || convert_p1_print( mySerial1.peekByte(i-1)) == '!') {
+                 if (tmpdataFaultDetected) {
+                         Serial.print(" #"); // finish line v75d indicate possible datafault  
+                         tmpdataFaultDetected = false;
+                 }                  
+                 Serial.printf("\r\n dati%.3d - %9.4f:C\t", i, 
                       (float)((((mySerial1.peekBit(i) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
-
+        }
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
-
+        if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+        
         if (convert_p1_print( mySerial1.peekByte(i)) == '|' || convert_p1_print( mySerial1.peekByte(i)) == '!')  {   // check if we are going to new P1 record
+          
+          /* B) print masked line:
+                data000:m              /KFM5KAIFA-METER<|
+                data018:m              <|
+                ....
+                data035:m              0-0:1.0.0(26081423XXXXS)<|
+                ....
+                data751:m              1-0:22.7.0(00.000*kW)<|
+                data774:m              !
+                data775:m              ______                                                                                      
+          */
+
           int m_len = 0;                          //  count masked line length
-          if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare ?
+          if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare datM & datD
 
               // Serial.print((String) "\r\n dataM"+ j + ":\t");  
-              Serial.printf("\r\n data%3d:m\t\t", j);                  // print masked line 
+              Serial.printf("\r\n datm%.3d:m\t\t", j);                  // print masked line 
               
               for (int m = j; m <= i; m++ )  {
                   Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
                   m_len++;     // account this masked line length
               }
+              
+              /*  C) Print delta indications of input line and mask
+                          // Serial.print((String) "\r\n dataC"+ j + ":\t");  
 
-              // Serial.print((String) "\r\n dataC"+ j + ":\t");  
-              Serial.printf("\r\n data%3d:d (%3d)\t", j, m_len);                  // print differnce pointer lines
+                  data751:d (028)                    ^^^^^^^^^^^^^^^^
+                  data774:d (001
+                  data775:d (006)        ^^^^^^
+              */
+              Serial.printf("\r\n datd%.3d:d (%.3d)\t", j, m_len);                  // print differnce pointer lines
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
                 if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
                     telegram_crcOut[m] == 'X') 
@@ -7220,7 +7655,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           // Serial.printf("\r\n data%3d - %9.4f:C\t", (i+1), (float)(((mySerial1.peekBit(i+1) - temp0)*12.5)/1000000.0000) );
         }
         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
-    }     
+     }     
 
 
     /*
@@ -7305,7 +7740,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   if (bit_port == 2) {
     unsigned long temp = 0UL;    
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial2Baudrate;
-    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
+    Serial.print((String) "\r\n Print bitTimeCycle ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial2.peekBitPos()
                   + "-------------time:" + micros()
