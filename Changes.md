@@ -6,6 +6,11 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.75e] - work version, solved instability, improved data table print
+		- 14aug26 cause for instability was neglected compiler optimization in SoftwareSerial241.cpp
+		- improved data table printing Serial_Print_PeekBits()
+		- instability issue discussed on https://gathering.tweakers.net/forum/list_message/85928530 
+		-	- nice reply with hint & tips from @farlane
 ## [v21.75] - new master branch rebased from v74 that is stable
 		10aug26 will be used to continue new work changes
 		Note1: ../libs/SoftwareSerial241-P1/SoftwareSerial241.cpp has bit improvements and works OK
