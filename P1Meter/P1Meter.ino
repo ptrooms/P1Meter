@@ -62,8 +62,10 @@
 #define VERSION_NUMBER "75e" // number this version 11aug26 (master, rebased from stable v74)
 /* code documentation 75e 75d 75c
       v75e  15aug26 - improved visulisation of datatables
+        - errorwater switch function, holduntil hotwater is tapped
+        - chanmged tez/ter functionlity details.
         - adding visulalisation in Serial_Print_PeekBits(1, 1024); to
-            detect corrupted RS232 data *a-f* in telegram.
+        - detect corrupted RS232 data *a-g* in telegram.
       v75d  14aug26 - solved instbility by using volatiles on variables used in ISR
         - re-added improved printed RS232 timetable
         - re-added switchDebugCommand function (print table after a R or Z fault)
@@ -1665,8 +1667,8 @@ void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in 
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
 volatile int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
      #define WATER_ERROR_SWITCH_ok      0x0f  // v75 <= 0x0F we have no faults
-     #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off
-     #define WATER_ERROR_SWITCH_done    0x02  // v75    0x02 = error displayed
+     #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off was activated
+     #define WATER_ERROR_SWITCH_done    0x02  // v75    0x02 = error has been displayed
      #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
 volatile long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
@@ -3492,8 +3494,11 @@ void readTelegramP1() {
                  if (switchDebugCmd == 2) {            // v74 add fault analysis
                      switchDebugCmd = 0;               // v74 reset this condition
                      Serial.print((String) "\r\n R fault ");  // v52 count Recoveries _R -R
-                     serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                     outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
+                     // serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                     serial_Print_PeekBits(1,(-2 * MAXLINELENGTH)); // print mask compare
+                     serial_Print_PeekBits(1, 1024);       // print time table  
+                     serial_Print_PeekBits(1, 2048);       // print diff table
+                     // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
                  }                    
              #endif
           } else {
@@ -3501,7 +3506,7 @@ void readTelegramP1() {
               p1CrcFailCnt++ ;             // v52 count Crc fails
               #if defined(DUMMY_SWITCHCMD_Z) // v75d1 test              
                  #if defined(DUMMY_SWITCHCMD_Z0) // v75d1 test
-                   if (switchDebugCmd == 1) {            // v74 add fault analysis
+                   if (switchDebugCmd == 1 || switchDebugCmd == 2) {            // v74 add fault analysis
                  #else
                     #ifndef DUMMY_SWITCHCMD_Z1
                         #ifndef DUMMY_SWITCHCMD_Z2
@@ -3668,7 +3673,7 @@ void readTelegramP1() {
                    }
                  #endif
 
-              /**/
+               /**/
               #else
                   /// NOP_MACRO354               // insert 2+352 NOP's
                   if (switchDebugCmd == 1) {            // v74 add fault analysis
@@ -3676,7 +3681,7 @@ void readTelegramP1() {
                      // NOP_MACRO512               // insert 512 NOP's
                      // switchDebugCmd = 0;               // v74 reset this condition
                      Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
-                     serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
+                     serial_Print_PeekBits(1, 1024);   // v74 print timetable after this fault
                      // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable
                    }
               #endif
@@ -4874,12 +4879,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
 
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
-                    outputOnSerial  = true;  // v74e activate debugging
+                    // outputOnSerial  = true;  // v74e activate debugging
                     Serial.print((String) "_te1_"); 
                  }
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'r' ) {   // v74 set error exection condition
                     switchDebugCmd = 2;                       // v74 execute t16 when we have a _R fault condition
-                    outputOnSerial  = true;  // v74e activate debugging                    
+                    // outputOnSerial  = true;  // v74e activate debugging                    
                     Serial.print((String) "_te2_"); 
                  }
 
@@ -7410,7 +7415,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
     // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
-    Serial.print((String) "\r\n Print bitTime ("+ l_bitTime + ") sequences "+ 
+    Serial.print((String) "\r\n Print bitTimeA ("+ l_bitTime + ") sequences "+ 
                   + " serial port="+ bit_port 
                   + " #Inpos=" + mySerial1.peekBitPos()
                   + "\t-------------time:" + micros()
@@ -7423,7 +7428,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       */
     // bm ----> print serial_Print_PeekBits bittime table
     bool tmpdataFaultDetected = false;   // v75d on/off previous data contained Hash$gfault (character a-h)
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {
+    
+    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {  // print bitTimeA character field
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
           Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
@@ -7439,95 +7445,100 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           else                      tempc1 = tempc3;      // excessive
           Serial.printf("%4d "  , tempc1);
 
+          /* These codeslocks, commented below to achieve column formatted printing below will corrupt somehwere 
+              
+              so we use bove a more elementary approach.
+              */
 
-        /*
-          These codesblocks below to achieve column formatted printing below will corrupt somehwere 
-          so we use bove a more elementary approach.
-        */
+                /*
+                  serials maps to /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/HardwareSerial.h
+                    --> extern HardwareSerial Serial; using tx pin etc.etc
 
-       /*
-          serials maps to /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/HardwareSerial.h
-            --> extern HardwareSerial Serial; using tx pin etc.etc
+                  note printf() uses:
+                        size_t Print::print(const Printable& x) {
+                          return x.printTo(*this);
+                        }
 
-          note printf() uses:
-                size_t Print::print(const Printable& x) {
-                  return x.printTo(*this);
-                }
+                  esp8266 uses: /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/libc_replacements.c
+                      int ICACHE_RAM_ATTR printf(const char* format, ...) {
+                          va_list arglist;
+                          va_start(arglist, format);
+                          int ret = ets_vprintf(ets_putc, format, arglist);
+                          va_end(arglist);
+                          return ret;
+                      }
+                */
 
-          esp8266 uses: /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/libc_replacements.c
-              int ICACHE_RAM_ATTR printf(const char* format, ...) {
-                  va_list arglist;
-                  va_start(arglist, format);
-                  int ret = ets_vprintf(ets_putc, format, arglist);
-                  va_end(arglist);
-                  return ret;
-              }
-        */
+                // using localised variables, rs232 code still unstable
+                /* 
+                  if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
+                        temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                        temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+                                            Serial.print((String) temp  );     // variation                 
+                  else  if (temp <= 9999)    Serial.print((String) temp  );     // normal
+                  else  if (temp <= 9999999) Serial.print((String) tempc1);      // large
+                  else                       Serial.print((String) tempc2);      // excessive
 
-        // using localised variables, rs232 code still unstable
-        /* 
-          if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
-                 temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
-                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
-                                     Serial.print((String) temp  );     // variation                 
-          else  if (temp <= 9999)    Serial.print((String) temp  );     // normal
-          else  if (temp <= 9999999) Serial.print((String) tempc1);      // large
-          else                       Serial.print((String) tempc2);      // excessive
+                */
 
-        */
+                // adding large formatted division, code unstable 
+                /*
+                                            Serial.printf("%4d~"  , temp     );     // variation                 
+                  else  if (temp <= 9999)    Serial.printf("%4d "  , temp     );     // normal
+                  else  if (temp <= 9999999) Serial.printf("_%3d " , tempc1);      // large
+                  else                       Serial.printf("__%2d ", tempc2);      // excessive
+                */
 
-         // adding large formatted division, code unstable 
-         /*
-                                     Serial.printf("%4d~"  , temp     );     // variation                 
-          else  if (temp <= 9999)    Serial.printf("%4d "  , temp     );     // normal
-          else  if (temp <= 9999999) Serial.printf("_%3d " , tempc1);      // large
-          else                       Serial.printf("__%2d ", tempc2);      // excessive
-        */
+                // using localised varibales,  code unstable
+                /* 
+                                Serial.printf("%4d~" , temp     );      // variation
+                  else  if (temp <= 9999) Serial.printf("%4d " , temp     );      // normal
+                  else  if (temp <= 9999999) Serial.printf("_%3d "  , tempc1   );      // large
+                  else                       Serial.printf("__%2d " , tempc2   );      // excessive
+                */
 
-         // using localised varibales,  code unstable
-         /* 
-                        Serial.printf("%4d~" , temp     );      // variation
-          else  if (temp <= 9999) Serial.printf("%4d " , temp     );      // normal
-          else  if (temp <= 9999999) Serial.printf("_%3d "  , tempc1   );      // large
-          else                       Serial.printf("__%2d " , tempc2   );      // excessive
-        */
+                // original: < v74 no problem
+                /*
+                                          Serial.printf("%4d~" , temp     );      // variation
+                  else  if (temp <= 9998) Serial.printf("%3d " , temp     );      // normal
+                  else  if (temp <= 9999) Serial.printf("%3d " , temp/10  );      // normal
+                  else                    Serial.printf("_%2d " , temp/1000);      // excessive
+                  
+                */
 
-        // original: < v74 no problem
-         /*
-                                  Serial.printf("%4d~" , temp     );      // variation
-          else  if (temp <= 9998) Serial.printf("%3d " , temp     );      // normal
-          else  if (temp <= 9999) Serial.printf("%3d " , temp/10  );      // normal
-          else                    Serial.printf("_%2d " , temp/1000);      // excessive
-          
-        */
-
-        //  wanted function, code corrupts
-         /*
-                                  Serial.printf("%4d~" , temp     );      // variation
-          else  if (temp <= 9999) Serial.printf("%4d " , temp     );      // normal
-          else  if (temp <= 9999999) Serial.printf("_%3d " , temp/10000     );      // large
-          else                       Serial.printf("__%2d " , temp/100000000);      // excessive
-        */
+                //  wanted function, code corrupts
+                /*
+                                          Serial.printf("%4d~" , temp     );      // variation
+                  else  if (temp <= 9999) Serial.printf("%4d " , temp     );      // normal
+                  else  if (temp <= 9999999) Serial.printf("_%3d " , temp/10000     );      // large
+                  else                       Serial.printf("__%2d " , temp/100000000);      // excessive
+          */
 
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
-       }
+          // if (mySerial1.peekByte(i-1) >= 'a'  && mySerial1.peekByte(i-1) <= 'f' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+        }
 
 
-       /*
-        Print bitTime (694) sequences  serial port=1 #Inpos=280        -------------time:2003230034
-           0=>  2.941.984.346>  6883 /  6921 K  6933 F  6933 M  7167 5  6701~K  6933 A  6933 I
-
-        Print time data Lines (position , mSec):
-        data  0 -    0.0000:C  /KFM5KAIFA-METER<|
-       */
+      /* Print bitTime (694) sequences  serial port=1 #Inpos=781        -------------time:308199325
+            0=>  2.028.991.592 #         0 >     6864 /  6944 K  6928 F  6928 M  6928 5  6944 K  6928 A  6944 I  (l=   55408)
+            8=>  2.029.047.000 #     55408 >     6928 F  6928 A  6928 -  6944 M  6928 E  6928 T  6944 E  6928 R  (l=   55456)
+          ...
+          328=>  2.062.091.592 #  33100000 >     6928 .  6944 0  6928 (  6928 1  6928 0  7742 ) 66130 f  6928 0  (l=   55456) #
+          768=>  2.108.522.232 #  79530640 >     6928 *  6928 k  6944 W  6928 )  6928 <    31 |  6880 !  6944 B  (l=  366768)
+          ...
+          776=>  2.108.889.000 #  79897408 >     6928 0  6992 6  6880 E  6928 <    23 |  69
+      */
 
       if ( (i % 8) == 0) {
           temp = mySerial1.peekBit(i);
           if (i > 0) {
               Serial.printf("\t(l=%8d)", (temp - mySerial1.peekBit(i-8) ) ); // finish previous line with total)
-              if (tmpdataFaultDetected) Serial.print(" #"); // finish line v75d indicate possible datafault  
-              tmpdataFaultDetected = false;   // v75d reset fault error switch
-          }              
+              if (tmpdataFaultDetected) {
+                  Serial.print(" #"); // finish line v75d indicate possible datafault  
+                  tmpdataFaultDetected = false;   // v75d reset fault error switch
+              }
+              // if (!(mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g') ) tmpdataFaultDetected = false;  // v75d indicate possible datafault
+           }              
 
           // Serial.print((String) "\r\n" + i + "="); 
           Serial.printf("\r\n %3d=>", i);
@@ -7549,7 +7560,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
        }
 
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
-      if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'f' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+      if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
     }
 
    
@@ -7576,7 +7587,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           data751:m              1-0:22.7.0(00.000*kW)<|!____
           data751:d (028)                    ^^^^^^^^^^^^^^^^
     */
-    tmpdataFaultDetected = false;  // v75d indicate we have a posisble datafault
+    tmpdataFaultDetected = false;  // v75d indicate we have a possible datafault
     int j = 0;    // v61a: to print CRC character
     for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         /* A) print data input :
@@ -7588,20 +7599,19 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
             data774 -  998.6082:C  !
 
         */
-        if (i == 0)  Serial.printf("\r\n data%3d - %9.4f:C\t", i, (float) 0.0000);
+        if (i == 0)  Serial.printf("\r\n dati%3d - %9.4f:C\t", i, (float) 0.0000);
         else if (convert_p1_print( mySerial1.peekByte(i-1)) == '|' || convert_p1_print( mySerial1.peekByte(i-1)) == '!') {
-                 Serial.printf("\r\n data%.3d - %9.4f:C\t", i, 
+                 if (tmpdataFaultDetected) {
+                         Serial.print(" #"); // finish line v75d indicate possible datafault  
+                         tmpdataFaultDetected = false;
+                 }                  
+                 Serial.printf("\r\n dati%.3d - %9.4f:C\t", i, 
                       (float)((((mySerial1.peekBit(i) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
         }
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
+        if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
         
         if (convert_p1_print( mySerial1.peekByte(i)) == '|' || convert_p1_print( mySerial1.peekByte(i)) == '!')  {   // check if we are going to new P1 record
-          
-          if (tmpdataFaultDetected) {
-                  Serial.print(" #"); // finish line v75d indicate possible datafault  
-                  tmpdataFaultDetected = false;
-          }                  
-
           
           /* B) print masked line:
                 data000:m              /KFM5KAIFA-METER<|
@@ -7615,24 +7625,24 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           */
 
           int m_len = 0;                          //  count masked line length
-          if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare ?
+          if (bit_sequence > MAXLINELENGTH) {     // v61a  do we want to compare datM & datD
 
               // Serial.print((String) "\r\n dataM"+ j + ":\t");  
-              Serial.printf("\r\n data%.3d:m\t\t", j);                  // print masked line 
+              Serial.printf("\r\n datm%.3d:m\t\t", j);                  // print masked line 
               
               for (int m = j; m <= i; m++ )  {
                   Serial.print((char)convert_p1_print( telegram_crcOut[m]) );
                   m_len++;     // account this masked line length
               }
-
-              // Serial.print((String) "\r\n dataC"+ j + ":\t");  
-              /*  Pinrt delta indications of input line and mask
+              
+              /*  C) Print delta indications of input line and mask
+                          // Serial.print((String) "\r\n dataC"+ j + ":\t");  
 
                   data751:d (028)                    ^^^^^^^^^^^^^^^^
                   data774:d (001
                   data775:d (006)        ^^^^^^
               */
-              Serial.printf("\r\n data%.3d:d (%.3d)\t", j, m_len);                  // print differnce pointer lines
+              Serial.printf("\r\n datd%.3d:d (%.3d)\t", j, m_len);                  // print differnce pointer lines
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
                 if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
                     telegram_crcOut[m] == 'X') 
@@ -7645,7 +7655,6 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           // Serial.printf("\r\n data%3d - %9.4f:C\t", (i+1), (float)(((mySerial1.peekBit(i+1) - temp0)*12.5)/1000000.0000) );
         }
         if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
-        if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'f' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
      }     
 
 

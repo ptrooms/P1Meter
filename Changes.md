@@ -7,6 +7,14 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 ## [v21.75e] - work version, solved instability, improved data table print
+		- 15aug26 In case the water ISR overruns, we pause i until, hotwate is tapped.
+			hopefully this will move the the water-blinker away from vibration causing interrupts
+			Rhis is doen via mapping erroWaterSwitch conditions which is then also reports
+			on JSON !Waterswitch:int (0x10/error, 0x02 reported, 0x01 waiting for hoton))
+		- changed logic for errorSwitchdebug:
+				"ter" will report  any every Z with table until an error R error with details,
+				"tez""will continious report any Z-error.
+				Tot stop "Z"reporting, use er'which stops after the first Recovery error.
 		- 14aug26 cause for instability was neglected compiler optimization in SoftwareSerial241.cpp
 		- improved data table printing Serial_Print_PeekBits()
 		- instability issue discussed on https://gathering.tweakers.net/forum/list_message/85928530 
