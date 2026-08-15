@@ -1,6 +1,7 @@
-/*
-SoftwareSerial.h 05aug26 v74 using PROD_MODE which uses RXREAD58 with BITWAIT1 417 (leadtime to ISR)
+/* SoftwareSerial.h v76   - 15aug26 new master branch/*
+   v75e  - 15aug26 variables/pointers used in ISR, volatised to prevnet optimisation/corruption
    v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
+   v74   05aug26  using PROD_MODE which uses RXREAD58 with BITWAIT1 417 (leadtime to ISR)
 
 Note: RXREAD2 must tbe cached for bitbang in order to BitBank read the Warmtelink ().
       we can enforce this in code SoftwareSerial241.cpp but choose to do this here... in void()
