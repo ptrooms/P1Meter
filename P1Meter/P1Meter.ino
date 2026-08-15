@@ -1663,9 +1663,10 @@ bool preserve_lightReadState_for_mqtt  = LOW;      // v70a preserve Highest Ledl
 
 void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR;  // store the ISR prod routine in cache
 void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // store the ISR test routine in cache
-int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
+volatile int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering 
      #define WATER_ERROR_SWITCH_ok      0x0f  // v75 <= 0x0F we have no faults
      #define WATER_ERROR_SWITCH_hoton   0x01  // v75    0x01 = hot on/off
+     #define WATER_ERROR_SWITCH_done    0x02  // v75    0x02 = error displayed
      #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
 volatile long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
@@ -4666,19 +4667,25 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       */
 
     } else  if ((char)payload[0] == 'W') {
-      useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
-      detachWaterInterrupt();
       // detachInterrupt(WATERSENSOR_READ); // disconnect ISR
-      waterTriggerTime = micros();       // set our time
-      // waterTriggerCnt  = 1;              // indicate we are in detached mode
-      if (outputOnSerial) {
-        Serial.print("useWaterTrigger1=");
-        if (useWaterTrigger1) {
-          Serial.print("ON .");
-          // attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // trigger at every change
-        } else {
-          Serial.print("OFF .");
-          // attachInterrupt(WATERSENSOR_READ,  WaterTrigger_ISR, CHANGE); // trigger at every change
+      if       ((char)payload[1] == '0') waterErrorSwitch  = 0;                           // v75d 15aug26 reset state
+      else  if ((char)payload[1] == '1') {
+          waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop;  // v75d 15aug26 set ISR
+          detachWaterInterrupt();                          // v75d deactivate water trigger
+      } else {
+        useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
+        detachWaterInterrupt();
+        waterTriggerTime = micros();       // set our time
+        // waterTriggerCnt  = 1;              // indicate we are in detached mode
+        if (outputOnSerial) {
+          Serial.print("useWaterTrigger1=");
+          if (useWaterTrigger1) {
+            Serial.print("ON .");
+            // attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, CHANGE); // trigger at every change
+          } else {
+            Serial.print("OFF .");
+            // attachInterrupt(WATERSENSOR_READ,  WaterTrigger_ISR, CHANGE); // trigger at every change
+          }
         }
       }
 
@@ -4922,7 +4929,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                                                                   + ", mode:" + loopbackRx2Mode );
           Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
           // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
-          Serial.println((String)"W on/OFF Watertrigger1:"        + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
+          Serial.println((String)"W on/OFF Watertrigger1 (Err="+waterErrorSwitch+") :" + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
           Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
           Serial.println((String)"y print water debounce");
           Serial.println((String)"Z zero counters " + 
@@ -5112,7 +5119,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // msg.concat(", \"Version\":1.3a }");
     msg.concat(", \"mqttCnt\":%u");      // as of 19nov19 include our message counter, v72 keep field name
 
-    msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
+    // msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
+    msg.concat( ((waterErrorSwitch != 0) ? "\", !WaterSwitch\":%u" : ", \"WaterSwitch\":%u")); // v75e 15aug26 print not sign in case of active error switch
 
     if (loopbackRx2Tx2) {
       msg.concat(", \"WaterTst\":%u");       // as of 25mar21 Use this Json to indicate Testmode
@@ -5203,7 +5211,10 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             // GasConsumption;
             mqttCnt_Out,                    // mqtt counter
 
-            waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
+            // waterReadState,             // Watersensor counter 21mar21 0=LOW 1=HIGH
+            ((waterErrorSwitch != 0) ? waterErrorSwitch : waterReadState),    // v75e 15aug26 print active error switch
+
+
             waterReadCounter,           // Watersensor state 21mar21 number falldowns
             waterReadHotCounter,        // Watersensor state 26mar21 number during Hotwater
             HeatFlowConsumption,        // v39 28feb23 show HeatFlowConsumption RX2
@@ -5458,24 +5469,30 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
 bool processHotLedRead(bool notkeep_HoldState) {
   bool local_lightReadState = false;
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
-  else local_lightReadState = false; // read D6 and keep until mqtt
+  else local_lightReadState = false; // read D6 and keep until mqtt ( <== LedLight is ON)
 
   /*
-    when water ISR routine is disabled and hot is turned on, perhas the water sensor is more stable
+    when water ISR routine is disabled and hot is turned on, perhaps the water sensor is more stable
     try to reset this condition
   */
  
   // n/a v74c_to_v75This  /v74f could corrupts, however later on we suspect printf() doing this in ICACHE
-  if (waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) { // v74f we have/had vibration on the water sensor 
-      if (outputOnSerial) Serial.print((String) "WaterErrorISR!!"); // v74f
-      else Serial.print((String) "!W"); 
+  if ( !(waterErrorSwitch & ~WATER_ERROR_SWITCH_ok)) {     // v74f we no problems with water sensor
+         waterErrorSwitch &= ~WATER_ERROR_SWITCH_done;     // v75e reset done 
+         waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // v75e reset hoton
+  } else {                                                 // v74f we have/had vibration on, try to re-initialise
+      if (!(waterErrorSwitch & WATER_ERROR_SWITCH_done)) {
+        if (outputOnSerial) Serial.print((String) "WaterErrorISR!!"); // v74f
+        else Serial.print((String) "!W"); 
+        waterErrorSwitch |=  WATER_ERROR_SWITCH_done;     // v75e indicate we have reported this
+      }
 
-      if (local_lightReadState) {
-        if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) {
-          waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;   // try to reset
-          waterErrorSwitch |=  WATER_ERROR_SWITCH_hoton;     // indicate we have ON activated
-        } else {
-          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // switch off hoton
+      if (!local_lightReadState) {        // led light == ON
+        if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_hoton) ) { // Was HOTON inactive (while LED is on) ?
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_isrLoop;         // try to reset ISR fault
+          waterErrorSwitch |=  WATER_ERROR_SWITCH_hoton;           // indicate we have retry activated during 1st Hot water tapping
+        } else {                                                // /else HOTON active (while LED is on) ? 
+          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;           // switch off hoton retry (2cnd time we tap hotwater)
         }
       }
   }
