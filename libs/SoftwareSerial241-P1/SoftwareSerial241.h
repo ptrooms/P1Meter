@@ -1,4 +1,5 @@
 /* SoftwareSerial.h v76   - 15aug26 new master branch/*
+   v76   - 16aug26 volatile int m_rxPin, m_txPin, m_txEnablePin;
    v75e  - 15aug26 variables/pointers used in ISR, volatised to prevnet optimisation/corruption
    v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
    v74   05aug26  using PROD_MODE which uses RXREAD58 with BITWAIT1 417 (leadtime to ISR)
@@ -235,7 +236,7 @@ public:
 private:
    bool isValidGPIOpin(int pin);
    // Member variables
-   int m_rxPin, m_txPin, m_txEnablePin;
+   volatile int m_rxPin, m_txPin, m_txEnablePin;
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
    volatile  bool m_invert;

@@ -2,6 +2,7 @@
 // #define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
 // #define DEBUG_ESP_OOM 1          // v75b5  playing around
 
+// TBD https://github.com/hideakitai/DebugLog
 
 /*  sof test & investigage intability at switchDebugCmd function in readTelegramP1() v75d
   // ---------------------------------------------------------------------------------------------test switches
@@ -62,7 +63,10 @@
 #define VERSION_NUMBER "76" // number this version 11aug26 (master, rebased from stable v74)
 /* code documentation v76.... starting 15aug26
       v76 - 15aug26 new master brnach from v75e
-          - - comments & documentation idented so VSCode kan expand collapse sections
+          - simple hardware serial inpuit commands m/M input/masks, t-full timing table, d-debug
+              doCmdHelp() doCheckSerialInput()
+          - comments & documentation idented so VSCode better can expand collapse sections
+
 */
 
 /* code documentation 75e 75d 75c
@@ -2739,8 +2743,8 @@ void loop()
     cntHeapStart = ESP.getFreeHeap();   // v75d1 start
     // cntHeapStart++;
   #endif   
-  
-  if (verboseLevel == VERBOSE_ON) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
+
+   if (verboseLevel == VERBOSE_ON) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
   // note this loop( ) routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
@@ -2750,6 +2754,7 @@ void loop()
   previousMicros = currentMicros; // get V47 previous loop time
   currentMicros = micros(); // get current cycle time
 
+  // /*  v76 deactivate 
     // v58c: check if this stabilizes
     for (int i = 14; i < 11; i--) {
       asm(
@@ -2765,6 +2770,7 @@ void loop()
         "NOP;"
       );
     }
+  // */
 
   /*
     time how long the P1 record took
@@ -2867,6 +2873,9 @@ void loop()
                                                     // that reset
 
   } else {                         // else we are allowed to do other acivities
+
+    doCheckSerialInput();   // v76 process hardware serial input commands
+
     // if (loopbackRx2Mode == 3) Serial.print((String) loopbackRx2Mode 
     //         + (p1SerialFinish  ? "f" : "g")
     //         + (p1SerialActive  ? "a" : "b")
@@ -4912,120 +4921,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             else                                 serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
 
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
-          Serial.println((String)"\r\n? (bell) \a Help commands"  + __FILE__ 
-                                                        + " version " + DEF_PROG_VERSION 
-                                                        + ", compiled " __DATE__ + " " + __TIME__ );
-          // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
-          Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
-          Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
-          Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") Thermostate"  
-                                                    + (new_ThermostatState == 2 ? " <--" : "" ) );
-          Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
-                                                    + (new_ThermostatState == 3 ? " <--" : "" ) );
-          Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
-          Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
-          Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-          Serial.println((String)"e 1/2 force exception "
-                          + "( heap:" + ESP.getFreeHeap() +")"
-                          // + "( stack:" + ESP.getFreeContStack() + ")"      // v75b4 (2.4.1) // 2.4.2 function
-                        );   // v52: display FreeHeap
-          Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-          Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
-                                    + " serial1=" +  serial1Baudrate
-                                    + " serial2=" +  serial2Baudrate);
-          Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
-          Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-          Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
-          Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
-                                                                         + (blue_led2_Water ? "Y" : "N") 
-                                                                         + (blue_led2_HotWater ? "Y" : "N") );
-          Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
-                                                                  + ", mode:" + loopbackRx2Mode );
-          Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
-          // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
-          Serial.println((String)"W on/OFF Watertrigger1 (Err="+waterErrorSwitch+") :" + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
-          Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
-          Serial.println((String)"y print water debounce");
-          Serial.println((String)"Z zero counters " + 
-                + "(mqtt=" + mqttCnt_Out              // v63 Output count
-                + " cmd=" + mqttCnt_In            // v72 display input number
-                + " faults: " 
-                + " Miss=" + p1MissingCnt         // v52 failed to read any P1
-                + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
-                + ", LenE=" + p1ShortCnt          // v74 updated when we have a length mismatch between Input and Mask
-                + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-                + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
-                + ", Yld="+  RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
-                + ", lT2="+  loopTelegram2cnt     // V53 print current loopTelegram2cnt
-                + " )" );
-          Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
-          Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
-          Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
-          Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
-          Serial.println((String)"M {+-} print Masking array(limiter) "
-                          + "( MaskX="+ telegram_crcOut_cnt    // v52 number of X maskings
-                          + "<"+ setMaskLimitCnt + " )"       // v74 display masklimit count
-                          + " Masking("+ (switchMaskingCmd  ? "+m" : "-m")  + ")="  // v74 display state of masking command
-                          + (switchMaskingOut  ? "Active" : "Inactive")             // v74: display state masking array
-                  );
-          Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )"      // v52 number of Times we validated
-                          + " & flips Masking(m) to " + (switchMaskingCmd  ? "Off" : "On")   // v74: display state
-                 );
-          Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
-          int temp1 = mySerial1.m_bitWait * 1;
-            // S P/T|0-1 serial1 on/off finish
-            // s P/T|0-9 serial2 interval
-          Serial.println((String)"S (p|Test|0-1) ON/off "
-                        + "\t" + (!serial1Stop  ? "Yes" : "No") 
-                        + "\tserial1P1-"
-                        + (bSerial1State  ? "A" : "i")
-                        +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
-                        + " , bitWait=" + temp1
-                        + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
-                        + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
-                        + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
-                        );
-          
-          int temp2 = mySerial2.m_bitWait * 1;
-          Serial.println((String)"s (p|Test|0-9) ON/off" 
-                        + " \t" + (!serial2Stop  ? "Yes" : "No")          
-                        + "\tserial2P2-"
-                        + (bSerial2State  ? "A" : "i")
-                        +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
-                        + " , bitWait=" + temp2
-                        + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
-                        + ", interval:"+ rx2ReadInterval  
-                        );
-          
-          Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
-          Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
-                                                      // + "/" + (mySerial1.m_bitWait % 1) + "/"
-                                                      + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
-                                                      + ", jserial2=" + mySerial2.m_bitWait);
-          
-          Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
-          
-          Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
-          
-          /* // cannot do here as resetInfo is not defined and cannot be not globalised
-          Serial.printf("Restart reason: 0x%08x epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x" , 
-            resetInfo->reason, resetInfo->epc1, resetInfo->epc2, resetInfo->epc3, resetInfo->excvaddr, resetInfo->depc); // v52: print registers
-          */
-          Serial.printf("\t restart reason 0x%08x  epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x ",
-                             save_reason, save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
-          Serial.println();
-          Serial.println("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)");          // v51 print portstatus 
-          Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
-                                + "\t" + WATERSENSOR_READ  + "=WATERSENSOR_READ:" + !digitalRead(WATERSENSOR_READ) 
-                                + "\t" + SERIAL_RX2        + "=SERIAL_RX2:"       + !digitalRead(SERIAL_RX2)       
-                                + "\t" + DS18B20_SENSOR    + "=DS18B20_SENSOR:"   + !digitalRead(DS18B20_SENSOR)   
-                                + "\t" + BLUE_LED2         + "=BLUE_LED2:"        + !digitalRead(BLUE_LED2)       ); 
-          Serial.println((String) "\t" + SERIAL_RX         + "=SERIAL_RX:"        + !digitalRead(SERIAL_RX)        
-                                + "\t" + LIGHT_READ        + "=HOT_READ:"         + !digitalRead(LIGHT_READ)       
-                                + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
-                                + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
-                                + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
-              } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
+            doCmdHelp();
+    } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
 
      if (outputOnSerial) Serial.println();   // ensure crlf
   }
@@ -7422,7 +7319,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp,tempc1,tempc2,tempc3,tempc4 = 0UL;               // check duplicates          
+    unsigned long temp,tempc1,tempc2,tempc3 = 0UL;               // check duplicates          
     unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
@@ -7545,6 +7442,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           temp = mySerial1.peekBit(i);
           if (i > 0) {
               Serial.printf("\t(l=%8d)", (temp - mySerial1.peekBit(i-8) ) ); // finish previous line with total)
+              
               if (tmpdataFaultDetected) {
                   Serial.print(" #"); // finish line v75d indicate possible datafault  
                   tmpdataFaultDetected = false;   // v75d reset fault error switch
@@ -7580,7 +7478,6 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
     int temp0 = mySerial1.peekBit(0);  // get zero reference
-    int temp1 = temp0;                 // get zero reference
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
@@ -7786,14 +7683,21 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     v74g 10aug26 Print the input array table split from command sequences
 */
 void printCrcInTable() {
+  bool tmpdataFaultDetected = false;
   Serial.print((String) "\r\nsI=0\t");   // initialise
   for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
+    if (telegram_crcIn[cnt] >= 'a'  && telegram_crcIn[cnt] <= 'g' ) tmpdataFaultDetected = true;  // v76 indicate we have a possible datafault
+
     if (isprint(telegram_crcIn[cnt])) {             // if printable
         Serial.print(telegram_crcIn[cnt]);
     } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
         Serial.print("_");
     } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
-        Serial.print((String) "\r\n"+ cnt +"\t>");
+        if (tmpdataFaultDetected) {             // v76 print lower case fault
+            Serial.print((String) "\r\t\b\b#");   // CR tab backspace print # for lowercase a-g
+            tmpdataFaultDetected = false;       // v76 reset fault error switch
+        } 
+        Serial.print((String) "\r\n"+ cnt +"\t>");  
     } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
         Serial.print("|");
         // break;
@@ -7856,4 +7760,168 @@ int convert_p1_print(int data_in) {
   else if ( data_in == '\x0a') data_out = '|';
   else if ( data_in == '\x00') data_out = '_';
   return data_out;
+}
+
+/*
+  check process erial input
+*/
+
+void doCheckSerialInput() {    // v76 do check console commands on serial input
+
+    if (Serial.available()) { 
+       // Check if data is available to read    
+       String data = Serial.readStringUntil('\n'); // Read until newline    
+       Serial.println("\t>>"+data+"=="+(char) data[0] +"<<\t");      // Print the received data  }
+       if         ((char) data[0] == '?') doCmdHelp();              // '?' - Help
+       else if    ((char) data[0] == 't') {                         // 't'= 
+             serial_Print_PeekBits(1, 1024);                    // print time table P1
+             serial_Print_PeekBits(1, 2048);                    // print diff table P1
+             serial_Print_PeekBits(1,(-2 * MAXLINELENGTH));     // print mask compare P1
+       } else if  ((char) data[0] == 'T') {                         // 't'= 
+             serial_Print_PeekBits(2, 1024);                    // print time table P2 
+             serial_Print_PeekBits(2, 2048);                    // print diff table P2
+             serial_Print_PeekBits(2,(-2 * MAXLINELENGTH));     // print mask compare P2
+       } else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
+         else if  ((char) data[0] == 'm') {       // v48 10jun25 print m-asked Input array
+                   Serial.println((String)"\r\n dataIn telegram_crcIn"
+                    + " myLen=" + telegram_crcIn_len 
+                    + " Masking("+ (switchMaskingOut ? "m" : "M") +") now " + (switchMaskingCmd ? "Active" : "Inactive")   // v74: display state
+                    + " MaskCount=" + telegram_crcOut_cnt     // v74 print number of masked poisitions
+                    + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
+                    + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
+                    + " som>>");
+                  printCrcInTable();    // v74g split to subroutine 
+       } else  if ((char) data[0] == 'M') {       // v48 10jun25 print M-asked array
+                  Serial.println((String)"\r\n Recovery telegram_crcOut"      // display states
+                    + " myLen="     + telegram_crcOut_len                    // lenth of output record
+                    + " Masking("
+                            + setMaskLimitCnt                   // v74 display maslimiter
+                            +")=" + (switchMaskingOut  ? "Active" : "Inactive")   // v74: display state
+                    + " MaskCount=" + telegram_crcOut_cnt      // v74 print number of masked poisitions in Masking array
+                    + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
+                    + " Elen=" + p1ShortCnt                    // v74 number of errors length Input != Mask
+                    + " som>>");
+                  printcrcOutTable();    // v74g split to subroutine 
+       }
+     }
+}
+
+/*  
+  facilitate Help command
+*/
+void doCmdHelp() {    // v76
+
+      Serial.println((String)"\r\n? (bell) \a Help commands "  + __FILE__ 
+                                                    + " version " + DEF_PROG_VERSION 
+                                                    + ", compiled " __DATE__ + " " + __TIME__ );
+      // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
+      Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
+      Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
+      Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") Thermostate"  
+                                                + (new_ThermostatState == 2 ? " <--" : "" ) );
+      Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
+                                                + (new_ThermostatState == 3 ? " <--" : "" ) );
+      Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
+      Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
+      Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
+      Serial.println((String)"e 1/2 force exception "
+                      + "( heap:" + ESP.getFreeHeap() +")"
+                      // + "( stack:" + ESP.getFreeContStack() + ")"      // v75b4 (2.4.1) // 2.4.2 function
+                    );   // v52: display FreeHeap
+      Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
+      Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
+                                + " serial1=" +  serial1Baudrate
+                                + " serial2=" +  serial2Baudrate);
+      Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
+      Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
+      Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
+      Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
+                                                                      + (blue_led2_Water ? "Y" : "N") 
+                                                                      + (blue_led2_HotWater ? "Y" : "N") );
+      Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
+                                                              + ", mode:" + loopbackRx2Mode );
+      Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
+      // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
+      Serial.println((String)"W on/OFF Watertrigger1 (Err="+waterErrorSwitch+") :" + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
+      Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
+      Serial.println((String)"y print water debounce");
+      Serial.println((String)"Z zero counters " + 
+            + "(mqtt=" + mqttCnt_Out              // v63 Output count
+            + " cmd=" + mqttCnt_In            // v72 display input number
+            + " faults: " 
+            + " Miss=" + p1MissingCnt         // v52 failed to read any P1
+            + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
+            + ", LenE=" + p1ShortCnt          // v74 updated when we have a length mismatch between Input and Mask
+            + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
+            + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
+            + ", Yld="+  RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
+            + ", lT2="+  loopTelegram2cnt     // V53 print current loopTelegram2cnt
+            + " )" );
+      Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
+      Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
+      Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
+      Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
+      Serial.println((String)"M {+-} print Masking array(limiter) "
+                      + "( MaskX="+ telegram_crcOut_cnt    // v52 number of X maskings
+                      + "<"+ setMaskLimitCnt + " )"       // v74 display masklimit count
+                      + " Masking("+ (switchMaskingCmd  ? "+m" : "-m")  + ")="  // v74 display state of masking command
+                      + (switchMaskingOut  ? "Active" : "Inactive")             // v74: display state masking array
+              );
+      Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )"      // v52 number of Times we validated
+                      + " & flips Masking(m) to " + (switchMaskingCmd  ? "Off" : "On")   // v74: display state
+              );
+      Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
+      int temp1 = mySerial1.m_bitWait * 1;
+        // S P/T|0-1 serial1 on/off finish
+        // s P/T|0-9 serial2 interval
+      Serial.println((String)"S (p|Test|0-1) ON/off "
+                    + "\t" + (!serial1Stop  ? "Yes" : "No") 
+                    + "\tserial1P1-"
+                    + (bSerial1State  ? "A" : "i")
+                    +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
+                    + " , bitWait=" + temp1
+                    + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
+                    + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
+                    + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
+                    );
+      
+      int temp2 = mySerial2.m_bitWait * 1;
+      Serial.println((String)"s (p|Test|0-9) ON/off" 
+                    + " \t" + (!serial2Stop  ? "Yes" : "No")          
+                    + "\tserial2P2-"
+                    + (bSerial2State  ? "A" : "i")
+                    +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
+                    + " , bitWait=" + temp2
+                    + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
+                    + ", interval:"+ rx2ReadInterval  
+                    );
+      
+      Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
+      Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+                                                  // + "/" + (mySerial1.m_bitWait % 1) + "/"
+                                                  + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
+                                                  + ", jserial2=" + mySerial2.m_bitWait);
+      
+      Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
+      
+      Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
+      
+      /* // cannot do here as resetInfo is not defined and cannot be not globalised
+      Serial.printf("Restart reason: 0x%08x epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x" , 
+        resetInfo->reason, resetInfo->epc1, resetInfo->epc2, resetInfo->epc3, resetInfo->excvaddr, resetInfo->depc); // v52: print registers
+      */
+      Serial.printf("\t restart reason 0x%08x  epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x ",
+                          save_reason, save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
+      Serial.println();
+      Serial.println("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)");          // v51 print portstatus 
+      Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
+                            + "\t" + WATERSENSOR_READ  + "=WATERSENSOR_READ:" + !digitalRead(WATERSENSOR_READ) 
+                            + "\t" + SERIAL_RX2        + "=SERIAL_RX2:"       + !digitalRead(SERIAL_RX2)       
+                            + "\t" + DS18B20_SENSOR    + "=DS18B20_SENSOR:"   + !digitalRead(DS18B20_SENSOR)   
+                            + "\t" + BLUE_LED2         + "=BLUE_LED2:"        + !digitalRead(BLUE_LED2)       ); 
+      Serial.println((String) "\t" + SERIAL_RX         + "=SERIAL_RX:"        + !digitalRead(SERIAL_RX)        
+                            + "\t" + LIGHT_READ        + "=HOT_READ:"         + !digitalRead(LIGHT_READ)       
+                            + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
+                            + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
+                            + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
 }
