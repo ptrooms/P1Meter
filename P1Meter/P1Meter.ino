@@ -7424,7 +7424,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           */
 
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
-          // if (mySerial1.peekByte(i-1) >= 'a'  && mySerial1.peekByte(i-1) <= 'f' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+          // if (mySerial1.peekByte(i-1) >= 'a'  && mySerial1.peekByte(i-1) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
         }
 
 
@@ -7767,11 +7767,19 @@ int convert_p1_print(int data_in) {
 */
 
 void doCheckSerialInput() {    // v76 do check console commands on serial input
+    // for details read: https://deepwiki.com/esp8266/Arduino/4.1-serial-communication
 
     if (Serial.available()) { 
        // Check if data is available to read    
        String data = Serial.readStringUntil('\n'); // Read until newline    
        Serial.println("\t>>"+data+"=="+(char) data[0] +"<<\t");      // Print the received data  }
+
+        publishMqtt(mqttLogTopic, (String) "ESP P1 console:" 
+                          + (char) data[0] 
+                          + "=" + (int) data[0] 
+                          + ", (" + mqttCnt_In + "/"  + mqttCnt_Out + ")."  
+                    );  // v76 report to log
+
        if         ((char) data[0] == '?') doCmdHelp();              // '?' - Help
        else if    ((char) data[0] == 't') {                         // 't'= 
              serial_Print_PeekBits(1, 1024);                    // print time table P1

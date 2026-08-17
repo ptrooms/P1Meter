@@ -59,8 +59,8 @@ extern "C" {
 #define GET_CYCLE_COUNT  ESP.getCycleCount()       // get the esp cycle counter
 
 #if !defined(USE_RXREAD) && !defined(USE_RXREAD2) && !defined(USE_RXREAD58) && !defined(USE_RXREAD59) && !defined(USE_RXREAD60) && !defined(USE_RXREAD61)
-   #define USE_RXREAD 0          // allocate default
-   #if !defined(BITWAIT1)        // allocate default
+   #define USE_RXREAD 0          // allocate default for reading P1
+   #if !defined(BITWAIT1)        // allocate default wait interval
       #define BITWAIT1 469 // v63a rxread58 469
    #endif
 #endif
@@ -560,7 +560,7 @@ unsigned long SoftwareSerial::peekBitPos() {
 /*
   w.i.p Register cycle count in m_buffer_bits[m_buffer_bits_inPos]
 */
-void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {          
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {          
    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
    int next = (m_inPos+1) % m_buffSize;
    if (next != m_outPos) {  // this works best in production
@@ -575,7 +575,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxTriggerBit() {
 */
 #define WAITIram4w { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 #if defined (USE_RXREAD)
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
    #else
    void SoftwareSerial::rxRead() {
    #endif
@@ -642,13 +642,10 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {    // original Plerup
 
 /*
   Do BitBang serial port2, store Byte in m_buffer[m_inPos] , alway used, f.e. for RX2 Warmtelink
+  Note: RXREAD2 is always cached to IRAM !!!!
 */
 #define WAITIram4w2  { while (SoftwareSerial::getCycleCountIram()-start <   wait &&   wait<BYTE_MAXWAIT_1);   wait += m_bitTime; }
-#if defined (USE_RXREAD2)
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() { 
-   #else
-   void SoftwareSerial::rxRead2() {
-   #endif
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() { 
    ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
    // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
 
@@ -718,15 +715,13 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
 }
 
 
-/*
-   below rxread taken from stable version 58, tuned to register usage.
+/* below WAITIram4w58 WAITIram4t58 DSMR_READ taken from stable version 58, tuned to register usage.
    v63b: stabilized/. COP_MODE m_bitWait=579 ,  PROD_MODE m_bitWait=502
       seq: LOCK, set varbls, startbit , bitwait/read7-8bit,  stopbit, set varbls, UNLOCK, REGset
 
       Two macros: one regular and the other monitor/follow input
    */
-   #define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
-
+   // below WAITIram4t58 && DSMR_READ not used now
    #define WAITIram4t58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000) { \
                if (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin)) \
                      GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4); \
@@ -735,8 +730,9 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead2() {
    #define DSMR_READ() (GPIO_REG_READ(GPIO_IN_ADDRESS) & (1 << m_rxPin))   // v63b use register read to save cycles.
 
 // --58 //------------------------------------------------------------
+#define WAITIram4w58 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += m_bitTime; }
 #if defined (USE_RXREAD58)
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
    #else
    void SoftwareSerial::rxRead58() {
    #endif
@@ -862,12 +858,6 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
          // }         
       */
    }
-
-
-
-
-
-
 
    /*
       Read Data bits after StartBit
@@ -1001,7 +991,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<7000); m_wait += m_bitTime; }
 #if defined (USE_RXREAD59)
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    #else
    void SoftwareSerial::rxRead59() {
    #endif
@@ -1089,7 +1079,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 #define WAITIram4p60 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 // waittime (digwrite/cli.....sei) = 594-640
 #if defined (USE_RXREAD60)
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    #else
    void SoftwareSerial::rxRead60() {
    #endif
@@ -1199,7 +1189,7 @@ void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
 // #define BITTEST_BLUE_ACTIVE   // if ISR is active Blueled is on else off
 #define WAITIram4w61 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 #if defined (USE_RXREAD61)
-void ICACHE_RAM_ATTR SoftwareSerial::rxRead61() {
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead61() {
    #else
    void SoftwareSerial::rxRead61() {
    #endif

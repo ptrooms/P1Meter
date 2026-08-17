@@ -201,24 +201,57 @@ public:
 
    virtual size_t write(uint8_t byte) override;
    virtual int read() override;
-   virtual int available() override;
+   virtual int available() override;       // fyi: runtime polymorphism, calls class pointers/refss to invoke
    virtual void flush() override;
    virtual bool P1active();          // check if driver is active beween header-/ and trailer byte-!
    virtual bool portActive();        // check if port is active (m_port_state)
-   operator bool() {return m_rxValid || m_txValid;}
+   // operator bool() {return m_rxValid || m_txValid;}  // user-defined conversion operator in C++.
+                              // if (bool) { ..}  // Executes if either m_rxValid or m_txValid is true
 
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
    void enableRx(bool on, int recordtype);      // v58 to use/do/selec type of data 0-physical/ 1-simulatedP1 / 2-simulatatedWL
 
-   void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
-   void rxRead2() ICACHE_RAM_ATTR;		// test to IRAM iso at function BitBang Wl without p1active detection beween / and !
-   // void rxRead2();		// BitBang Wl without p1active detection beween / and !
-   void rxRead58();		// BitBang routine v58 
-   void rxRead59();		// BitBang routine v59 
-   void rxRead60();		// BitBang routine v60
-   void rxRead61();		// BitBang routine v61
-   void rxTriggerBit(); // use bittiming every flank change allocates a time
+   /* define RXREADxx either volatile cached or native 
+
+      */ 
+      #if defined (USE_RXREAD) 
+         volatile void rxRead() ICACHE_RAM_ATTR; // v59b volatile (to be user) BitBang P1 with  p1active detection beween / and !
+      #else
+         void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
+      #endif
+
+         // RxRead2 is always cached volatile as its used for correctly reading WarmteLink
+         volatile void rxRead2() ICACHE_RAM_ATTR;		// BitBang Wl without p1active detection beween / and !
+   
+      #if defined (USE_RXREAD58) 
+
+         volatile void rxRead58() ICACHE_RAM_ATTR;		// BitBang routine v58, advanced bittiming P1 detection / & !
+      #else   
+         void rxRead58();		// BitBang routine v58 
+      #endif
+   
+      #if defined (USE_RXREAD59) 
+         volatile void rxRead59() ICACHE_RAM_ATTR;		// BitBang routine v59 
+      #else   
+         void rxRead59();		// BitBang routine v59 
+      #endif
+   
+      #if defined (USE_RXREAD60) 
+         volatile void rxRead60() ICACHE_RAM_ATTR;		// BitBang routine v60
+      #else   
+         void rxRead60();		// BitBang routine v60
+      #endif      
+   
+      #if defined (USE_RXREAD61) 
+         voltatile void rxRead61() ICACHE_RAM_ATTR;	// BitBang routine v61
+      #else   
+          void rxRead61();		// BitBang routine v61
+      #endif
+   // above, RX read definitions.
+
+   volatile void rxTriggerBit(); // use bittiming every flank change allocates a time
+
    int m_use_rxRead;      // holds the USE_RXREAD ISR number to be used
    
    // AVR compatibility methods
@@ -240,22 +273,13 @@ private:
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
    volatile  bool m_invert;
-   #ifdef RXREAD58
-      volatile bool m_P1active;        // v75d ,  Ptro 28mar21 to support P1 messageing 
-   #else
-      volatile bool m_P1active;        // Ptro 28mar21 to support P1 messageing, volatile v59b used in ISR
-   #endif
+   volatile bool m_P1active;        // v75d ,  Ptro 28mar21 to support P1 messageing 
    bool m_port_state;               // v59 contains status of (in)activated ISR
    volatile  bool m_overflow;        // volatile v59b , used in ISR
    volatile unsigned long m_bitTime;  // volatile v60a, used in ISR
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
-   #ifdef RXREAD58
-      // unsigned int m_inPos, m_outPos;          
-      volatile unsigned int m_inPos, m_outPos;     // v74 do not optimize for test in rxread58
-   #else
-      volatile unsigned int m_inPos, m_outPos;
-   #endif
+   volatile unsigned int m_inPos, m_outPos;     // v74 do not optimize for test in rxread58
    volatile int m_buffSize;
    uint8_t * volatile m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
@@ -290,4 +314,4 @@ uint32_t ICACHE_RAM_ATTR SoftwareSerial::getCycleCountIram()
 #define SW_SERIAL_UNUSED_PIN -1
 
 
-#endif
+#endif   // #ifndef SoftwareSerial_h
