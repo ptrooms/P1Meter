@@ -6,6 +6,12 @@ Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 Note : upto V66 we developed on Vxx, master is production. 
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
+## [v21.77] - working new RXREAD59  
+		- tbd: adapt new timeing algorithme for BitBang using RXread59
+			Note: the specific XREAD to be used is currently
+				selected in ../libs/SoftwareSerial241-P1/SoftwareSerial241.h
+## [v21.76] - consolidation to master, added changes to stability
+		- improve stability volatising rxread(), reports console commands to mqqt log
 ## [v21.75e] - work version, solved instability, improved data table print
 		- 15aug26 In case the water ISR overruns, we pause i until, hotwate is tapped.
 			hopefully this will move the the water-blinker away from vibration causing interrupts

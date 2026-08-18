@@ -1,4 +1,5 @@
-/* SoftwareSerial.h v76   - 15aug26 new master branch/*
+/* SoftwareSerial.h v77 - using RXREAD59 iso RXREAD58 to improve bit realiabiloity
+   v76   - 15aug26 new master branch/*
    v76   - 16aug26 volatile int m_rxPin, m_txPin, m_txEnablePin;
    v75e  - 15aug26 variables/pointers used in ISR, volatised to prevnet optimisation/corruption
    v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
@@ -55,7 +56,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // else USE_RXREAD2 2                  // w.i.p
 
 #if defined(COP_MODE) || defined(DUP_MODE)
-   #define USE_RXREAD58 58             // v63a enabled
+   // #define USE_RXREAD58 58             // v63a enabled
+   #define USE_RXREAD59 59             // v63a enabled
    // #define USE_RXREAD60 60          // v63a disabled
    // -----------------------------------------------------------------vvvv conditional settings
 
@@ -67,7 +69,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
       #ifndef BITWAIT1
-         #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+         // #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+         #define BITWAIT1 579 // take from RXREAD59 v63a rxread58  479-579-769 
       #endif
    #elif defined(USE_RXREAD60)
       #define USE_RXREAD USE_RXREAD60
@@ -78,9 +81,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #endif
 
 #elif defined(PROD_MODE) 
-   #define USE_RXREAD58 58          // v63a enabled
-   // #define USE_RXREAD59
-   // #define USE_RXREAD60       // v63a disabled
+   // #define USE_RXREAD58 58          // v63a-v76 enabled
+   #define USE_RXREAD59 59          // v77
+   // #define USE_RXREAD60 60       // v63a disabled
 
    // -----------------------------------------------------------------vvvv conditional settings
    #ifdef USE_RXREAD58
@@ -98,6 +101,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
       #endif
    #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
+      #define BITWAIT1 417          // v69c:12aug25 16u00 slighly better
       #ifndef BITWAIT1
          // #define BITWAIT1 509       // v59 rxread59 509
          #define BITWAIT1 522       // v62a 524 v59 rxread59 509
@@ -128,6 +132,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // #define BITWAIT1 419    // v61b with rxread59 PROD
    // v58: m_bitWait = 498;   rxread58
    // v59: m_bitWait = 509;   rxRead59 59a/59b
+   // v77: m_bitWait = 414;   rxRead59
    // v60: m_bitWait = 519;   rxRead60
    // v60: m_bitWait = 435;   rxRead61
    // v61b --> 419
