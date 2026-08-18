@@ -1003,48 +1003,68 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 
    /*
       Hold / lock Interrupts
-   */
-   unsigned long start = getCycleCountIram();         // 15-18cycles cycle counter, which increments with each clock cycle  (doc: v55d)      
-   ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
+ 77*/
+   unsigned long start = getCycleCountIram();         // 15-18cycles 77cle counter, which increments with each clock cycle  (doc: v55d)      
+   ETS_INTR_LOCK();  // v63a Disable as sugge77ed by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START]  = start;                 // v77a get timing
+   else              m_buffer_time[M_TIME_BIT_ISR2_START] = start;
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START1]  = getCycleCountIram();  // 15-18cycles
+   else              m_buffer_time[M_TIME_BIT_ISR2_START1] = getCycleCountIram();
    uint8_t bit_shift = 8;                 // v63b assume missing bit
    unsigned long wait = (m_bitTime + (m_bitTime/3)) - m_bitWait;	// v77 = 508
-   unsigned long bit_diff = start - m_buffer_bits[m_inPos - 1]; // v63a_first try to get timing since last stop bit
+   unsigned long bit_diff = start - m_buffer_bits[m_inPos - ((m_inPos!=0) ? 1 : 0) ]; // v77 get this or previous
    unsigned long l_bitTime = m_bitTime;      // get proposal 694
 
    /*
       Compensate for timing and missing bit which else would shift bits
    */
-   if (m_bitWait % 2 && m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
+   if ( m_bitWait == 418) {             // use m_bitWait from RXREAD58 as switch to control bit compensation
+      if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*5)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
+      else if (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
+      else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
+      bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
+   }
+   else if (m_bitWait % 2 && m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
       //                  (508-         (69))        5000 < 6246
       //                   
       /* bitiming
          1st branch: 763 <= 6940   early , should not be the case
                       +0    (694−(6940-((508+231)))/9)-5
                       +11   (694−(6840-((508+231)))/9)-5
+                      +29   (694−(6672-((508+231)))/9)-5
                       +104  (694−(6040-((508+231)))/9)-5
                       +215  (694−(5000-((508+231)))/9)-5
  
          2nd branch: 763 <= 10410  late , can happen         l_bitTime -= (((bit_diff- (wait+(9*l_bitTime)))/9)-20)
                      -0     (( 6941−(508+(9⋅694)))/9)−20
                      -40    ( 7300−(508+(9⋅694)))/9)-20
+                     -77    ( 7632−(508+(9⋅694)))/9)-20
                      -118   (( 8000−(508+(9⋅694)))/9)−20
                      -386   ((10410−(508+(9⋅694)))/9)−20
+                     -504   ((11798−(508+(9⋅694)))/9)−20
          3rd branch: > 230 set wait to 230
       */
 
       if           ( bit_diff > (wait-(l_bitTime/10))  ) { // > 763   pevious was at leas waittime plus 10% ?
          if        ( bit_diff <= (l_bitTime*10) )        //  <= 6940  early incoming, reduced bits, extend our bitbang by +0-215
-              l_bitTime += (l_bitTime - ( bit_diff - (wait+(l_bitTime/3))))-5;
-         else  if ( bit_diff <= (l_bitTime*15) )         //  <= 10410 late incoming, missing bits, shorten our bitbang by -0-400
+              l_bitTime += (l_bitTime - ( bit_diff - (wait+(l_bitTime/3)))/9)-5;
+         else  if ( bit_diff <= (l_bitTime*16) )         //  <= 11798 late incoming, missing bits, shorten our bitbang by -0-400
               l_bitTime -= (((bit_diff - (wait+(9*l_bitTime)))/9)-20);  
       }  else  if   ( bit_diff < ((l_bitTime*2)/3) )         //  > 230    fast     incoming assume, shorten lead to midships 231-462
                     wait = (l_bitTime*2)/3 ;
+    }
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_WAIT] = wait;      // v77 get overhead wait time
+   else              m_buffer_time[M_TIME_BIT_WAIT1] = wait;      
 
-    } // use m_bitWait as switch to control bit compensation
+     // use m_bitWait as switch to control bit compensation
    /*
       Read Data bits after StartBit
+      m_buffer_time M_TIME_BIT_START
    */
    uint8_t rec = 0;
+   
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_READ]  = getCycleCountIram();      // v77 get overhead timing
+   else              m_buffer_time[M_TIME_BIT_ISR2_READ] = getCycleCountIram();      
    for (int i = 0; i < bit_shift ; i++) {
      WAITIram4w59; // while (getCycleCount()-start < wait) if (!m_highSpeed) optimistic_yield(1); wait += m_bitTime; 
      rec >>= 1;
@@ -1055,7 +1075,9 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
      }
 
    }
-   
+   if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_END]  = getCycleCountIram();   // v77 get overhead timing
+   else              m_buffer_time[M_TIME_BIT_ISR2_END] = getCycleCountIram();
+
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    
    

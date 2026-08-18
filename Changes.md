@@ -7,8 +7,14 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 ## [v21.77] - working new RXREAD59  
-		- tbd: adapt new timeing algorithme for BitBang using RXread59
-			Note: the specific XREAD to be used is currently
+		- "P1crc:" 0/1/2 moved to front of JSON record to improve readbility
+		- "ẄLcrc:" 0/1 report to JSON WarmteLink CRC16 result als "WLcrc:" 0/1 to MQTT
+		- add console command 'b' to print the ISR timing array mySerial1.peekTime() using serial_Print_m_buffer_time(). This to investigate ISR timing between start-data-end
+		- doCheckSerialInput() now named as cmdSerialInputConsole(0 for direct console commands
+		- adapt new timing algorithme for BitBang using RXread59
+			- we caluclate ranges and now shorten the read time for processig 8 bits
+			- When Bitwait is exactly 418 (J+1) we use the algorithm as used/for RXREAD59 using bitshift) 
+			Note: the specific RXREAD to be used is currently
 				selected in ../libs/SoftwareSerial241-P1/SoftwareSerial241.h
 ## [v21.76] - consolidation to master, added changes to stability
 		- improve stability volatising rxread(), reports console commands to mqqt log

@@ -64,7 +64,7 @@
 /* code documentation v76.... starting 15aug26
       v76 - 15aug26 new master brnach from v75e
           - simple hardware serial inpuit commands m/M input/masks, t-full timing table, d-debug
-              doCmdHelp() doCheckSerialInput()
+              doCmdHelp() cmdSerialInputConsole()
           - comments & documentation idented so VSCode better can expand collapse sections
 
 */
@@ -1607,7 +1607,7 @@ int  setMaskLimitCnt  = 18;      // number of mask poisition in masking array, p
 volatile bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 volatile bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 volatile bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
-int  loopbackRx2Mode  = 0;       // '0' Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc, 6=print
+int  loopbackRx2Mode  = 0;       // 'T' +0-9 Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc, 6=print
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
@@ -1745,7 +1745,8 @@ bool telegramP1header = false;      // used to trigger/signal Header window /KFM
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
 
 unsigned int dataInCRC  = 0;          // CRC routine to calculate CRC of data telegram_crcIn
-int publishP1ToMqttCrc = 0;           // 0=failed, 1=OK, 2=recovered
+int publishP1ToMqttCrc = 0;           // P1 0=failed, 1=OK, 2=recovered
+int publishWLToMqttCrc = 0;           // v77 WL 0=failed, 1=OK, 2=recovered
 bool validCrcInFound = false;         // Set by Decode when Full (recovered) datarecord has valid Crc
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
@@ -2874,7 +2875,7 @@ void loop()
 
   } else {                         // else we are allowed to do other acivities
 
-    doCheckSerialInput();   // v76 process hardware serial input commands
+    cmdSerialInputConsole();   // v76 process hardware serial input commands
 
     // if (loopbackRx2Mode == 3) Serial.print((String) loopbackRx2Mode 
     //         + (p1SerialFinish  ? "f" : "g")
@@ -3347,6 +3348,7 @@ void readTelegramP1() {
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt_Out+1) +" started at " + micros());
   
   // "Tn_D2diClc1 = RxYield# Cycle# Tstate# Tread-dT Twrite-Ai Water-hl Prsrve_CW Hot-cw "
+  //  loop() --> readTelegramP1()  :==> " ReadT3:  5.853802204 D2diChc1:   451 start:  276.13143 ...."
   if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s%d: %5u start: %11.6f \b\b ", 
         RX_yieldcount,    // v52: check countlevel
           ((float)ESP.getCycleCount()/80000000),
@@ -3973,6 +3975,8 @@ void readTelegramWL() {
 
           /*
               add CRC check on WL record, required as we have clearly wrong read values.
+              WL>245-0=245:244,s=0,e=239,v=233]    &+r. s=/, e=!, crt=3579, cr1=3579, ;                                                                                          
+              crc OK: /WARMTELINK-VI\<|<|1-3:0.2.8(50)<|0-0:1.1.0(260818205954W)<|0-0:96.1.1(3037386633663736366566333065393434643561326461643162646237373865)<|0-1:24.1.0(012)<|0-1:96.1.0(37323632353436343243324433343043)<|0-1:24.2.1(260818205900W)(95.308*GJ)<|!3579 
           */
           if  ( startChar >= 0  && endChar > startChar && valChar < endChar) {    // we have a start to end, ten do CRC check
 
@@ -3983,139 +3987,14 @@ void readTelegramWL() {
                 validTelegram2CRCFound = (strtol(messageCRC2, NULL, 16) == currentCRC2);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
 
               
-
+                if ( validTelegram2CRCFound) publishWLToMqttCrc = 1; else publishWLToMqttCrc = 0; // v77 sent out Crc
                 if ( validTelegram2CRCFound && loopbackRx2Mode == 5 ) {   // v55 debug/print one validated hex characters
                   Serial.println("");
                   Serial.printf(" crt=%s, crc=%04x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
 
                   for (int i = startChar ; i  < ((endChar-startChar)+1+4); i++ ) {
-                    
+                    // v77 removed: commented obsolete instability code  ubtil v76
                     // diagnose instability of code.....
-                    // Serial.print(telegram2_org[i]);             // 001 only, is stable
-                    // -------------------------------------------------------------------------------------
-                    
-                    // Serial.print(telegram2_org[i]);             // 002 try to unlock, just somewhat more stable
-
-                    /*
-                    Serial.print(telegram2_org[i]);             // 003 try to unlock, instable
-                    Serial.print(telegram2_org[i]);
-                    */
-                    
-
-                    // ---------------------------------------------------------------------------- keep below
-                    // Serial.printf(" %02x", telegram2_org[i]);      // 000-005 causing unstablity
-                    // ---------------------------------------------------------------------------- keep above
-
-                    // Serial.print(telegram2_org[i]);             // 004 after try to unlock, instable
-
-                    /*
-                      asm(                    // 005 try to insert unsued code, no effect
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                      );
-                    */     
-                  // // teststable2-only
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   // ---------------------------- 009 line 2585 added printf (unstable) 
-                  //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                  //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // add13 + add 014 stable (rx2-70%)
-
-                  // // teststable3&2
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   // ---------------------------- 009 line 2585 added printf (unstable) 
-                  //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                  //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // add13 + add 014 stable (rx2-70%)
-
-
-                    //  // teststable0
-                    //  // move020 to void command_testH3() to check if location influnces things
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                    //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-                    //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // add13 + add 014 stable (rx2-70%)
-                    //   delay(0);     // add14 + add015 stable (rx2=40%)
-                    //   delay(0);     // add15 + add016 less stable (rx2=20%)
-                    //   delay(0);     // add16 + add017 stable (rx2=50%)
-                    //   delay(0);     // add17 + add018 stable  (rx2=10%)
-                    //   delay(0);     // add18 + add019 stable  (rx2=75%)
-                    
-                   /*
-                      if (false) {
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable 30% (comment = 22c2 problem)
-                        delay(0);     // 008 adding here without printf above , unstable 20%
-                        delay(0);     // 008 adding here without printf above , untstale 25%
-                        delay(0);     // 008 adding here wihout printf above , stable
-                        delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                        delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-                        delay(0);     // 008 adding 009 test remove, add 011 unstable
-                        delay(0);     // 008 adding 009 test remove, add 011 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // add13 + add 014 stable (rx2-70%
-                      }
-                    */                      
-                    // no zzzzz = instable
-                    // z     = instable 20%
-                    // zz    = instable
-                    // zzz   = less 50% instable
-                    // zzzz  = very 60% instable
                     Serial.printf(" %02x", telegram2_org[i]);      // 000-005, 008 causing unstablity
                   }
                   
@@ -4968,6 +4847,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     String msg = "{"; // build mqtt frame 
     // msg.concat("\"currentTime\": %lu");                // P1 19nov19 17u12 remove superflous comma
     msg.concat("\"currentTime\":\"%s\"");                  // %s is string
+    msg.concat(",\"P1crc\":%u");                       // v77 moved to start Validity CRC 0 or 1
     msg.concat(",\"CurrentPowerConsumption\":%lu");    // P1
     msg.concat(",\"ThermoState\":%u");                 // Johnson
     msg.concat(",\"AnalogRead\":%u");                  // adc
@@ -4981,7 +4861,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
         msg.concat(",\"!powerConsumptionHighTariff\":%lu"); // v46 P1 false or missing read, ignore field
     }
     
-    msg.concat(",\"P1crc\":%u");                       // Validity CRC 0 or 1
+    // msg.concat(",\"P1crc\":%u");                       // v77 moved to start Validity CRC 0 or 1
 
     char temperatureString[7];
     // sequence does matter
@@ -5054,6 +4934,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     }
     // HeatConsumptionOld = HeatConsumption;  // check for next cycle 
 
+    msg.concat(", \"WLcrc\":%u");                       // Validity WarmteLnk CRC 0 or 1
+
     if (useWaterTrigger1) msg.concat(", \"Trigger1\":1");  // show triggernumber
     if (useWaterPullUp)   msg.concat(", \"PullUp\":1");    // show pullupmode
 
@@ -5095,6 +4977,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             // currentTime,                // metertime difference 52 seconds can also use millis()
             currentTimeS,               // meter time in string format from timedate record
             // millis(),
+            publishP1ToMqttCrc,         // v77 to start, v45 1=validTelegramCRCFound or 2=recovered validCrcInFound
             CurrentPowerConsumption,
             !thermostatReadState,       // input setting Switch press 1=ON low , Not active High 0=OFF
             filteredValueAdc,           // read analog value
@@ -5104,7 +4987,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
             // myCrcFound,                         // v45 either original validTelegramCRCFound or recovered validCrcInFound
             // validTelegramCRCFound,              // P1crc=0 or 1 for valid CRC
-            publishP1ToMqttCrc,                    // v45 unsigned original validTelegramCRCFound or recovered validCrcInFound
+            // publishP1ToMqttCrc,                    // v45 unsigned original validTelegramCRCFound or recovered validCrcInFound
 
             // powerProductionLowTariff,
             // powerProductionHighTariff,
@@ -5130,6 +5013,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             waterReadHotCounter,        // Watersensor state 26mar21 number during Hotwater
             HeatFlowConsumption,        // v39 28feb23 show HeatFlowConsumption RX2
             HeatConsumption,            // v46 23feb25 show HeatConsumption MJ counter RX2
+            publishWLToMqttCrc,         // v77 unsigned original validWarmteLimkCRCFound 
             
             prog_Version );             // (fixed) Version from program , see top
 
@@ -5140,6 +5024,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       Serial.println((String)"v");        // indicate no connection at datarecord
     }
 
+    // (p)reset WL Crc after reporting on MQTT 
+    publishWLToMqttCrc |= 2;    // i WL=0->2/1->3 indicate it was not yeat read for next report
 
     if (Got_Telegram2Record_cnt > Got_Telegram2Record_prev) {
         Got_Telegram2Record_prev = Got_Telegram2Record_cnt;   // count for this record
@@ -7254,6 +7140,18 @@ void printf_port_state_isr() {
 */
 void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
   if (time_port == 1) {
+    /* tt re              +25213841    327691760 
+                      START      RXstart      RX-end      START-rxE = B_start     Be-RX=  B_start  +Bend-start= TA-start  TA-e-TA-s = TA-end
+     p1 serial1 setup 2573572863 2598786704.  2926478464 +3967261228= 2598772396 +15027=2598787423 +609998452 =3208785875 +17       =3208785892
+
+     first      ISRstart     s1-s2 R-s1     ISRend-rd   Exit-End   =E-e                 ISR2-ISR1_start   
+     ISR1st:  2819141676:    +44 +150    +1475825426 +2819147762   =6086 , ISRstart2-1= 79925857
+
+     last      ISR2start    s1-s2 Rd-s1     End-Read    Exit-End   E-e                  ISR2-ISR1_exit
+     ISR2ls:  2899067533:    +48 +449    +1395899266 +2899073723   =6190 ,  ISRexit2-1= 79925961
+    
+    
+    */
     Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 setup"     // print first 4 (time initiated an port allocated)
         + " "  +  mySerial1.peekTime(M_TIME_START)
         + " "  +  mySerial1.peekTime(M_TIME_RX_START)
@@ -7261,7 +7159,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + " "  +  mySerial1.peekTime(M_TIME_RX_END));
     if (m_time_request >= M_TIME_RX_END )              // print all standard
       Serial.print((String) 
-        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
+        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))         
         + "= " +  mySerial1.peekTime(M_TIME_BEGIN_START) 
         + " +" + (mySerial1.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
         + "="  +  mySerial1.peekTime(M_TIME_BEGIN_END) 
@@ -7766,7 +7664,7 @@ int convert_p1_print(int data_in) {
   check process erial input
 */
 
-void doCheckSerialInput() {    // v76 do check console commands on serial input
+void cmdSerialInputConsole() {    // v76 do check console commands on serial input
     // for details read: https://deepwiki.com/esp8266/Arduino/4.1-serial-communication
 
     if (Serial.available()) { 
@@ -7781,6 +7679,8 @@ void doCheckSerialInput() {    // v76 do check console commands on serial input
                     );  // v76 report to log
 
        if         ((char) data[0] == '?') doCmdHelp();              // '?' - Help
+       else if    ((int) data[0] == 8 )  
+                    Serial.println((String)"\r\n Reconnect console"); //  v77 ^H
        else if    ((char) data[0] == 't') {                         // 't'= 
              serial_Print_PeekBits(1, 1024);                    // print time table P1
              serial_Print_PeekBits(1, 2048);                    // print diff table P1
@@ -7789,7 +7689,8 @@ void doCheckSerialInput() {    // v76 do check console commands on serial input
              serial_Print_PeekBits(2, 1024);                    // print time table P2 
              serial_Print_PeekBits(2, 2048);                    // print diff table P2
              serial_Print_PeekBits(2,(-2 * MAXLINELENGTH));     // print mask compare P2
-       } else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
+       } else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
+         else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
          else if  ((char) data[0] == 'm') {       // v48 10jun25 print m-asked Input array
                    Serial.println((String)"\r\n dataIn telegram_crcIn"
                     + " myLen=" + telegram_crcIn_len 
@@ -7813,6 +7714,47 @@ void doCheckSerialInput() {    // v76 do check console commands on serial input
        }
      }
 }
+
+/* print time table related to ISR  
+ */
+void serial_Print_m_buffer_time() {      // print tiem table offset
+   unsigned long offset = -1;   // time offset ISR  
+   #ifdef M_TIME_NAMES
+      for (int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset
+         if ( mySerial1.peekTime(i) >=1 && offset < mySerial1.peekTime(i) ) offset = mySerial1.peekTime(i);
+      }
+   #endif
+      Serial.print((String) "\r\n M_TIME_ENTRIES #" + M_TIME_ENTRIES + " , currentcycle=" + ESP.getCycleCount() + " , cycle offset= " + offset );
+   #ifdef M_TIME_NAMES
+      Serial.print((String) "\r\n M_TIME_START             2 =  start of Object                         = " + mySerial1.peekTime(M_TIME_START) );
+      Serial.print((String) "\r\n M_TIME_RX_START          3 =  start of SoftwareSerial::enableRx Attach= " + ((mySerial1.peekTime(M_TIME_RX_START)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_START)        - offset) ));
+      Serial.print((String) "\r\n M_TIME_RX_END            4 =  end of SoftwareSerial::enableRx Detach  = " + ((mySerial1.peekTime(M_TIME_RX_END)           == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_END)          - offset) ));
+      Serial.print((String) "\r\n M_TIME_BEGIN_START       5 =  start SoftwareSerial::begin             = " + ((mySerial1.peekTime(M_TIME_BEGIN_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_START)     - offset) ));
+      Serial.print((String) "\r\n M_TIME_BEGIN_END         6 =  end  SoftwareSerial::begin              = " + ((mySerial1.peekTime(M_TIME_BEGIN_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_END)       - offset) ));
+      Serial.print((String) "\r\n M_TIME_AVAIL_START       7 =  start SoftwareSerial::enableRx Attach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_START)     - offset) ));
+      Serial.print((String) "\r\n M_TIME_AVAIL_END         8 =  start SoftwareSerial::enableRx Detach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_END)       - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_START         9 =  ISR START                               = " + ((mySerial1.peekTime(M_TIME_BIT_START)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START)       - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_STOP         10 =  ISR AFTER STOPBIT                       = " + ((mySerial1.peekTime(M_TIME_BIT_STOP)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP)        - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_START1       10 =  ISR Nominal end Actual End              = " + ((mySerial1.peekTime(M_TIME_BIT_START1)       == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START1)      - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_STOPT        11 =  ISR Nominal to save                     = " + ((mySerial1.peekTime(M_TIME_BIT_STOPT)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOPT)       - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_STOP1        12 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_STOP1)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP1)       - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_END1         13 =  ISR END                                 = " + ((mySerial1.peekTime(M_TIME_BIT_END1)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END1)        - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_END2         14 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_END2)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END2)        - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_WAIT          0 =  first ISR wait                          = " +  mySerial1.peekTime(M_TIME_BIT_WAIT));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_START    15 =  first ISR entered                       = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START)   - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_START1   16 =  first ISR getCycleCountIram()           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START1)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START1)  - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_READ     17 =  first ISR start read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_READ)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_READ)    - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_END      18 =  first ISR finish read                   = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_END)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_END)     - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_EXIT     19 =  first ISR exit                          = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_WAIT1         1 =  last ISR wait                           = " +  mySerial1.peekTime(M_TIME_BIT_WAIT1));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START   20 =  last ISR entered                        = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START)  - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START1  21 =  last ISR getCycleCountIram()            = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START1)  == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_READ    22 =  last ISR start read                     = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_READ)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_END     23 =  last ISR finish read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_END)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_END)    - offset) ));
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset) ));
+      Serial.print((String) "\r\n");
+  #endif
+}   
 
 /*  
   facilitate Help command

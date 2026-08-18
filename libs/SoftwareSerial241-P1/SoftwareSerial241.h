@@ -156,33 +156,36 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef M_TIME_NAMES    // used by table: unsgined long m_buffer_time[M_TIME_ENTRIES]
    #define M_TIME_NAMES           // Indicate our name
    #define M_TIME_ENTRIES    30  // Numbeer of entries in M_TIME table
-   #define M_TIME_START       0   // cyclenumber start of Object
-   #define M_TIME_RX_START    1   // cyclenumber start of void SoftwareSerial::enableRx Attach
-   #define M_TIME_RX_END      2   // cyclenumber end of void SoftwareSerial::enableRx Detach
-   #define M_TIME_BEGIN_START 3   // cyclenumber start of  SoftwareSerial::begin
-   #define M_TIME_BEGIN_END   4   // cyclenumber end of  SoftwareSerial::begin
-   #define M_TIME_AVAIL_START 5   // cyclenumber start of void SoftwareSerial::enableRx Attach
-   #define M_TIME_AVAIL_END   6   // cyclenumber start of void SoftwareSerial::enableRx Attach
-   #define M_TIME_BIT_START   7   // v60a Cycle ISR START
-   #define M_TIME_BIT_STOP    8   // v60a Cycle ISR AFTER STOPBIT
-   #define M_TIME_BIT_START1  9   // v60a Cycle ISR Nominal end Actual End (inclusdng get cycle)
-   #define M_TIME_BIT_STOPT  10   // v60a Cycle ISR Nominal to save 
-   #define M_TIME_BIT_STOP1  10   // v60a Cycle ISR Nominal end
-   #define M_TIME_BIT_END1   11   // v60a Cycle ISR END
-   #define M_TIME_BIT_END2   12   // v60a Cycle ISR Nominal end
-   #define M_TIME_BIT_ISR_START    13   // v64a Cycle first ISR entered 
-   #define M_TIME_BIT_ISR_START1   14   // v64a Cycle first ISR for doing getCycleCountIram()
-   #define M_TIME_BIT_ISR_READ     15   // v64a Cycle first ISR start read
-   #define M_TIME_BIT_ISR_END      16   // v64a Cycle first ISR finish read
-   #define M_TIME_BIT_ISR_EXIT     17   // v64a Cycle first ISR exit
-   #define M_TIME_BIT_ISR2_START   18   // v64a Cycle last ISR entered 
-   #define M_TIME_BIT_ISR2_START1  19   // v64a Cycle last ISR for doing getCycleCountIram()
-   #define M_TIME_BIT_ISR2_READ    20   // v64a Cycle last ISR start read
-   #define M_TIME_BIT_ISR2_END     21   // v64a Cycle last ISR finish read
-   #define M_TIME_BIT_ISR2_EXIT    22   // v64a Cycle last ISR exit
+   #define M_TIME_BIT_WAIT          0   // cyclenumber WAIT cycle at start
+   #define M_TIME_BIT_WAIT1         1   // cyclenumber WAIT cycle at end
+   #define M_TIME_START             2   // start of Object 
+   #define M_TIME_RX_START          3   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_RX_END            4   // cyclenumber end of void SoftwareSerial::enableRx Detach
+   #define M_TIME_BEGIN_START       5   // cyclenumber start of  SoftwareSerial::begin
+   #define M_TIME_BEGIN_END         6   // cyclenumber end of  SoftwareSerial::begin
+   #define M_TIME_AVAIL_START       7   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_AVAIL_END         8   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_BIT_START         9   // v60a Cycle ISR START
+   #define M_TIME_BIT_STOP         10   // v60a Cycle ISR AFTER STOPBIT
+   #define M_TIME_BIT_START1       10   // v60a Cycle ISR Nominal end Actual End (inclusdng get cycle)
+   #define M_TIME_BIT_STOPT        11   // v60a Cycle ISR Nominal to save 
+   #define M_TIME_BIT_STOP1        12   // v60a Cycle ISR Nominal end
+   #define M_TIME_BIT_END1         13   // v60a Cycle ISR END
+   #define M_TIME_BIT_END2         14   // v60a Cycle ISR Nominal end
+   #define M_TIME_BIT_ISR_START    15   // v77  Cycle first ISR entered 
+   #define M_TIME_BIT_ISR_START1   16   // v77  Cycle first ISR for doing getCycleCountIram()
+   #define M_TIME_BIT_ISR_READ     17   // v77  Cycle first ISR start read
+   #define M_TIME_BIT_ISR_END      18   // v77  Cycle first ISR finish read
+   #define M_TIME_BIT_ISR_EXIT     19   // v77  Cycle first ISR exit
+   #define M_TIME_BIT_ISR2_START   20   // v77  Cycle last ISR entered 
+   #define M_TIME_BIT_ISR2_START1  21   // v77  Cycle last ISR for doing getCycleCountIram()
+   #define M_TIME_BIT_ISR2_READ    22   // v77  Cycle last ISR start read
+   #define M_TIME_BIT_ISR2_END     23   // v77  Cycle last ISR finish read
+   #define M_TIME_BIT_ISR2_EXIT    24   // v77  Cycle last ISR exit
 #endif
 
 #define M_BIT_CYCLE_VALUE (getCycleCountIram() % 4096);     // get distance
+
 
 class SoftwareSerial : public Stream
 {
