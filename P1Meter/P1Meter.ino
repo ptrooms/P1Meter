@@ -7723,15 +7723,29 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
 void serial_Print_m_buffer_time() {      // print tiem table offset
    unsigned long offset  = -1;   // time offset setup
    unsigned long offset2 = -1;   // time offset ISR timing
-   // return;
+
+      // v77a 19aug26 23u19  dummy code which improves before the next two (whoich have no volatile in their in=i defintion
+      // unsigned long offset3 =  0;   // time offset ISR timing
+      //      for ( volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      //         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) > offset3 ) offset3 = mySerial1.peekTime(i);
+      //      }
+
+      // return; // does not improve things
    #ifdef M_TIME_NAMES
-      for (volatile int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
+      // v77a 19aug26 23u19 the fornext must use volatile as without, things become unstable
+      for (  volatile int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
          if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset ) offset = mySerial1.peekTime(i);
       }
-      
-      for (volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      // v77a 19aug26 23u19  then next is sensitive required in combination to previous loop to stabilize reliability
+      for (  volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
          if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset2 ) offset2 = mySerial1.peekTime(i);
       }
+
+      // dummy code which improves when wat least one of before loop one of them have volatile
+      // unsigned long offset3 =  0;   // time offset ISR timing
+      //      for (int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      //         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) > offset3 ) offset3 = mySerial1.peekTime(i);
+      //      }
    #endif
 
       Serial.print((String) "\r\n M_TIME_ENTRIES #" + M_TIME_ENTRIES + " , currentcycle=" + ESP.getCycleCount() + " , SSoffset= " + offset + " , ISRoffset= " + offset2);
