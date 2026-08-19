@@ -519,7 +519,7 @@ int SoftwareSerial::peek() {              // must be defined to allow mutiple st
 /*
    return request Time entry where driver is see for names M_TIME_NAMES
 */
-volatile unsigned long SoftwareSerial::peekTime(int buffer_time_Pos ) {
+unsigned long SoftwareSerial::peekTime(int buffer_time_Pos ) {
    // if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    return m_buffer_time[buffer_time_Pos];
 }
@@ -527,7 +527,7 @@ volatile unsigned long SoftwareSerial::peekTime(int buffer_time_Pos ) {
 /*
    Return requested BitTime entry
 */
-volatile unsigned long SoftwareSerial::peekBit(int buffer_bit_Pos ) {
+unsigned long SoftwareSerial::peekBit(int buffer_bit_Pos ) {
    // if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    return m_buffer_bits[buffer_bit_Pos];
 }
@@ -535,7 +535,7 @@ volatile unsigned long SoftwareSerial::peekBit(int buffer_bit_Pos ) {
 /*
    Return requested BitTime entry
 */
-volatile int SoftwareSerial::peekByte(int buffer_byte_Pos ) {
+int SoftwareSerial::peekByte(int buffer_byte_Pos ) {
    // if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    return m_buffer[buffer_byte_Pos];
 }
@@ -544,7 +544,7 @@ volatile int SoftwareSerial::peekByte(int buffer_byte_Pos ) {
 /*
    return number of entries in BitTime table
 */
-volatile unsigned long SoftwareSerial::peekBitPos() {
+unsigned long SoftwareSerial::peekBitPos() {
    return m_inPos;
 }
 
