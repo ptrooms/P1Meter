@@ -1,4 +1,4 @@
-/* SoftwareSerial.cpp v77 17aug26 - try new RXREAD59 (as copy of RXREASD 58)
+/* SoftwareSerial.cpp v77a 19aug26 - try new RXREAD59 (as copy of RXREASD 58)
    v76 15aug26 new master branch/*
          - provement in RXREADxx volatiles 
    v75e  - 15aug26 variables/pointers used in ISR, volatised to prevnet optimisation/corruption

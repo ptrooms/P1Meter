@@ -1,4 +1,8 @@
 
+#define VERSION_NUMBER "77a" // 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
+                            // periodic Z en many Restarts doe make this a candidate
+                            // related, we played with softserial
+
 // #define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
 // #define DEBUG_ESP_OOM 1          // v75b5  playing around
 
@@ -60,7 +64,6 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "77" // number this version 11aug26 (master, rebased from stable v74)
 /* code documentation v76.... starting 15aug26
       v76 - 15aug26 new master brnach from v75e
           - simple hardware serial inpuit commands m/M input/masks, t-full timing table, d-debug
