@@ -437,7 +437,7 @@ void SoftwareSerial::enableRx(bool on, int recordtype) {
 }
 
 
-int SoftwareSerial::read() {
+int SoftwareSerial::read() {           // stream.h
    if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    uint8_t ch = m_buffer[m_outPos];
    m_outPos = (m_outPos+1) % m_buffSize;
@@ -455,7 +455,7 @@ bool SoftwareSerial::portActive() {                // v59 indicate portstatus
    return false;
 }
 
-int SoftwareSerial::available() {
+int SoftwareSerial::available() {      // stream.h
    if (m_P1active) return 0;                     // Return 0 if P1 is active, buffer will be filled until receive '!'
    if (!m_rxValid) return 0;
    m_buffer_time[M_TIME_AVAIL_START] = GET_CYCLE_COUNT;   // initialise
@@ -503,17 +503,18 @@ void SoftwareSerial::flush() {
    m_inPos = m_outPos = 0;
 }
 
-bool SoftwareSerial::overflow() {
+volatile bool SoftwareSerial::overflow() {
    bool res = m_overflow;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation P1active finished
    m_overflow = false;
    return res;
 }
 
-int SoftwareSerial::peek() {
+int SoftwareSerial::peek() {              // must be defined to allow mutiple streams (as stream.h is involved) 
    if (!m_rxValid || (m_inPos == m_outPos)) return -1;
    return m_buffer[m_outPos];
 }
+
 
 /*
    return request Time entry where driver is see for names M_TIME_NAMES
@@ -1018,41 +1019,44 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    /*
       Compensate for timing and missing bit which else would shift bits
    */
-   if ( m_bitWait == 418) {             // use m_bitWait from RXREAD58 as switch to control bit compensation
-      if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*5)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
-      else if (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
-      else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
-      bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
-   }
-   else if (m_bitWait % 2 && m_inPos > 0) {             // use m_bitWait as switch to control bit compensation
-      //                  (508-         (69))        5000 < 6246
-      //                   
-      /* bitiming
-         1st branch: 763 <= 6940   early , should not be the case
-                      +0    (694−(6940-((508+231)))/9)-5
-                      +11   (694−(6840-((508+231)))/9)-5
-                      +29   (694−(6672-((508+231)))/9)-5
-                      +104  (694−(6040-((508+231)))/9)-5
-                      +215  (694−(5000-((508+231)))/9)-5
- 
-         2nd branch: 763 <= 10410  late , can happen         l_bitTime -= (((bit_diff- (wait+(9*l_bitTime)))/9)-20)
-                     -0     (( 6941−(508+(9⋅694)))/9)−20
-                     -40    ( 7300−(508+(9⋅694)))/9)-20
-                     -77    ( 7632−(508+(9⋅694)))/9)-20
-                     -118   (( 8000−(508+(9⋅694)))/9)−20
-                     -386   ((10410−(508+(9⋅694)))/9)−20
-                     -504   ((11798−(508+(9⋅694)))/9)−20
-         3rd branch: > 230 set wait to 230
-      */
+   if (m_inPos > 0) { // only to reccculation after first start of rs232
 
-      if           ( bit_diff > (wait-(l_bitTime/10))  ) { // > 763   pevious was at leas waittime plus 10% ?
-         if        ( bit_diff <= (l_bitTime*10) )        //  <= 6940  early incoming, reduced bits, extend our bitbang by +0-215
-              l_bitTime += (l_bitTime - ( bit_diff - (wait+(l_bitTime/3)))/9)-5;
-         else  if ( bit_diff <= (l_bitTime*16) )         //  <= 11798 late incoming, missing bits, shorten our bitbang by -0-400
-              l_bitTime -= (((bit_diff - (wait+(9*l_bitTime)))/9)-20);  
-      }  else  if   ( bit_diff < ((l_bitTime*2)/3) )         //  > 230    fast     incoming assume, shorten lead to midships 231-462
-                    wait = (l_bitTime*2)/3 ;
-    }
+      if (m_bitWait % 2) {             // use m_bitWait as switch to control bit compensation
+         /* bitiming
+            1st branch: 763 <= 6940   early , should not be the case
+                        +0    (694−(6940-((508+231)))/9)-5
+                        +11   (694−(6840-((508+231)))/9)-5
+                        +29   (694−(6672-((508+231)))/9)-5
+                        +104  (694−(6040-((508+231)))/9)-5
+                        +215  (694−(5000-((508+231)))/9)-5
+   
+            2nd branch: 763 <= 10410  late , can happen         l_bitTime -= (((bit_diff- (wait+(9*l_bitTime)))/9)-20)
+                        -0     (( 6941−(508+(9⋅694)))/9)−20
+                        -40    ( 7300−(508+(9⋅694)))/9)-20
+                        -77    ( 7632−(508+(9⋅694)))/9)-20
+                        -118   (( 8000−(508+(9⋅694)))/9)−20
+                        -386   ((10410−(508+(9⋅694)))/9)−20
+                        -504   ((11798−(508+(9⋅694)))/9)−20
+            3rd branch: > 230 set wait to 230
+         */
+
+         if           ( bit_diff > (wait-(l_bitTime/10))  ) { // > 763   pevious was at leas waittime plus 10% ?
+            if        ( bit_diff <= (l_bitTime*10) )        //  <= 6940  early incoming, reduced bits, extend our bitbang by +0-215
+               l_bitTime += (l_bitTime - ( bit_diff - (wait+(l_bitTime/3)))/9)-5;
+            else  if ( bit_diff <= (l_bitTime*16) )         //  <= 11798 late incoming, missing bits, shorten our bitbang by -0-400
+               l_bitTime -= (((bit_diff - (wait+(9*l_bitTime)))/9)-20);  
+         }  else  if   ( bit_diff < ((l_bitTime*2)/3) )         //  > 230    fast     incoming assume, shorten lead to midships 231-462
+                     wait = (l_bitTime*2)/3 ;
+
+      } else {  // use m_bitWait from RXREAD58 as switch to control bit compensation
+         if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*5)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
+         else if (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
+         else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
+         bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
+      }
+
+   } // if m_inPos > 0
+
    if (m_inPos == 0) m_buffer_time[M_TIME_BIT_WAIT] = wait;      // v77 get overhead wait time
    else              m_buffer_time[M_TIME_BIT_WAIT1] = wait;      
 

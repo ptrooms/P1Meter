@@ -4848,13 +4848,13 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // msg.concat("\"currentTime\": %lu");                // P1 19nov19 17u12 remove superflous comma
     msg.concat("\"currentTime\":\"%s\"");                  // %s is string
     msg.concat(",\"P1crc\":%u");                       // v77 moved to start Validity CRC 0 or 1
-    msg.concat(",\"CurrentPowerConsumption\":%lu");    // P1
+    msg.concat(", \"CurrentPowerConsumption\":%lu");    // P1
     msg.concat(",\"ThermoState\":%u");                 // Johnson
     msg.concat(",\"AnalogRead\":%u");                  // adc
     msg.concat(",\"LedLight1\":%u");                   // Hot water witch on
 
     if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0 ) {
-        msg.concat(",\"powerConsumptionLowTariff\":%lu");  // P1   always > 0
+        msg.concat(", \"powerConsumptionLowTariff\":%lu");  // P1   always > 0
         msg.concat(",\"powerConsumptionHighTariff\":%lu"); // P1   always > 0
     } else {
         msg.concat(",\"!powerConsumptionLowTariff\":%lu");  // v46 P1 false or missing read, ignore field
@@ -4866,7 +4866,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     char temperatureString[7];
     // sequence does matter
     // TBD: consider logic to ignore if we have a missing sensorcount
-    msg.concat(",\"T0\":"); dtostrf(tempDev[5], 2, 1, temperatureString); msg.concat(temperatureString);  // T0
+    msg.concat(", \"T0\":"); dtostrf(tempDev[5], 2, 1, temperatureString); msg.concat(temperatureString);  // T0
     msg.concat(",\"T1\":"); dtostrf(tempDev[0], 2, 1, temperatureString); msg.concat(temperatureString);  // T1
     msg.concat(",\"T2\":"); dtostrf(tempDev[1], 2, 1, temperatureString); msg.concat(temperatureString);  // T2
     msg.concat(",\"T3\":"); dtostrf(tempDev[2], 2, 1, temperatureString); msg.concat(temperatureString);  // T3
@@ -4881,7 +4881,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       msg.concat(temperatureString); 
     } 
 
-    msg.concat(",\"Heating\":%u");                     // Heating valve (out)
+    msg.concat(", \"Heating\":%u");                     // Heating valve (out)
     if (new_ThermostatState == old_ThermostatState) {  // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
       msg.concat(",\"HeatMode\":%u");                  // current state
     } else {
@@ -7718,40 +7718,45 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
 /* print time table related to ISR  
  */
 void serial_Print_m_buffer_time() {      // print tiem table offset
-   unsigned long offset = -1;   // time offset ISR  
+   unsigned long offset  = -1;   // time offset setup
+   unsigned long offset2 = -1;   // time offset ISR timing
    #ifdef M_TIME_NAMES
-      for (int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset
-         if ( mySerial1.peekTime(i) >=1 && offset < mySerial1.peekTime(i) ) offset = mySerial1.peekTime(i);
+      for (int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
+         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset ) offset = mySerial1.peekTime(i);
+      }
+      for (int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset2 ) offset2 = mySerial1.peekTime(i);
       }
    #endif
-      Serial.print((String) "\r\n M_TIME_ENTRIES #" + M_TIME_ENTRIES + " , currentcycle=" + ESP.getCycleCount() + " , cycle offset= " + offset );
+      Serial.print((String) "\r\n M_TIME_ENTRIES #" + M_TIME_ENTRIES + " , currentcycle=" + ESP.getCycleCount() + " , SSoffset= " + offset + " , ISRoffset= " + offset2);
+      serial_Print_PeekTime(1,M_TIME_ENTRIES);  // print calculation(s)
    #ifdef M_TIME_NAMES
-      Serial.print((String) "\r\n M_TIME_START             2 =  start of Object                         = " + mySerial1.peekTime(M_TIME_START) );
-      Serial.print((String) "\r\n M_TIME_RX_START          3 =  start of SoftwareSerial::enableRx Attach= " + ((mySerial1.peekTime(M_TIME_RX_START)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_START)        - offset) ));
-      Serial.print((String) "\r\n M_TIME_RX_END            4 =  end of SoftwareSerial::enableRx Detach  = " + ((mySerial1.peekTime(M_TIME_RX_END)           == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_END)          - offset) ));
-      Serial.print((String) "\r\n M_TIME_BEGIN_START       5 =  start SoftwareSerial::begin             = " + ((mySerial1.peekTime(M_TIME_BEGIN_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_START)     - offset) ));
-      Serial.print((String) "\r\n M_TIME_BEGIN_END         6 =  end  SoftwareSerial::begin              = " + ((mySerial1.peekTime(M_TIME_BEGIN_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_END)       - offset) ));
-      Serial.print((String) "\r\n M_TIME_AVAIL_START       7 =  start SoftwareSerial::enableRx Attach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_START)     - offset) ));
-      Serial.print((String) "\r\n M_TIME_AVAIL_END         8 =  start SoftwareSerial::enableRx Detach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_END)       - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_START         9 =  ISR START                               = " + ((mySerial1.peekTime(M_TIME_BIT_START)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START)       - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_STOP         10 =  ISR AFTER STOPBIT                       = " + ((mySerial1.peekTime(M_TIME_BIT_STOP)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP)        - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_START1       10 =  ISR Nominal end Actual End              = " + ((mySerial1.peekTime(M_TIME_BIT_START1)       == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START1)      - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_STOPT        11 =  ISR Nominal to save                     = " + ((mySerial1.peekTime(M_TIME_BIT_STOPT)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOPT)       - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_STOP1        12 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_STOP1)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP1)       - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_END1         13 =  ISR END                                 = " + ((mySerial1.peekTime(M_TIME_BIT_END1)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END1)        - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_END2         14 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_END2)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END2)        - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_WAIT          0 =  first ISR wait                          = " +  mySerial1.peekTime(M_TIME_BIT_WAIT));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_START    15 =  first ISR entered                       = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START)   - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_START1   16 =  first ISR getCycleCountIram()           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START1)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START1)  - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_READ     17 =  first ISR start read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_READ)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_READ)    - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_END      18 =  first ISR finish read                   = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_END)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_END)     - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_EXIT     19 =  first ISR exit                          = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_WAIT1         1 =  last ISR wait                           = " +  mySerial1.peekTime(M_TIME_BIT_WAIT1));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START   20 =  last ISR entered                        = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START)  - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START1  21 =  last ISR getCycleCountIram()            = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START1)  == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_READ    22 =  last ISR start read                     = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_READ)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_END     23 =  last ISR finish read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_END)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_END)    - offset) ));
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset) ));
+      Serial.print((String) "\r\n M_TIME_START             2 =  start of Object                         = " +   mySerial1.peekTime(M_TIME_START) )    ;
+      Serial.print((String) "\r\n M_TIME_BIT_WAIT          0 =  first ISR wait                          = " +   mySerial1.peekTime(M_TIME_BIT_WAIT))  ;
+      Serial.print((String) "\r\n M_TIME_BIT_WAIT1         1 =  last ISR wait                           = " +   mySerial1.peekTime(M_TIME_BIT_WAIT1)) ;
+      Serial.print((String) "\r\n M_TIME_RX_START          3 =  start of SoftwareSerial::enableRx Attach= " + ((mySerial1.peekTime(M_TIME_RX_START)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_START)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_RX_START)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_RX_END            4 =  end of SoftwareSerial::enableRx Detach  = " + ((mySerial1.peekTime(M_TIME_RX_END)           == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_END)          - offset )) + "\t( " + mySerial1.peekTime(M_TIME_RX_END)          + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BEGIN_START       5 =  start SoftwareSerial::begin             = " + ((mySerial1.peekTime(M_TIME_BEGIN_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_START)     - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BEGIN_START)     + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BEGIN_END         6 =  end  SoftwareSerial::begin              = " + ((mySerial1.peekTime(M_TIME_BEGIN_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_END)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BEGIN_END)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_AVAIL_START       7 =  start SoftwareSerial::enableRx Attach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_START)     - offset )) + "\t( " + mySerial1.peekTime(M_TIME_AVAIL_START)     + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_AVAIL_END         8 =  start SoftwareSerial::enableRx Detach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_END)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_AVAIL_END)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_START         9 =  ISR START                               = " + ((mySerial1.peekTime(M_TIME_BIT_START)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_START)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_STOP         10 =  ISR AFTER STOPBIT                       = " + ((mySerial1.peekTime(M_TIME_BIT_STOP)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOP)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_START1       10 =  ISR Nominal end Actual End              = " + ((mySerial1.peekTime(M_TIME_BIT_START1)       == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START1)      - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_START1)      + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_STOPT        11 =  ISR Nominal to save                     = " + ((mySerial1.peekTime(M_TIME_BIT_STOPT)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOPT)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOPT)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_STOP1        12 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_STOP1)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP1)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOP1)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_END1         13 =  ISR END                                 = " + ((mySerial1.peekTime(M_TIME_BIT_END1)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END1)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END1)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_END2         14 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_END2)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END2)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END2)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_START    15 =  first ISR entered                       = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_START)   + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_START1   16 =  first ISR getCycleCountIram()           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START1)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START1)  - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_START1)  + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_READ     17 =  first ISR start read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_READ)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_READ)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_READ)    + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_END      18 =  first ISR finish read                   = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_END)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_END)     - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_END)     + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_EXIT     19 =  first ISR exit                          = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START   20 =  last ISR entered                        = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START)  - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_START)  + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START1  21 =  last ISR getCycleCountIram()            = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START1)  == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_START1) + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_READ    22 =  last ISR start read                     = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_READ)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_END     23 =  last ISR finish read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_END)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_END)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_END)    + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   + " )" ) ;
       Serial.print((String) "\r\n");
   #endif
 }   

@@ -199,8 +199,9 @@ public:
    long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
 
-   bool overflow();
-   int peek();
+   volatile bool overflow();
+   
+   volatile int mypeek();
    // unsigned long peek(int);
    unsigned long peekBit(int);            // v59b return request Time of inserted entry
    unsigned long peekBitPos();            // v59b return last entry in BitTime table
@@ -208,6 +209,12 @@ public:
    int           peekByte(int);           // v59b return this Byte in Buffer
 
    virtual size_t write(uint8_t byte) override;
+   virtual int peek();  // v77 must be defined to allow mutiple streams, not sure why this is and connot be rename/removed
+                           // else we get error: cannot declare variable 'mySerial1'-4 to be of abstract type 'SoftwareSerial'
+                           // changing definition to volatile geive a conflict in 
+                           //  file:  /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/Stream.h
+                           //    on: virtual int peek() = 0; virtual int read() = 0; virtual int peek() = 0;
+
    virtual int read() override;
    virtual int available() override;       // fyi: runtime polymorphism, calls class pointers/refss to invoke
    virtual void flush() override;
