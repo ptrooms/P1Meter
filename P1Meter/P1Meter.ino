@@ -7239,7 +7239,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     // bm ----> print serial_Print_PeekBits bittime table
     bool tmpdataFaultDetected = false;   // v75d on/off previous data contained Hash$gfault (character a-h)
     
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {  // print bitTimeA character field
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {  // print bitTimeA character field
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
           Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
@@ -7399,7 +7399,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     */
     tmpdataFaultDetected = false;  // v75d indicate we have a possible datafault
     int j = 0;    // v61a: to print CRC character
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         /* A) print data input :
             data  0 -    0.0000:C  /KFM5KAIFA-METER<|
             data018 -    1.4924:C  <| 
@@ -7509,7 +7509,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
         int temp1 = mySerial1.peekBit(0);  // get zero previous
-        for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
+        for (volatile int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
           if ( m == 0 ||
               mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
               !(telegram_crcOut[m+1]  == mySerial1.peekByte(m+1)  || telegram_crcOut[m+1] == 'X') ||   // triple detect
@@ -7555,7 +7555,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + " #Inpos=" + mySerial2.peekBitPos()
                   + "-------------time:" + micros()
                   + " \r\n");
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
       // Serial.print((String) "\t" + mySerial2.peekBit(i));
       if (i > 0) {
           if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&
@@ -7569,7 +7569,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
     Serial.print((String) "\r\n data0:\t");                 // print character line data
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
          Serial.print((char) convert_p1_print( mySerial2.peekByte(i)) );
          if (convert_p1_print( mySerial2.peekByte(i)) == '|')     // check if we are going to new P1 record
              Serial.print((String) "\r\n data"+ i + ":\t");  
@@ -7723,16 +7723,20 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
 void serial_Print_m_buffer_time() {      // print tiem table offset
    unsigned long offset  = -1;   // time offset setup
    unsigned long offset2 = -1;   // time offset ISR timing
+   // return;
    #ifdef M_TIME_NAMES
-      for (int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
+      for (volatile int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
          if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset ) offset = mySerial1.peekTime(i);
       }
-      for (int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      
+      for (volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
          if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset2 ) offset2 = mySerial1.peekTime(i);
       }
    #endif
+
       Serial.print((String) "\r\n M_TIME_ENTRIES #" + M_TIME_ENTRIES + " , currentcycle=" + ESP.getCycleCount() + " , SSoffset= " + offset + " , ISRoffset= " + offset2);
       serial_Print_PeekTime(1,M_TIME_ENTRIES);  // print calculation(s)
+
    #ifdef M_TIME_NAMES
       Serial.print((String) "\r\n M_TIME_START             2 =  start of Object                         = " +   mySerial1.peekTime(M_TIME_START) )    ;
       Serial.print((String) "\r\n M_TIME_BIT_WAIT          0 =  first ISR wait                          = " +   mySerial1.peekTime(M_TIME_BIT_WAIT))  ;

@@ -203,10 +203,10 @@ public:
    
    volatile int mypeek();
    // unsigned long peek(int);
-   unsigned long peekBit(int);            // v59b return request Time of inserted entry
-   unsigned long peekBitPos();            // v59b return last entry in BitTime table
-   unsigned long peekTime(int);           // v59b return Time where driver is
-   int           peekByte(int);           // v59b return this Byte in Buffer
+   volatile unsigned long peekBit(int);            // v59b return request Time of inserted entry
+   volatile unsigned long peekBitPos();            // v59b return last entry in BitTime table
+   volatile unsigned long peekTime(int);           // v59b return Time where driver is
+   volatile int           peekByte(int);           // v59b return this Byte in Buffer
 
    virtual size_t write(uint8_t byte) override;
    virtual int peek();  // v77 must be defined to allow mutiple streams, not sure why this is and connot be rename/removed
