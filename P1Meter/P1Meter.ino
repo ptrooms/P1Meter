@@ -1,5 +1,7 @@
 
-#define VERSION_NUMBER "77a" // 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
+#define VERSION_NUMBER "77b" // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
+                            // v77a adapted dummy code on sectiont o stabilise
+                            // v77a 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
                             // periodic Z en many Restarts doe make this a candidate
                             // related, we played with softserial
 
@@ -65,6 +67,7 @@
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
 /* code documentation v77.... starting 18aug26
+      v77b - 20aug26 wip enhanced bittiming & bitshifting libs/SoftwareSerial241-P1/SoftwareSerial241.cpp to prevent superfluous byte insertion 
       v77a - 20aug26 stable
           - J-1 somewhat worse then (default) of prewait 417 (which %2 takes bitbang logic1)
           - added doYIELD_MACRO and inserted these into some intensive print like serial_Print_PeekBits()
@@ -7270,6 +7273,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       if (i > 0) {
           Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
           temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
+          /*
           tempc1 = temp;
           tempc2 = temp / 10000;
           tempc3 = temp / 100000000;
@@ -7280,7 +7284,19 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           else if (temp <= 9999999) tempc1 = tempc2;      // large
           else                      tempc1 = tempc3;      // excessive
           Serial.printf("%4d "  , tempc1);
+          */
 
+        /* v77b retry this one
+
+          */
+         if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
+                 temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+                                  Serial.printf("%.4d~" , temp     );      // variation
+          else  if (temp <= 9999) Serial.printf("%04d " , temp     );      // normal
+          else  if (temp <= 9999999) Serial.printf("_%.3d " , temp/10000     );      // large
+          else                       Serial.printf("__%.2d " , temp/100000000);      // excessive
+          
           /* These codeslocks, commented below to achieve column formatted printing below will corrupt somehwere 
               
               so we use bove a more elementary approach.

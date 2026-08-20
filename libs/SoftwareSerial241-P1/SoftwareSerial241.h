@@ -1,4 +1,6 @@
-/* SoftwareSerial.h v77a 19aug26 - using RXREAD59 iso RXREAD58 to improve bit realiabiloity
+/* SoftwareSerial.h v77b - 20aug26 bittiming/bitshift in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp 
+   v77a  - 19aug26 - using RXREAD59 iso RXREAD58 to improve bit realiabiloity, added some volatiles
+   v77   - 
    v76   - 15aug26 new master branch/*
    v76   - 16aug26 volatile int m_rxPin, m_txPin, m_txEnablePin;
    v75e  - 15aug26 variables/pointers used in ISR, volatised to prevnet optimisation/corruption
