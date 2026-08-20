@@ -64,7 +64,19 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-/* code documentation v76.... starting 15aug26
+/* code documentation v77.... starting 18aug26
+      v77a - 20aug26 stable
+          - J-1 somewhat worse then (default) of prewait 417 (which %2 takes bitbang logic1)
+          - added doYIELD_MACRO and inserted these into some intensive print like serial_Print_PeekBits()
+          -  - doYIELD_MACRO was to prevent wdt-reset at printing, question stbd if this in general imnproves
+          -     as exection code, this seem wat more unstable, more Z's .....
+          -     currently content removed.
+          - improvements, extended BIT calculation table serial_Print_m_buffer_time()
+          - added volatiles to libs/SoftwareSerial241-P1/SoftwareSerial241.h 
+          - added volatiles to libs/SoftwareSerial241-P1/SoftwareSerial241.cpp
+          - added volatile fornext in serial_Print_m_buffer_time() , seems to be key for getting things stable
+          - superfluous perhaps, add volatile to fornext in serial_Print_PeekBits()
+      v77 - stable
       v76 - 15aug26 new master brnach from v75e
           - simple hardware serial inpuit commands m/M input/masks, t-full timing table, d-debug
               doCmdHelp() cmdSerialInputConsole()
@@ -1375,6 +1387,20 @@
   );
 
 const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
+
+/* doDUMMY_MACRO doYIELD_MACRO v77a  ------------------------------------------- dummy code insertions
+    default of nullify by activation
+  */
+
+  // #define doDUMMY_MACRO { };            // do background processing required for wifi etc.
+  // #define doYIELD_MACRO { };            // do background processing required for wifi etc.
+  #ifndef doDUMMY_MACRO
+  #define doDUMMY_MACRO { delay(0);delay(0);delay(0); };  // do some dummy delay code 
+  #endif
+  #ifndef doYIELD_MACRO
+  #define doYIELD_MACRO { yield(); ESP.wdtFeed(); };      // do background processing wifi etc.
+  #endif
+// ------------------------------------------------------------------------------- dummy code insertions
 
 #ifndef ARDUINO_ESP8266_RELEASE     // include #include <core_version.h>
   /*
@@ -6533,8 +6559,7 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interfe
   will gLow Blueled if sensor triggered
   will detach during more excessive vibration
 */
-void WaterTrigger0_ISR()
-{
+void WaterTrigger0_ISR() {
   // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
     if (waterISRActive) {    // set routine already active
         if (outputOnSerial) Serial.print( (String) ".W" );
@@ -7142,6 +7167,7 @@ void printf_port_state_isr() {
   Diagnose, print a series of Times as collected by softserial
 */
 void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
+  doDUMMY_MACRO;    // dv77a do some dummy code
   if (time_port == 1) {
     /* tt re              +25213841    327691760 
                       START      RXstart      RX-end      START-rxE = B_start     Be-RX=  B_start  +Bend-start= TA-start  TA-e-TA-s = TA-end
@@ -7218,7 +7244,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
   Diagnose, print a series of Bit Times as collected by softserial
 */
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
-
+  doDUMMY_MACRO;    // dv77a do some dummy code
   if (bit_port == 1) {
     unsigned long temp,tempc1,tempc2,tempc3 = 0UL;               // check duplicates          
     unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
@@ -7373,7 +7399,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
       if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
     }
-
+    doYIELD_MACRO;  // v77a execute yeield and wdtfeed
    
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
@@ -7399,6 +7425,11 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     */
     tmpdataFaultDetected = false;  // v75d indicate we have a possible datafault
     int j = 0;    // v61a: to print CRC character
+
+    /*
+        Print A input B mask  C  delta table
+      */
+     doYIELD_MACRO;  // v77a execute yeield and wdtfeed
     for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         /* A) print data input :
             data  0 -    0.0000:C  /KFM5KAIFA-METER<|
@@ -7476,6 +7507,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         Serial.print((String) "\t <M> Check binary Mask: 0  to " +  (bit_sequence * -1) );
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
+        doYIELD_MACRO;  // v77a execute yeield and wdtfeed
         for (int m = 0; m <= ( (bit_sequence % MAXLINELENGTH) * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
           if ( m == 0 ||
               mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
@@ -7584,6 +7616,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     v74g 10aug26 Print the input array table split from command sequences
 */
 void printCrcInTable() {
+  doDUMMY_MACRO;    // dv77a do some dummy code
   bool tmpdataFaultDetected = false;
   Serial.print((String) "\r\nsI=0\t");   // initialise
   for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
@@ -7613,6 +7646,7 @@ void printCrcInTable() {
     v74g 10aug26 Print the Masking array table split from command sequences
 */
 void printcrcOutTable() {
+      doDUMMY_MACRO;    // dv77a do some dummy code
       Serial.print((String) "\r\nsM=0\t");   // initialise
       for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
         if (isprint(telegram_crcOut[cnt])) {             // if printable
@@ -7721,6 +7755,7 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
 /* print time table related to ISR  
  */
 void serial_Print_m_buffer_time() {      // print tiem table offset
+   doDUMMY_MACRO;    // dv77a do some dummy code
    unsigned long offset  = -1;   // time offset setup
    unsigned long offset2 = -1;   // time offset ISR timing
 
@@ -7734,10 +7769,12 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
    #ifdef M_TIME_NAMES
       // v77a 19aug26 23u19 the fornext must use volatile as without, things become unstable
       for (  volatile int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
+      // for ( int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
          if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset ) offset = mySerial1.peekTime(i);
       }
       // v77a 19aug26 23u19  then next is sensitive required in combination to previous loop to stabilize reliability
       for (  volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      // for (  int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
          if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset2 ) offset2 = mySerial1.peekTime(i);
       }
 
@@ -7766,6 +7803,7 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
       Serial.print((String) "\r\n M_TIME_BIT_START1       10 =  ISR Nominal end Actual End              = " + ((mySerial1.peekTime(M_TIME_BIT_START1)       == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START1)      - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_START1)      + " )" ) ;
       Serial.print((String) "\r\n M_TIME_BIT_STOPT        11 =  ISR Nominal to save                     = " + ((mySerial1.peekTime(M_TIME_BIT_STOPT)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOPT)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOPT)       + " )" ) ;
       Serial.print((String) "\r\n M_TIME_BIT_STOP1        12 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_STOP1)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP1)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOP1)       + " )" ) ;
+      doYIELD_MACRO;  // v77a execute yeield and wdtfeed
       Serial.print((String) "\r\n M_TIME_BIT_END1         13 =  ISR END                                 = " + ((mySerial1.peekTime(M_TIME_BIT_END1)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END1)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END1)        + " )" ) ;
       Serial.print((String) "\r\n M_TIME_BIT_END2         14 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_END2)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END2)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END2)        + " )" ) ;
       Serial.print((String) "\r\n M_TIME_BIT_ISR_START    15 =  first ISR entered                       = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_START)   + " )" ) ;
@@ -7786,7 +7824,7 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
   facilitate Help command
 */
 void doCmdHelp() {    // v76
-
+      doDUMMY_MACRO;    // dv77a do some dummy code
       Serial.println((String)"\r\n? (bell) \a Help commands "  + __FILE__ 
                                                     + " version " + DEF_PROG_VERSION 
                                                     + ", compiled " __DATE__ + " " + __TIME__ );
