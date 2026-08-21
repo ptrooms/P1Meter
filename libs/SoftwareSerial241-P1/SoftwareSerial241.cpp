@@ -1028,7 +1028,10 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    */
    if (m_inPos > 0) { // only to reccculation after first start of rs232
 
-      if (m_bitWait % 2) {              // use m_bitWait as switch to control bit compensation
+      if ( m_bitWait == 416) { // v77b added from  v73 using bitdif
+         if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
+         else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
+      } else if (m_bitWait % 2) {              // use m_bitWait as switch to control bit compensation
 
             // take from SoftwareSerial241_19aug26_14u51.cpp_save
             // code will shift bits to time differently
@@ -1074,19 +1077,18 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
                      wait = (l_bitTime*2)/3 ;
 
         // from git diff 0515b0a30b7bb43e34839f630420e2e1c8d19e31 > changes_b10k_15aug.txt
-      } else if ( m_bitWait == 416) { // v77b added from  v74b10k use m_bitWait as switch to control bit compensation
+      } else if ( m_bitWait == 420) { // v77b added from  v74b10k use m_bitWait as switch to control bit compensation
          if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
          else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
-         bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
        // original logic from stable rxread58
       } else {                          // use m_bitWait from RXREAD58 as switch to control bit compensation
          if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*5)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
          else if (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
          else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
-         bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
       }
 
    } // if m_inPos > 0
+   bit_shift = (bit_shift < 1) ? 1 : (bit_shift > 8) ? 8 : bit_shift; // Clamp to valid range (1-8)
 
    if (m_inPos == 0) m_buffer_time[M_TIME_BIT_WAIT] = wait;      // v77 get overhead wait time
    else              m_buffer_time[M_TIME_BIT_WAIT1] = wait;      
