@@ -1,4 +1,6 @@
-/* SoftwareSerial.cpp v77b 20aug26 try to adapt bittiming with bitshift to prevent byte isnertions
+/* SoftwareSerial.cpp v77b 21aug26 added bittime version of previous stable version to be (s)elected by bit-wait
+   
+   v77b 20aug26 try to adapt bittiming with bitshift to prevent byte isnertions
    v77a 19aug26 - RXREAD59 (as copy of RXREASD 58), added redundant code doYIELD_MACRO, doDUMMY_MACRO, stable OK
    v77   -
    v76 15aug26 new master branch/*
@@ -1028,11 +1030,7 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    */
    if (m_inPos > 0) { // only to reccculation after first start of rs232
 
-      if ( m_bitWait == 416) { // v77b added from  v73 using bitdif
-         if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
-         else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
-      } else if (m_bitWait % 2) {              // use m_bitWait as switch to control bit compensation
-
+      if (m_bitWait % 2 ) {              // use m_bitWait as switch to control bit compensation
             // take from SoftwareSerial241_19aug26_14u51.cpp_save
             // code will shift bits to time differently
             if           ( bit_diff > (wait-(l_bitTime/10))  ) { // > 763   pevious was at leas waittime plus 10% ?
@@ -1043,8 +1041,13 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
             }  else  if   ( bit_diff < ((l_bitTime*2)/3) )         //  > 230    fast     incoming assume, shorten lead to midships 231-462
                         wait = (l_bitTime*2)/3 ;
 
+      } else if ( m_bitWait == 414) { // v69a added bittiming will shift
+            if (bit_diff > 100  && bit_diff < 4858) bit_shift = bit_shift - ((bit_diff / m_bitTime) + 1); // compensate short 1-7 bits
+            else if (bit_diff > 7634 && bit_diff < 9717) bit_shift = bit_shift - (((bit_diff-7974)/694)  + 1); // compensate long 2 bits
+      } else if ( m_bitWait == 416) { // v77b added from  v73 using bitdif
+         if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
+         else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
       } else if ( m_bitWait == 418) {   // use some stable since RXREAD59 v77a 19aug26
-
          /* bit-timing
             1st branch: 763 <= 6940   early , should not be the case
                         +0    (694−(6940-((508+231)))/9)-5
@@ -1075,7 +1078,6 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
                            m_buffer_bits[m_inPos - 1] = (start - (bit_shift * m_bitTime)) | 7; } // indicate the shifted timing
          }  else  if   ( bit_diff < ((l_bitTime*2)/3) )         //  > 230  too fast incoming assume, shorten lead to midships 231-462
                      wait = (l_bitTime*2)/3 ;
-
         // from git diff 0515b0a30b7bb43e34839f630420e2e1c8d19e31 > changes_b10k_15aug.txt
       } else if ( m_bitWait == 420) { // v77b added from  v74b10k use m_bitWait as switch to control bit compensation
          if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
@@ -1135,8 +1137,8 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
          m_P1active = true ; 
       } 
       if (rec == '!') {  // 26mar21 Ptro P1 messageing has ended due valid trailer, v65b as else
-          m_P1active = false ; 
-          if (bit_diff > wait) m_P1active = false ; else rec = '<';  // v77b do no allow termination at non-intergap
+          // m_P1active = false ; 
+          if (bit_diff > (2*wait)) m_P1active = false ; else rec = '<';  // v77b do no allow termination at non-intergap
       }
       m_buffer[m_inPos] = rec;
       m_inPos = next;

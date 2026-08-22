@@ -68,6 +68,7 @@
 
 /* code documentation v77.... starting 18aug26
       v77b - 20aug26 wip enhanced bittiming & bitshifting libs/SoftwareSerial241-P1/SoftwareSerial241.cpp to prevent superfluous byte insertion 
+          - heavily changed SoftwareSerial241.cpp and bsically back to v69a using timeshift  with bitwait=417
       v77a - 20aug26 stable
           - J-1 somewhat worse then (default) of prewait 417 (which %2 takes bitbang logic1)
           - added doYIELD_MACRO and inserted these into some intensive print like serial_Print_PeekBits()
@@ -6094,6 +6095,14 @@ char TranslateForPrint(char c)
   return c;
 }  
 
+bool CheckFaultCharacter(char c)      // v77b 21aug26 check if chracter is a valid one for P1 data
+{
+  if (c == 10  || c == 13 || c == 00 ) return false ;   // translate NL CR are/can be OK
+  if (c >= 'a' && c <=  'g' ) return true ;  // a-g is anyway a dataread fault
+  if (c < 32   || c >= 127  ) return true ;  // space to DEL
+  return false ;
+}  
+
 /* 
   generic subroutine to find a character in reverse , return position as offset to 0
 */
@@ -7413,7 +7422,9 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
        }
 
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
-      if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+      if ( CheckFaultCharacter(mySerial1.peekByte(i)) ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+
+
     }
     doYIELD_MACRO;  // v77a execute yeield and wdtfeed
    
@@ -7466,7 +7477,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                       (float)((((mySerial1.peekBit(i) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
         }
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
-        if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+        if ( CheckFaultCharacter(mySerial1.peekByte(i) ) ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+
         
         if (convert_p1_print( mySerial1.peekByte(i)) == '|' || convert_p1_print( mySerial1.peekByte(i)) == '!')  {   // check if we are going to new P1 record
           
@@ -7636,7 +7648,7 @@ void printCrcInTable() {
   bool tmpdataFaultDetected = false;
   Serial.print((String) "\r\nsI=0\t");   // initialise
   for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
-    if (telegram_crcIn[cnt] >= 'a'  && telegram_crcIn[cnt] <= 'g' ) tmpdataFaultDetected = true;  // v76 indicate we have a possible datafault
+    if ( CheckFaultCharacter(telegram_crcIn[cnt]) ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
 
     if (isprint(telegram_crcIn[cnt])) {             // if printable
         Serial.print(telegram_crcIn[cnt]);
