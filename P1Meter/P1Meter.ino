@@ -1396,8 +1396,8 @@ const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 
     default of nullify by activation
   */
 
-  #define doDUMMY_MACRO { };            // do background processing required for wifi etc.
-  #define doYIELD_MACRO { };            // do background processing required for wifi etc.
+  // #define doDUMMY_MACRO { };            // do background processing required for wifi etc.
+  // #define doYIELD_MACRO { };            // do background processing required for wifi etc.
   #ifndef doDUMMY_MACRO
   #define doDUMMY_MACRO { delay(0);delay(0);delay(0); };  // do some dummy delay code 
   #endif

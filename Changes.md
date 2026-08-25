@@ -7,6 +7,7 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 ## [v21.77] - working new RXREAD59  
+		- v77b stabilised
 		- "P1crc:" 0/1/2 moved to front of JSON record to improve readbility
 		- "ẄLcrc:" 0/1 report to JSON WarmteLink CRC16 result als "WLcrc:" 0/1 to MQTT
 		- add console command 'b' to print the ISR timing array mySerial1.peekTime() using serial_Print_m_buffer_time(). This to investigate ISR timing between start-data-end
