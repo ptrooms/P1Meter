@@ -4944,7 +4944,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(", \"mqttCnt\":%u");      // as of 19nov19 include our message counter, v72 keep field name
 
     // msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
-    msg.concat( ((waterErrorSwitch != 0) ? "\", !WaterSwitch\":%u" : ", \"WaterSwitch\":%u")); // v75e 15aug26 print not sign in case of active error switch
+    msg.concat( ((waterErrorSwitch != 0) ? ", \"!WaterSwitch\":%u" : ", \"WaterSwitch\":%u")); // v75e 15aug26 print not sign in case of active error switch
 
     if (loopbackRx2Tx2) {
       msg.concat(", \"WaterTst\":%u");       // as of 25mar21 Use this Json to indicate Testmode
