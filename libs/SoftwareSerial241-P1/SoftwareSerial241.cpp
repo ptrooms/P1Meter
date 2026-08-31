@@ -1286,6 +1286,8 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
 #define WAITIram4w61 { while (SoftwareSerial::getCycleCountIram()-start < m_wait && m_wait<BYTE_MAXWAIT_1); m_wait += m_bitTime; }
 #if defined (USE_RXREAD61)
 volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead61() {
+)
+volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead61() {
    #else
    void SoftwareSerial::rxRead61() {
    #endif

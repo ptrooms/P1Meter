@@ -301,3 +301,21 @@ Procedure Guide for changes:
 when ready, mrge to master on github:
   11. Create Pull and Merge request to master
   12. create next version for changes
+
+FYI: One may run into '`.text' will not fit in region ` iram1_0_seg'
+	meaning we have occupied the avaible space using "ICACHE_RAM_ATTR"
+		- void WaterTrigger0_ISR(void) ICACHE_RAM_ATTR; // approx 512 bytes
+		- void WaterTrigger1_ISR(void) ICACHE_RAM_ATTR; // approx 488 bytes
+		- _ZN14SoftwareSerial7rxRead2Ev  // approx 340B
+		- _ZN14SoftwareSerial8rxRead59Ev // approx 1.2KB (can be reduced by 200bytes)
+		- unavoidable data/sections like timers/ digital take about approx 2.6KB
+	to check on IRAM occupation, take an firmware.elf file and  run
+	$ xtensa-lx106-elf-nm firmware.elf | sort | uniq -u | grep "^4010*"
+	likely that tool resides in the platformio tool chain of $HOME/.platformio/packages/...
+
+	One can also check the firmware.map file whch will mention 32KB:
+		iram1_0_seg      0x0000000040100000 0x0000000000008000
+		indicating the actual zie for our own IRAM items start at approximately 
+		.iram.text     0x000000004010681c giving us a working size of only 6KB
+		of which is occupied by system sections  and thus only give room for a measly 3Kbyte of
+		code to store our required / other ISR items.
