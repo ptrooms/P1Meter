@@ -1,6 +1,12 @@
-/*
-SoftwareSerial.h 05aug26 v74 using PROD_MODE which uses RXREAD58 with BITWAIT1 417 (leadtime to ISR)
+/* SoftwareSerial.h  v78 31aug26 base version
+   v77b - 20aug26 bittiming/bitshift in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp 
+   v77a  - 19aug26 - using RXREAD59 iso RXREAD58 to improve bit realiabiloity, added some volatiles
+   v77   - 
+   v76   - 15aug26 new master branch/*
+   v76   - 16aug26 volatile int m_rxPin, m_txPin, m_txEnablePin;
+   v75e  - 15aug26 variables/pointers used in ISR, volatised to prevnet optimisation/corruption
    v75b4 - 11aug26 changed malloc() to os_malloc() per advice https://www.bbs.espressif.com/viewtopic.php?t=621
+   v74   05aug26  using PROD_MODE which uses RXREAD58 with BITWAIT1 417 (leadtime to ISR)
 
 Note: RXREAD2 must tbe cached for bitbang in order to BitBank read the Warmtelink ().
       we can enforce this in code SoftwareSerial241.cpp but choose to do this here... in void()
@@ -53,7 +59,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // else USE_RXREAD2 2                  // w.i.p
 
 #if defined(COP_MODE) || defined(DUP_MODE)
-   #define USE_RXREAD58 58             // v63a enabled
+   // #define USE_RXREAD58 58             // v63a enabled
+   #define USE_RXREAD59 59             // v63a enabled
    // #define USE_RXREAD60 60          // v63a disabled
    // -----------------------------------------------------------------vvvv conditional settings
 
@@ -65,7 +72,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
       #ifndef BITWAIT1
-         #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+         // #define BITWAIT1 509 // rx60=519 // rx60=524 // rx60=549      // v62a rxread59 524 t_wait=5974
+         #define BITWAIT1 579 // take from RXREAD59 v63a rxread58  479-579-769 
       #endif
    #elif defined(USE_RXREAD60)
       #define USE_RXREAD USE_RXREAD60
@@ -76,9 +84,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
    #endif
 
 #elif defined(PROD_MODE) 
-   #define USE_RXREAD58 58          // v63a enabled
-   // #define USE_RXREAD59
-   // #define USE_RXREAD60       // v63a disabled
+   // #define USE_RXREAD58 58          // v63a-v76 enabled
+   #define USE_RXREAD59 59          // v77
+   // #define USE_RXREAD60 60       // v63a disabled
 
    // -----------------------------------------------------------------vvvv conditional settings
    #ifdef USE_RXREAD58
@@ -96,6 +104,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
       #endif
    #elif defined(USE_RXREAD59)
       #define USE_RXREAD USE_RXREAD59
+      #define BITWAIT1 417          // v69c:12aug25 16u00 slighly better
       #ifndef BITWAIT1
          // #define BITWAIT1 509       // v59 rxread59 509
          #define BITWAIT1 522       // v62a 524 v59 rxread59 509
@@ -126,6 +135,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // #define BITWAIT1 419    // v61b with rxread59 PROD
    // v58: m_bitWait = 498;   rxread58
    // v59: m_bitWait = 509;   rxRead59 59a/59b
+   // v77: m_bitWait = 414;   rxRead59
    // v60: m_bitWait = 519;   rxRead60
    // v60: m_bitWait = 435;   rxRead61
    // v61b --> 419
@@ -149,33 +159,36 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef M_TIME_NAMES    // used by table: unsgined long m_buffer_time[M_TIME_ENTRIES]
    #define M_TIME_NAMES           // Indicate our name
    #define M_TIME_ENTRIES    30  // Numbeer of entries in M_TIME table
-   #define M_TIME_START       0   // cyclenumber start of Object
-   #define M_TIME_RX_START    1   // cyclenumber start of void SoftwareSerial::enableRx Attach
-   #define M_TIME_RX_END      2   // cyclenumber end of void SoftwareSerial::enableRx Detach
-   #define M_TIME_BEGIN_START 3   // cyclenumber start of  SoftwareSerial::begin
-   #define M_TIME_BEGIN_END   4   // cyclenumber end of  SoftwareSerial::begin
-   #define M_TIME_AVAIL_START 5   // cyclenumber start of void SoftwareSerial::enableRx Attach
-   #define M_TIME_AVAIL_END   6   // cyclenumber start of void SoftwareSerial::enableRx Attach
-   #define M_TIME_BIT_START   7   // v60a Cycle ISR START
-   #define M_TIME_BIT_STOP    8   // v60a Cycle ISR AFTER STOPBIT
-   #define M_TIME_BIT_START1  9   // v60a Cycle ISR Nominal end Actual End (inclusdng get cycle)
-   #define M_TIME_BIT_STOPT  10   // v60a Cycle ISR Nominal to save 
-   #define M_TIME_BIT_STOP1  10   // v60a Cycle ISR Nominal end
-   #define M_TIME_BIT_END1   11   // v60a Cycle ISR END
-   #define M_TIME_BIT_END2   12   // v60a Cycle ISR Nominal end
-   #define M_TIME_BIT_ISR_START    13   // v64a Cycle first ISR entered 
-   #define M_TIME_BIT_ISR_START1   14   // v64a Cycle first ISR for doing getCycleCountIram()
-   #define M_TIME_BIT_ISR_READ     15   // v64a Cycle first ISR start read
-   #define M_TIME_BIT_ISR_END      16   // v64a Cycle first ISR finish read
-   #define M_TIME_BIT_ISR_EXIT     17   // v64a Cycle first ISR exit
-   #define M_TIME_BIT_ISR2_START   18   // v64a Cycle last ISR entered 
-   #define M_TIME_BIT_ISR2_START1  19   // v64a Cycle last ISR for doing getCycleCountIram()
-   #define M_TIME_BIT_ISR2_READ    20   // v64a Cycle last ISR start read
-   #define M_TIME_BIT_ISR2_END     21   // v64a Cycle last ISR finish read
-   #define M_TIME_BIT_ISR2_EXIT    22   // v64a Cycle last ISR exit
+   #define M_TIME_BIT_WAIT          0   // cyclenumber WAIT cycle at start
+   #define M_TIME_BIT_WAIT1         1   // cyclenumber WAIT cycle at end
+   #define M_TIME_START             2   // start of Object 
+   #define M_TIME_RX_START          3   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_RX_END            4   // cyclenumber end of void SoftwareSerial::enableRx Detach
+   #define M_TIME_BEGIN_START       5   // cyclenumber start of  SoftwareSerial::begin
+   #define M_TIME_BEGIN_END         6   // cyclenumber end of  SoftwareSerial::begin
+   #define M_TIME_AVAIL_START       7   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_AVAIL_END         8   // cyclenumber start of void SoftwareSerial::enableRx Attach
+   #define M_TIME_BIT_START         9   // v60a Cycle ISR START
+   #define M_TIME_BIT_STOP         10   // v60a Cycle ISR AFTER STOPBIT
+   #define M_TIME_BIT_START1       10   // v60a Cycle ISR Nominal end Actual End (inclusdng get cycle)
+   #define M_TIME_BIT_STOPT        11   // v60a Cycle ISR Nominal to save 
+   #define M_TIME_BIT_STOP1        12   // v60a Cycle ISR Nominal end
+   #define M_TIME_BIT_END1         13   // v60a Cycle ISR END
+   #define M_TIME_BIT_END2         14   // v60a Cycle ISR Nominal end
+   #define M_TIME_BIT_ISR_START    15   // v77  Cycle first ISR entered 
+   #define M_TIME_BIT_ISR_START1   16   // v77  Cycle first ISR for doing getCycleCountIram()
+   #define M_TIME_BIT_ISR_READ     17   // v77  Cycle first ISR start read
+   #define M_TIME_BIT_ISR_END      18   // v77  Cycle first ISR finish read
+   #define M_TIME_BIT_ISR_EXIT     19   // v77  Cycle first ISR exit
+   #define M_TIME_BIT_ISR2_START   20   // v77  Cycle last ISR entered 
+   #define M_TIME_BIT_ISR2_START1  21   // v77  Cycle last ISR for doing getCycleCountIram()
+   #define M_TIME_BIT_ISR2_READ    22   // v77  Cycle last ISR start read
+   #define M_TIME_BIT_ISR2_END     23   // v77  Cycle last ISR finish read
+   #define M_TIME_BIT_ISR2_EXIT    24   // v77  Cycle last ISR exit
 #endif
 
 #define M_BIT_CYCLE_VALUE (getCycleCountIram() % 4096);     // get distance
+
 
 class SoftwareSerial : public Stream
 {
@@ -189,8 +202,9 @@ public:
    long baudRate();
    void setTransmitEnablePin(int transmitEnablePin);
 
-   bool overflow();
-   int peek();
+   volatile bool overflow();
+   
+   volatile int mypeek();
    // unsigned long peek(int);
    unsigned long peekBit(int);            // v59b return request Time of inserted entry
    unsigned long peekBitPos();            // v59b return last entry in BitTime table
@@ -198,25 +212,64 @@ public:
    int           peekByte(int);           // v59b return this Byte in Buffer
 
    virtual size_t write(uint8_t byte) override;
+   virtual int peek();  // v77 must be defined to allow mutiple streams, not sure why this is and connot be rename/removed
+                           // else we get error: cannot declare variable 'mySerial1'-4 to be of abstract type 'SoftwareSerial'
+                           // changing definition to volatile geive a conflict in 
+                           //  file:  /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/Stream.h
+                           //    on: virtual int peek() = 0; virtual int read() = 0; virtual int peek() = 0;
+
    virtual int read() override;
-   virtual int available() override;
+   virtual int available() override;       // fyi: runtime polymorphism, calls class pointers/refss to invoke
    virtual void flush() override;
    virtual bool P1active();          // check if driver is active beween header-/ and trailer byte-!
    virtual bool portActive();        // check if port is active (m_port_state)
-   operator bool() {return m_rxValid || m_txValid;}
+   // operator bool() {return m_rxValid || m_txValid;}  // user-defined conversion operator in C++.
+                              // if (bool) { ..}  // Executes if either m_rxValid or m_txValid is true
 
    // Disable or enable interrupts on the rx pin
    void enableRx(bool on);
    void enableRx(bool on, int recordtype);      // v58 to use/do/selec type of data 0-physical/ 1-simulatedP1 / 2-simulatatedWL
 
-   void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
-   void rxRead2() ICACHE_RAM_ATTR;		// test to IRAM iso at function BitBang Wl without p1active detection beween / and !
-   // void rxRead2();		// BitBang Wl without p1active detection beween / and !
-   void rxRead58();		// BitBang routine v58 
-   void rxRead59();		// BitBang routine v59 
-   void rxRead60();		// BitBang routine v60
-   void rxRead61();		// BitBang routine v61
-   void rxTriggerBit(); // use bittiming every flank change allocates a time
+   /* define RXREADxx either volatile cached or native 
+
+      */ 
+      #if defined (USE_RXREAD) 
+         volatile void rxRead() ICACHE_RAM_ATTR; // v59b volatile (to be user) BitBang P1 with  p1active detection beween / and !
+      #else
+         void rxRead();		   // v59b volatile (to be user) BitBang P1 with    p1active detection beween / and !
+      #endif
+
+         // RxRead2 is always cached volatile as its used for correctly reading WarmteLink
+         volatile void rxRead2() ICACHE_RAM_ATTR;		// BitBang Wl without p1active detection beween / and !
+   
+      #if defined (USE_RXREAD58) 
+
+         volatile void rxRead58() ICACHE_RAM_ATTR;		// BitBang routine v58, advanced bittiming P1 detection / & !
+      #else   
+         void rxRead58();		// BitBang routine v58 
+      #endif
+   
+      #if defined (USE_RXREAD59) 
+         volatile void rxRead59() ICACHE_RAM_ATTR;		// BitBang routine v59 
+      #else   
+         void rxRead59();		// BitBang routine v59 
+      #endif
+   
+      #if defined (USE_RXREAD60) 
+         volatile void rxRead60() ICACHE_RAM_ATTR;		// BitBang routine v60
+      #else   
+         void rxRead60();		// BitBang routine v60
+      #endif      
+   
+      #if defined (USE_RXREAD61) 
+         voltatile void rxRead61() ICACHE_RAM_ATTR;	// BitBang routine v61
+      #else   
+          void rxRead61();		// BitBang routine v61
+      #endif
+   // above, RX read definitions.
+
+   volatile void rxTriggerBit(); // use bittiming every flank change allocates a time
+
    int m_use_rxRead;      // holds the USE_RXREAD ISR number to be used
    
    // AVR compatibility methods
@@ -234,26 +287,17 @@ public:
 private:
    bool isValidGPIOpin(int pin);
    // Member variables
-   int m_rxPin, m_txPin, m_txEnablePin;
+   volatile int m_rxPin, m_txPin, m_txEnablePin;
    bool m_rxValid, m_rxEnabled;
    bool m_txValid, m_txEnableValid;
    volatile  bool m_invert;
-   #ifdef RXREAD58
-      volatile bool m_P1active;        // v75d ,  Ptro 28mar21 to support P1 messageing 
-   #else
-      volatile bool m_P1active;        // Ptro 28mar21 to support P1 messageing, volatile v59b used in ISR
-   #endif
+   volatile bool m_P1active;        // v75d ,  Ptro 28mar21 to support P1 messageing 
    bool m_port_state;               // v59 contains status of (in)activated ISR
    volatile  bool m_overflow;        // volatile v59b , used in ISR
    volatile unsigned long m_bitTime;  // volatile v60a, used in ISR
    // volatile unsigned long m_bitWait;         // introduced to control bittiming
    bool m_highSpeed;
-   #ifdef RXREAD58
-      // unsigned int m_inPos, m_outPos;          
-      volatile unsigned int m_inPos, m_outPos;     // v74 do not optimize for test in rxread58
-   #else
-      volatile unsigned int m_inPos, m_outPos;
-   #endif
+   volatile unsigned int m_inPos, m_outPos;     // v74 do not optimize for test in rxread58
    volatile int m_buffSize;
    uint8_t * volatile m_buffer;            // note this is a pointer to unt8_t array (aka bytes) index by m_inPos, m_outPos;
 
@@ -288,4 +332,4 @@ uint32_t ICACHE_RAM_ATTR SoftwareSerial::getCycleCountIram()
 #define SW_SERIAL_UNUSED_PIN -1
 
 
-#endif
+#endif   // #ifndef SoftwareSerial_h

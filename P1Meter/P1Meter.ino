@@ -1,7 +1,15 @@
 
+#define VERSION_NUMBER "78" // v78 31aug26 base version
+                            // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
+                            // v77a adapted dummy code on sectiont o stabilise
+                            // v77a 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
+                            // periodic Z en many Restarts doe make this a candidate
+                            // related, we played with softserial
+
 // #define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
 // #define DEBUG_ESP_OOM 1          // v75b5  playing around
 
+// TBD https://github.com/hideakitai/DebugLog
 
 /*  sof test & investigage intability at switchDebugCmd function in readTelegramP1() v75d
   // ---------------------------------------------------------------------------------------------test switches
@@ -41,25 +49,47 @@
 
 #define DUMMY_CNTHEAP 0  // v75d1 test cntHeapStart/Finish definition 0 / 1-loop{}start  / 2loop{}end / 3-both
                             // as to date executing ESP.getFreeHeap() leads to instability at using rs232
-  // cntHeapFinish && cntHeapStart are now laways defined, extra code soze = 
-// below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 to test insert/code stability. v75c keep 
-// #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
-// #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE3    // v75b10f v75b10c  for adding dummy code to end of loop{}
-// #define DUMMYCODE4    // v75b10c  for adding dummy code to end of loop{}
-// #define DUMMYCODE5    // v75b10c  for adding dummy code to end of loop{}
-// #define DUMMYCODE6    // v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE7    // v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE8    // v75b7  for adding dummy code to end of loop{}
-// #define DUMMYCODE9    // v75b7  for adding dummy code to end of loop{}
-// -------------------------------------------------------------------------------------------------test switches
+ // cntHeapFinish && cntHeapStart are now laways defined, extra code soze = 
+ // below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 to test insert/code stability. v75c keep 
+ // #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
+ // #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
+ // #define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
+ // #define DUMMYCODE3    // v75b10f v75b10c  for adding dummy code to end of loop{}
+ // #define DUMMYCODE4    // v75b10c  for adding dummy code to end of loop{}
+ // #define DUMMYCODE5    // v75b10c  for adding dummy code to end of loop{}
+ // #define DUMMYCODE6    // v75b7  for adding dummy code to end of loop{}
+ // #define DUMMYCODE7    // v75b7  for adding dummy code to end of loop{}
+ // #define DUMMYCODE8    // v75b7  for adding dummy code to end of loop{}
+ // #define DUMMYCODE9    // v75b7  for adding dummy code to end of loop{}
+ // -------------------------------------------------------------------------------------------------test switches
 
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-#define VERSION_NUMBER "75e" // number this version 11aug26 (master, rebased from stable v74)
+/* code documentation v78.... starting 31aug26
+      v77b - very stable, fixed a small Json error
+      v77b - 20aug26 wip enhanced bittiming & bitshifting libs/SoftwareSerial241-P1/SoftwareSerial241.cpp to prevent superfluous byte insertion 
+          - heavily changed SoftwareSerial241.cpp and bsically back to v69a using timeshift  with bitwait=417
+      v77a - 20aug26 stable
+          - J-1 somewhat worse then (default) of prewait 417 (which %2 takes bitbang logic1)
+          - added doYIELD_MACRO and inserted these into some intensive print like serial_Print_PeekBits()
+          -  - doYIELD_MACRO was to prevent wdt-reset at printing, question stbd if this in general imnproves
+          -     as exection code, this seem wat more unstable, more Z's .....
+          -     currently content removed.
+          - improvements, extended BIT calculation table serial_Print_m_buffer_time()
+          - added volatiles to libs/SoftwareSerial241-P1/SoftwareSerial241.h 
+          - added volatiles to libs/SoftwareSerial241-P1/SoftwareSerial241.cpp
+          - added volatile fornext in serial_Print_m_buffer_time() , seems to be key for getting things stable
+          - superfluous perhaps, add volatile to fornext in serial_Print_PeekBits()
+      v77 - stable
+      v76 - 15aug26 new master brnach from v75e
+          - simple hardware serial inpuit commands m/M input/masks, t-full timing table, d-debug
+              doCmdHelp() cmdSerialInputConsole()
+          - comments & documentation idented so VSCode better can expand collapse sections
+
+*/
+
 /* code documentation 75e 75d 75c
       v75e  15aug26 - improved visulisation of datatables
         - errorwater switch function, holduntil hotwater is tapped
@@ -86,7 +116,7 @@
         ESP8266-FreeHeap: 19928
         Program using: RXREAD=58 with  RXREAD58 BITWAIT1=417.
         fault 275/3036 elen: 216 recover 1202
-*/
+ */
 /* v75b code documentation
   75b 11aug75 based on master: check test why 75a (formatted timetabe display) is instabnle compared to master
        Note there was a fault glitch between 13u15 and 13u35.... 8-10Zs on row while I was finisching paiting.
@@ -278,7 +308,7 @@
             reverted activae code back to 
             - v75b10k - re-added DUMMYCODE1-3           -  very stable. Mark this to v75b branch
 
-*/
+ */
 
 /* Procedure Guide tldr; for changes:
   0. set VSC/IDE to PlaformIO mode 
@@ -301,465 +331,465 @@
   // should have #define ARDUINO_ESP8266_RELEASE "2_7_1" // ~/.platformio/packages/framework-arduinoespressif8266@3.20701.0/cores/esp8266/core_version.h
 #endif
 
-/* dev 1153 epc1=0x401022c5 PROD_MODE v58c P1Meter.ino version 2158.2_4_1, compiled Jul 23 2025 18:12:52
+  /* dev 1153 epc1=0x401022c5 PROD_MODE v58c P1Meter.ino version 2158.2_4_1, compiled Jul 23 2025 18:12:52
 
-   dev 1153 epc1=0x401025dd, COP_MODE V58c P1Meter.ino version 6158.2_4_1, compiled Jul 23 2025 18:13:16 wdt1153
-    assemble file: file://home/pafoxp/code-P1Meter/.pio/build/p1meter-production_241_copy/firmware.asm
-        401025ce:	fe6421               	l32r	a2, 40101f60 <trc_NeedRTS+0x238>
-        401025d1:	fe6431               	l32r	a3, 40101f64 <trc_NeedRTS+0x23c>
-        401025d4:	81a442               	movi	a4, 0x481
-        401025d7:	f99a01               	l32r	a0, 40100c40 <ppTxqUpdateBitmap+0x28>
-        401025da:	0000c0               	callx0	a0
-        401025dd:	ffff06               	j	401025dd <wDev_ProcessFiq+0x341>
-        401025e0:	000000               	ill
-        401025e3:	c0                      	.byte 0xc0
-*/
+    dev 1153 epc1=0x401025dd, COP_MODE V58c P1Meter.ino version 6158.2_4_1, compiled Jul 23 2025 18:13:16 wdt1153
+      assemble file: file://home/pafoxp/code-P1Meter/.pio/build/p1meter-production_241_copy/firmware.asm
+          401025ce:	fe6421               	l32r	a2, 40101f60 <trc_NeedRTS+0x238>
+          401025d1:	fe6431               	l32r	a3, 40101f64 <trc_NeedRTS+0x23c>
+          401025d4:	81a442               	movi	a4, 0x481
+          401025d7:	f99a01               	l32r	a0, 40100c40 <ppTxqUpdateBitmap+0x28>
+          401025da:	0000c0               	callx0	a0
+          401025dd:	ffff06               	j	401025dd <wDev_ProcessFiq+0x341>
+          401025e0:	000000               	ill
+          401025e3:	c0                      	.byte 0xc0
+  */
 
-/*  documentation   
-  feeding data test_mode: while sleep 8; do ./sendp1_cr.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
-  feeding data  cop_mode: while sleep 8; do ./sendp1_crlf.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
+  /*  documentation   
+    feeding data test_mode: while sleep 8; do ./sendp1_cr.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
+    feeding data  cop_mode: while sleep 8; do ./sendp1_crlf.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
 
-  21jul25: debug serial2.4.1. library debug : 
-  1. search SoftwareSerial241.cpp.o in /home/pafoxp/code-P1Meter/.pio/build
-    /home/pafoxp/code-P1Meter/.pio/build/p1meter-production_271/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o:
-     file format elf32-xtensa-le
-  2. Note: we use Xobjdump which is locally linked by:
-      ln /home/pafoxp/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-objdump /home/pafoxp/.local/bin/Xobjdump 
-  3. Disassembl;e      
-      Xobjdump -C -d /home/pafoxp/code-P1Meter/.pio/build/p1meter-production_241_copy/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o
-      Note add this to conserve out: > /home/pafoxp/code-P1Meter/debug/SoftwareSerial241`date +%Y%M%d-%H%m`.asm
-
-
-    https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
-    api reference: https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf
-    sdk: https://github.com/espressif/ESP8266_NONOS_SDK/tree/release/v2.2.x
-                  https://espressif.com/sites/default/files/documentation/2a-esp8266-sdk_getting_started_guide_en.pdf
-
-    def RX2TX2LOOPBACK false -->  def NoTx2Function  <> loopbackRx2Tx2 will light led
-
-  Locations:
-    commands: void ProcessMqttCommand(char* payload, unsigned int myLength)
-    Setup ()
-    P1 processing: void readTelegramP1()
-    P2 processing: void readTelegramWL()
-
-  Summarised loop( ) sequence (approx 5000/sec): 
-      set timings & check P1 not active
-      else swap start Serial P1 <--> P2
-      Check if/do water trigger
-      If P2 Do WL process 
-      If P1 Do P1 process, when data processGpio() functions, publishP1ToMqtt();  
-      set timings, trace line and "loopCnt % 10"
-      If no data: do forced processGpio() functions, publishP1ToMqtt();  
-      OTA handle
-
-*/
-
-/*
-  fyi:  The heap (at end and Stack at begin of free memory).
-  ESP.getFreeHeap() returns the available space in between the heap and the stack.
-
-  Static assigned RAM, 
-    wich contains the global and 'static' defined variables. 
-    It grows up from the bottom of RAM and is assigned during compiletime, and so 
-    the compiler can tell you how much space it occupies. 
-    Unfortunately this part is named 'dynamic RAM' in the IDE.
-
-  The Stack. ( Total stack size is only 4K.)
-    This area grows and shrinks when using function calls. 
-    It contains the return addresses and dynamic variables local to a function (created 
-    when calling the function and deleted with return). It is assigned downwards from 
-    the end of the RAM and grows with every function call and shrinks with the return.
-
-  The Heap. 
-    This is the RAM area between the statically assigned variables and the 
-    stack. RAM space assigned with 'new' and deleted with 'delete' is allocated in 
-    this area. It starts at the end of the static area and grows up - 
-    and must at no time come in conflict with the stack. The size of the heap is'nt really 
-    fixed, because the upper limit is defined by the lower limit of the stack, which is dynamic.
-
-    The heap is fully dynamic. 
-    a buffer related to an object may be moved (like the String class does when it runs out
-    of space) and this can cause fragmentation.
+    21jul25: debug serial2.4.1. library debug : 
+    1. search SoftwareSerial241.cpp.o in /home/pafoxp/code-P1Meter/.pio/build
+      /home/pafoxp/code-P1Meter/.pio/build/p1meter-production_271/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o:
+      file format elf32-xtensa-le
+    2. Note: we use Xobjdump which is locally linked by:
+        ln /home/pafoxp/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-objdump /home/pafoxp/.local/bin/Xobjdump 
+    3. Disassembl;e      
+        Xobjdump -C -d /home/pafoxp/code-P1Meter/.pio/build/p1meter-production_241_copy/lib4c2/SoftwareSerial241-P1/SoftwareSerial241.cpp.o
+        Note add this to conserve out: > /home/pafoxp/code-P1Meter/debug/SoftwareSerial241`date +%Y%M%d-%H%m`.asm
 
 
-  Depends on your program.
-       Only variables/memory you reserve with 'new' occupy heap space And 
-       also variables local to a function and the stack reduce the 'free' space.
-      If you define your arrays and structures global, the belong to the 'dynamic' memory.
+      https://www.esp8266.com/wiki/doku.php?id=esp8266_gpio_pin_allocations
+      api reference: https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf
+      sdk: https://github.com/espressif/ESP8266_NONOS_SDK/tree/release/v2.2.x
+                    https://espressif.com/sites/default/files/documentation/2a-esp8266-sdk_getting_started_guide_en.pdf
 
-  Use the F() macro to save on RAM ?    s += F("Free memory: "); // This stores literals in progmem.
+      def RX2TX2LOOPBACK false -->  def NoTx2Function  <> loopbackRx2Tx2 will light led
 
-  What really grinds my gears is that whenever I changed an absolutely insignificant thing, 
-  the problem seems to decrease. So I made conclusions which was always put back on the table... B
-  cause I didn't know the problem was much more fucked up than I though.
+    Locations:
+      commands: void ProcessMqttCommand(char* payload, unsigned int myLength)
+      Setup ()
+      P1 processing: void readTelegramP1()
+      P2 processing: void readTelegramWL()
 
-  Recently I had a program running without less corrupted datas. I review my code and only add a 
-  Serial.println() in a unused function to debug a potential bug. By adding this line, I get a l
-  ot more corrupted data between ESP and SIM808. I reboot, same. I try to flash back the program without 
-  the Serial.println(), the problem disapear. I re-add this line, re-flash, the problem shows up again.
-  This Serial.println() wasn't even called in the boot process.
-  So in fact, I just changed 2 chars and it makes my whole program to be unstable.
+    Summarised loop( ) sequence (approx 5000/sec): 
+        set timings & check P1 not active
+        else swap start Serial P1 <--> P2
+        Check if/do water trigger
+        If P2 Do WL process 
+        If P1 Do P1 process, when data processGpio() functions, publishP1ToMqtt();  
+        set timings, trace line and "loopCnt % 10"
+        If no data: do forced processGpio() functions, publishP1ToMqtt();  
+        OTA handle
 
+  */
 
-  There are 2 stacks: the sys and cont. https://github.com/esp8266/Arduino/issues/5148
-  The sys is used by the sdk, and is als the one in use in certain callbacks, like Ticker. 
-  The cont is the one used in our Arduino setup() and loop(), as well as all functions called from them.
-    The cont is 4KB in size, and used to be allocated on the heap. 
-  However, some research found that the sys stack is very big, something like 9 or 10KB, 
-    and most of it is unused after boot. 
-    So we moved the cont stack on top of the sys stack, and that frees up 4KB additional heap.
-    If you use wps in your project, this optimization is automagically reverted, 
-      and the cont stack goes back to heap. 
-      The reason for this is that wps seems to make large use of the sys stack.
+  /*
+    fyi:  The heap (at end and Stack at begin of free memory).
+    ESP.getFreeHeap() returns the available space in between the heap and the stack.
 
+    Static assigned RAM, 
+      wich contains the global and 'static' defined variables. 
+      It grows up from the bottom of RAM and is assigned during compiletime, and so 
+      the compiler can tell you how much space it occupies. 
+      Unfortunately this part is named 'dynamic RAM' in the IDE.
 
-*/
+    The Stack. ( Total stack size is only 4K.)
+      This area grows and shrinks when using function calls. 
+      It contains the return addresses and dynamic variables local to a function (created 
+      when calling the function and deleted with return). It is assigned downwards from 
+      the end of the RAM and grows with every function call and shrinks with the return.
 
-/* tbd 
-  change record/idś to definitions like "/KFM5KAIFA-METER"
-  change \r\n to \r\n to 
-  sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
-      -- strange as wifi proces during setup( ) before was OK
-  change verboselevel == 1 to ==2 that will print myLenbgths of P1 records print
-  documentation for mqtt commands
-  cleanout no longer needed code
-    error: 06jul25 13u00 (using faulty esp, port0 > 3.6volts) 
-      ESP8266-ResetReason: Hardware Watchdog
-      Found Temp ghost device at 5 but could not detect address.
-      ESP8266-ResetReason: Software Watchdog
-      Crash after line: --> ESP8266-chip-size: 4194304 , ESP8#'+/37;?BFJNRVZ^bfjnrvz
-      (ESP8266-sdk-version: 2.2.1(cfd48f3) )
-  tbd: power protection
-        -- check excessive power usage
-  tbd: smart thermostat
-      controls heat based on own thermo couple
-          -- learn feedback time
-  tbd: feed check, 
-      veriy we have commands on a daily basis
-  tbd: activate antifreeze protection 
-      for 1 hour when any of the temperature below average threshold 10-12°C during > 15 minutes
-      check if heat is produced by monitoring warmtelink
-  tbd: alarm flashing blueleds ??
-      design code to alternate flash
-  tbd: read/write countersmqtt: Sents (C__) Misses (Cxx) Fails (Z_) Recovers (R)
-      we have a miss if the P1 RX premature  ends < 340µSec, usually <= 86.016
-      we have a fail if CRC does not match
-      we have a Recver if we coull reconstruct CRC
-      we have an OK if none of the above and we output things 
+    The Heap. 
+      This is the RAM area between the statically assigned variables and the 
+      stack. RAM space assigned with 'new' and deleted with 'delete' is allocated in 
+      this area. It starts at the end of the static area and grows up - 
+      and must at no time come in conflict with the stack. The size of the heap is'nt really 
+      fixed, because the upper limit is defined by the lower limit of the stack, which is dynamic.
+
+      The heap is fully dynamic. 
+      a buffer related to an object may be moved (like the String class does when it runs out
+      of space) and this can cause fragmentation.
 
 
-*/
+    Depends on your program.
+        Only variables/memory you reserve with 'new' occupy heap space And 
+        also variables local to a function and the stack reduce the 'free' space.
+        If you define your arrays and structures global, the belong to the 'dynamic' memory.
+
+    Use the F() macro to save on RAM ?    s += F("Free memory: "); // This stores literals in progmem.
+
+    What really grinds my gears is that whenever I changed an absolutely insignificant thing, 
+    the problem seems to decrease. So I made conclusions which was always put back on the table... B
+    cause I didn't know the problem was much more fucked up than I though.
+
+    Recently I had a program running without less corrupted datas. I review my code and only add a 
+    Serial.println() in a unused function to debug a potential bug. By adding this line, I get a l
+    ot more corrupted data between ESP and SIM808. I reboot, same. I try to flash back the program without 
+    the Serial.println(), the problem disapear. I re-add this line, re-flash, the problem shows up again.
+    This Serial.println() wasn't even called in the boot process.
+    So in fact, I just changed 2 chars and it makes my whole program to be unstable.
 
 
-/* change history
-  - v75c  - 13aug26 02u13 change to improve table fragmentation to prevent overflows.....
-          - perhaps we have overlows and our technique to surround with areas might not work.
-  - v75b  - stablised based on master
-  - v75a  - abandoned
-  - v75  - to master (11aug26)
-*/  
-/*  
-  - v75  - stable for 1250 read and 50 errors of which Rcvr=360 and Elenght errors=19
-  - v74  merged to maser.
-  - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
-        - masklimiter, improved masking
-        - if we have CRC failure, we try to recover using the built if the next is already masked also
-            mskio=49:4/3\X := we read a "4" , we had a '3' and the next is "X" masked: we keep as read
-            mskio=325:g/6  := we read a "g" , we had a '6' and the next is not masked: we use as not masked
-        - switchMaskingCmd/'m'  switchMaskingOut during CRC is OK
+    There are 2 stacks: the sys and cont. https://github.com/esp8266/Arduino/issues/5148
+    The sys is used by the sdk, and is als the one in use in certain callbacks, like Ticker. 
+    The cont is the one used in our Arduino setup() and loop(), as well as all functions called from them.
+      The cont is 4KB in size, and used to be allocated on the heap. 
+    However, some research found that the sys stack is very big, something like 9 or 10KB, 
+      and most of it is unused after boot. 
+      So we moved the cont stack on top of the sys stack, and that frees up 4KB additional heap.
+      If you use wps in your project, this optimization is automagically reverted, 
+        and the cont stack goes back to heap. 
+        The reason for this is that wps seems to make large use of the sys stack.
 
-  - v72  - implement restart followup decisions due to reained message(s).  
-          If restarted , ignore (retained) command R-estart, e-rror and 3-ignore state
-            this to prevent any loop due to last retained mqtt command and
-            prevent dwfault heatingstate is on when retained mode was '3' ignore.
-         - refactor "mqttCnt" to "mqttCnt_Out"
-            count number of input commands via "mqttCnt_In" and display this with as cmd= on '?' command
-  - v71  - protect coalescing change of new_ThermostatState by old_ThermostatState
-          when we have changed the thermostat mode, we report the state in Json as Xeatmode
-          03feb26: fault old_ThermostatState == new_ThermostatState; should be "="
-  - v70a - running stable
-  - v69a - refine byt-insertion when short < 4  is active at bitwait%2
-      indicate D4 line when we have an bit-time error
-  - v69 - based on v66, using RXREAD58 stable, 
-    work between interrupt waittiming
-    added correct 12.5nS time calculation
-  - v68, v66a/v66b abandoned as unstable
-  - v66  - reworked from v65  3952201: v65b: rxread2 ETS_INTR_UNLOCK() (which fixed wdt)
-  - v65b - qworked for timing.... not stable in production
-  - v65b - rxread58 only termination bittime registration
-    rxread2 supplied with  ETS_INTR_LOCK()/ETS_INTR_UNLOCK(), like rx58
-      ss: diagnose DO/gpio16 on/off with BITTEST_BLUE_ACTIVE when m_rxPin == 14 has ISR active
-  - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
-    (PROD shorten bitwait 502 --> 427 due to tieming)
-    improved watertrigger by resetting the recurrent ISR status at end of ISR
-  - v65  - rework v64a to prevent wdt (no timing registration in SS241 as developed in v64a)
-  - v64a - enahncwed with time diagnostics lead to wdt
-    improved watertrigger by resetting the recurrent ISR status at end of ISR
-  - v64a solved 2 data errors telegram field fault & no data transmit after checkdata() recovery.
-    beautify data diagnostics
-    added ISR timing measurements PRODmode 497 --> 427 , COP-MODE is stable but PROD-MODE varries
-    PROD_MODE suffers WDT when bitwait 427 is changed to 432
-    Note: Before changes: fully stable
-  - v64  (since v62) operational release
-    - SS stabilised as we use ETS_INTR_LOCK() &7 ETS_INTR_UNLOCK() which allows Wifi during BitBang
-  - v63b  - improve rsRead58: finally very stable after directly Interlock after ISR activates
-      adding recovery logic to stitch-recover record if this is 1 byte too short (indicated by < >)
-      Note:  the wait routine is fixed to 694 clock-window-cycles measured at/of start of ISR
-    - softserial: reorganise work RxRead58 to improve stability, DeepSeel: use register read/write/interlock()
-                  adding bitmiss logic if previous 100 < Byte time < 2300 (using m_start)
-                  v64: only when m_bitWait is odd..... 
-    - testing direct GPIO control using GPIO_REG_WRITE(GPIO_OUT_W1Tc/s_ADDRESS, 1<< D4)
-  - v63a - 50/50 stable table InterUn/lock() usage iso cli()/sei(), improve data layou-
-    Timing diagnostics m_BItTime, small changes between COP and PROD as DSMR use other specs
-  - v63a  Back to RxRead58 which was  stablke in v58
-  - v63   use/work RXread60 , not very stable
-  - v62a  timing  change RxRead60, unstable BitWait unpredictable
-  - v62   production
-  - v61a - changewd bitwait to make things stable
-  - v60 - stabilised, using m_bitwaittime 521 for production to have bytecycle from 6940 to range of 6930-6935
-  - v59b - testdata, preparing for alternative ISR (bittiming) routine, print time table serial_Print_PeekBits command t(1,2,3)
-    - introduced #define BYTE_MAXWAIT_1 7100 @ SoftwareSerial241.cpp  // maximum cycles per byte which floats between 6930-7012 cycles
-  - v59a - diagfnostics and prepare multiport threading, all serial combinaed in a single routine
-  - v59  - added extra telegram bash scripts to feed test data
-  - 58d2 - moved to production
-  - v58d, v58e error; reworked to v58d1 and v58d2 to new v59 
-    - added overloaded for SoftwareSerial to prepare for serial bittiming
-    - we played around with calloc. Woirks great as test (*activate D-dip;lay to) show timers
-      using peekTime(int i) thar interrogates the timer array pf serial1 and serial2
-                  M_TIME_START  RX_START     RX_END          BEGIN             END                   AVAIL_         END   
-      x1 serial1 time  4318330 1973965602.  1973918650 +754= 1973919404 +46922=1973966326 +395253309=2369219635 +10=2369219645,  
-                    START  START              RX_END
-                  4318330. 4318330+2390910242=2395228572
-  - v58c refactor len to myLen, debugging options
-    - testing for (int i = 14; i < 11; i--) {asm NOP}
-    - adding 4 delay()s to check if this stabilizes the COP_MODE version
-  - v58b refactor myserial1/2 names, enhanced bittime, stop and baudrate control
-    - we added serial read mode 0/1/2: 0-physical port, 1-P1 record, 2=WL-record
-  - v58a  --> moved to production
-    - likely cause that serial processing stays tool long in ISR, with wifi debug , we see dev:1153
-          https://github.com/espressif/ESP8266_NONOS_SDK/issues/90
-  v58 based on corrected master
-    - we extended platformio to generate Disassemble after compile, this to interrogate result
-      which could als be doen by executing the Extensa "objdump" that reads the ELF file to disassemble output.
-      This is done via Python post_build.py (for Arduino 2.4.1) and post_build_271.py (2.7.x)
-      Activated is adding & activating the  .ini options per project environment
-          ;extra_scripts = post_build.py
-          ;targets = disasm
-    - during testing we exprience frequent WDT crashes as related to Wifi, why is a mystery
-      Only the Live production  seems more stable. Perhaps this interelates with actual telegram data.
-    - inroduced COP_MODE to differentiate TEST/PROD_MODE only by IP_Address and Mqtt-prefix:x1 & versionid: 61 
+
+  */
+
+  /* tbd 
+    change record/idś to definitions like "/KFM5KAIFA-METER"
+    change \r\n to \r\n to 
+    sometimes after OTA restart, noping  & Attempt MQTT connection to nodemcu-d1 ...failed to 192.168.1.8
+        -- strange as wifi proces during setup( ) before was OK
+    change verboselevel == 1 to ==2 that will print myLenbgths of P1 records print
+    documentation for mqtt commands
+    cleanout no longer needed code
+      error: 06jul25 13u00 (using faulty esp, port0 > 3.6volts) 
+        ESP8266-ResetReason: Hardware Watchdog
+        Found Temp ghost device at 5 but could not detect address.
+        ESP8266-ResetReason: Software Watchdog
+        Crash after line: --> ESP8266-chip-size: 4194304 , ESP8#'+/37;?BFJNRVZ^bfjnrvz
+        (ESP8266-sdk-version: 2.2.1(cfd48f3) )
+    tbx: power protection
+          -- check excessive power usage
+    tbx: smart thermostat
+        controls heat based on own thermo couple
+            -- learn feedback time
+    tbx: feed check, 
+        veriy we have commands on a daily basis
+    tbx: activate antifreeze protection 
+        for 1 hour when any of the temperature below average threshold 10-12°C during > 15 minutes
+        check if heat is produced by monitoring warmtelink
+    tbd: alarm flashing blueleds ??
+        design code to alternate flash
+    tbd: read/write countersmqtt: Sents (C__) Misses (Cxx) Fails (Z_) Recovers (R)
+        we have a miss if the P1 RX premature  ends < 340µSec, usually <= 86.016
+        we have a fail if CRC does not match
+        we have a Recver if we coull reconstruct CRC
+        we have an OK if none of the above and we output things 
+
+
+  */
+
+
+ /* change history
+    - v75c  - 13aug26 02u13 change to improve table fragmentation to prevent overflows.....
+            - perhaps we have overlows and our technique to surround with areas might not work.
+    - v75b  - stablised based on master
+    - v75a  - abandoned
+    - v75  - to master (11aug26)
+  */  
+  /*  
+    - v75  - stable for 1250 read and 50 errors of which Rcvr=360 and Elenght errors=19
+    - v74  merged to maser.
+    - v74  - smart masking resistance 8-16, recover malformed rs232 lowercase g/f
+          - masklimiter, improved masking
+          - if we have CRC failure, we try to recover using the built if the next is already masked also
+              mskio=49:4/3\X := we read a "4" , we had a '3' and the next is "X" masked: we keep as read
+              mskio=325:g/6  := we read a "g" , we had a '6' and the next is not masked: we use as not masked
+          - switchMaskingCmd/'m'  switchMaskingOut during CRC is OK
+
+    - v72  - implement restart followup decisions due to reained message(s).  
+            If restarted , ignore (retained) command R-estart, e-rror and 3-ignore state
+              this to prevent any loop due to last retained mqtt command and
+              prevent dwfault heatingstate is on when retained mode was '3' ignore.
+          - refactor "mqttCnt" to "mqttCnt_Out"
+              count number of input commands via "mqttCnt_In" and display this with as cmd= on '?' command
+    - v71  - protect coalescing change of new_ThermostatState by old_ThermostatState
+            when we have changed the thermostat mode, we report the state in Json as Xeatmode
+            03feb26: fault old_ThermostatState == new_ThermostatState; should be "="
+    - v70a - running stable
+    - v69a - refine byt-insertion when short < 4  is active at bitwait%2
+        indicate D4 line when we have an bit-time error
+    - v69 - based on v66, using RXREAD58 stable, 
+      work between interrupt waittiming
+      added correct 12.5nS time calculation
+    - v68, v66a/v66b abandoned as unstable
+    - v66  - reworked from v65  3952201: v65b: rxread2 ETS_INTR_UNLOCK() (which fixed wdt)
+    - v65b - qworked for timing.... not stable in production
+    - v65b - rxread58 only termination bittime registration
+      rxread2 supplied with  ETS_INTR_LOCK()/ETS_INTR_UNLOCK(), like rx58
+        ss: diagnose DO/gpio16 on/off with BITTEST_BLUE_ACTIVE when m_rxPin == 14 has ISR active
+    - v65a - add v65 with timed diagnostics of v64a after suspending interrupts 
+      (PROD shorten bitwait 502 --> 427 due to tieming)
+      improved watertrigger by resetting the recurrent ISR status at end of ISR
+    - v65  - rework v64a to prevent wdt (no timing registration in SS241 as developed in v64a)
+    - v64a - enahncwed with time diagnostics lead to wdt
+      improved watertrigger by resetting the recurrent ISR status at end of ISR
+    - v64a solved 2 data errors telegram field fault & no data transmit after checkdata() recovery.
+      beautify data diagnostics
+      added ISR timing measurements PRODmode 497 --> 427 , COP-MODE is stable but PROD-MODE varries
+      PROD_MODE suffers WDT when bitwait 427 is changed to 432
+      Note: Before changes: fully stable
+    - v64  (since v62) operational release
+      - SS stabilised as we use ETS_INTR_LOCK() &7 ETS_INTR_UNLOCK() which allows Wifi during BitBang
+    - v63b  - improve rsRead58: finally very stable after directly Interlock after ISR activates
+        adding recovery logic to stitch-recover record if this is 1 byte too short (indicated by < >)
+        Note:  the wait routine is fixed to 694 clock-window-cycles measured at/of start of ISR
+      - softserial: reorganise work RxRead58 to improve stability, DeepSeel: use register read/write/interlock()
+                    adding bitmiss logic if previous 100 < Byte time < 2300 (using m_start)
+                    v64: only when m_bitWait is odd..... 
+      - testing direct GPIO control using GPIO_REG_WRITE(GPIO_OUT_W1Tc/s_ADDRESS, 1<< D4)
+    - v63a - 50/50 stable table InterUn/lock() usage iso cli()/sei(), improve data layou-
+      Timing diagnostics m_BItTime, small changes between COP and PROD as DSMR use other specs
+    - v63a  Back to RxRead58 which was  stablke in v58
+    - v63   use/work RXread60 , not very stable
+    - v62a  timing  change RxRead60, unstable BitWait unpredictable
+    - v62   production
+    - v61a - changewd bitwait to make things stable
+    - v60 - stabilised, using m_bitwaittime 521 for production to have bytecycle from 6940 to range of 6930-6935
+    - v59b - testdata, preparing for alternative ISR (bittiming) routine, print time table serial_Print_PeekBits command t(1,2,3)
+      - introduced #define BYTE_MAXWAIT_1 7100 @ SoftwareSerial241.cpp  // maximum cycles per byte which floats between 6930-7012 cycles
+    - v59a - diagfnostics and prepare multiport threading, all serial combinaed in a single routine
+    - v59  - added extra telegram bash scripts to feed test data
+    - 58d2 - moved to production
+    - v58d, v58e error; reworked to v58d1 and v58d2 to new v59 
+      - added overloaded for SoftwareSerial to prepare for serial bittiming
+      - we played around with calloc. Woirks great as test (*activate D-dip;lay to) show timers
+        using peekTime(int i) thar interrogates the timer array pf serial1 and serial2
+                    M_TIME_START  RX_START     RX_END          BEGIN             END                   AVAIL_         END   
+        x1 serial1 time  4318330 1973965602.  1973918650 +754= 1973919404 +46922=1973966326 +395253309=2369219635 +10=2369219645,  
+                      START  START              RX_END
+                    4318330. 4318330+2390910242=2395228572
+    - v58c refactor len to myLen, debugging options
+      - testing for (int i = 14; i < 11; i--) {asm NOP}
+      - adding 4 delay()s to check if this stabilizes the COP_MODE version
+    - v58b refactor myserial1/2 names, enhanced bittime, stop and baudrate control
+      - we added serial read mode 0/1/2: 0-physical port, 1-P1 record, 2=WL-record
+    - v58a  --> moved to production
+      - likely cause that serial processing stays tool long in ISR, with wifi debug , we see dev:1153
+            https://github.com/espressif/ESP8266_NONOS_SDK/issues/90
+    v58 based on corrected master
+      - we extended platformio to generate Disassemble after compile, this to interrogate result
+        which could als be doen by executing the Extensa "objdump" that reads the ELF file to disassemble output.
+        This is done via Python post_build.py (for Arduino 2.4.1) and post_build_271.py (2.7.x)
+        Activated is adding & activating the  .ini options per project environment
+            ;extra_scripts = post_build.py
+            ;targets = disasm
+      - during testing we exprience frequent WDT crashes as related to Wifi, why is a mystery
+        Only the Live production  seems more stable. Perhaps this interelates with actual telegram data.
+      - inroduced COP_MODE to differentiate TEST/PROD_MODE only by IP_Address and Mqtt-prefix:x1 & versionid: 61 
+        
+        internally TEST_MODE & PROD_MODE are different code lines to check and test
+          During TESTing we use real usb serial while PRODduction uses negative polaritye
+            DUP_MODE replicates and revert the active serial polarity and character termination
+            COP_MODE does not change any serial behavior and only differentiate on IP address and Mqtt prefix
+        
+        We now have (summarised) the following 6 code paths with platformio (Arduino framework 2.4.1):
+          PROD_MODE   : prefix p1 and versionid 21  - [env:p1meter-production_241]      LGTM 
+            DUP_MODE  : prefix d1 and versionid 41  - [env:p1meter-dup-production_241]  erratic ??
+            COP_MODE  : prefix x1 and versionid 61  - [env:p1meter-production_241_copy] limited
+          TEST_MODE   : prefix t1 and versionid 11  - [env:t1meter-test-OTA_241] 
+            DUP_MODE  : prefix e1 and versionid 31  - n.i.u.
+            COP_MODE  : prefix x1 and versionid 71  - n.i.u.
+      in addition we have (optional) flag:
+          DUP_MODE_NOINVERT which reverses serial polarity but keeps the end-data character
+
+      Note: Platformio is also used to differentiate Arduino on platform or framework:
+      All are using the SDK framework to generate/ompile code via the "toolchain-xtensa"
+        - Arduino 2.4.1 has it platform  espressif8266@1.7.0 as package framework-arduinoespressif8266@1.20401.3
+        - Arduino 2.7.1 has it platform  espressif8266@2.5.3 as package framework-arduinoespressif8266@3.20701.0
+          Note we have also others (2.4.0, 2.6.2, 2.7.4, 2.7.8, 3.1.2) but these are merely to check support issues 
+        
+      - copy PROD contents to testdevice, the thing collaapses as test data is temrinated with CR (\r = 0x0d)
+      - created 3 data options
+        --> sendp1_nl.sh = termnated solely by NewLine  (\n = 0x0A) (works on PROD_MODE)
+        --- sendp1_crlf.sh = termnated solely by Carriage Return & NewLine  (\r = 0x0D & \n = 0x0A)
+        --- sendp1_cr.sh = termnated solely by Carriage Return (\r = 0x0D)
+        Test op PROD_MOPDE 
+    v57 troubles  as master
+      - One way or the other the DUP_MODE of PROD_MODE behaves differently and crashes after approx 10-80 cycles
+        Possible while the routine collapses on unexpexted serialised input terminated by CR (0x0D)
+      - furthermore, we've had quite some problems to gfet the version numbers right.
+        Now on master, we created v58 as new syncrpoint
+    v57 improve state line diagnostics, updated Read.me, ensure P1/RX swapping
+        - 2.7.1 not stable on duptest goes after 20-100 mqtt  into wdt_reset @ 401031f1
+  woes in Wifi/Lamx layer
+          read also https://www.esp8266.com/viewtopic.php?f=9&t=3979&start=20
+          "wdev.c 1166" is printed on the UART before the crash. 
+              401031e0:	0adc                	bnez.n	a10, 401031f4 <wDev_ProcessFiq+0x28c>
+              401031e2:	fe8e21               	l32r	a2, 40102c1c <rcReachRetryLimit+0x19c>
+              401031e5:	fe8e31               	l32r	a3, 40102c20 <rcReachRetryLimit+0x1a0>
+              401031e8:	8ba442               	movi	a4, 0x48b
+              401031eb:	fa2801               	l32r	a0, 40101a8c <ppTxqUpdateBitmap+0x28>
+              401031ee:	0000c0               	callx0	a0
+              401031f1:	ffff06               	j	401031f1 <wDev_ProcessFiq+0x289>
+        - tested using Arduino 2.7.1
+        - PlatformIO enhancements
+        - introducing P1 records via bash script command
+          $ while sleep 8; do ./sendp1.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
+          -  P1: /home/pafoxp/code-P1Meter/sendp1.sh
+          -  P2: /home/pafoxp/code-P1Meter/sendp2.sh
+    master - 18jul25 - github stable
+    v56c - as merged from/to v52
+        - stabilized
+    v56c  investigage  erratic based on v56
+        - cosmetic: nam chanted to  readTelegramP1 readTelegramWL to ease usage
+        - RX_yieldcount = 8  --> RX_yieldcount = 3 when Yield1080 is hit uin a row to ease reads
+    v56 - reworked to stable
+        - rpelicated to test/production
+        - For DUP_MODE (running code on test device with different ID: d1 iso p1 we use normall serial
+          However, before V56  - for serial - this was slishtly different for the Test-duplicate device.
+          that was using regular PC/USB serial, hence reverse the invert for normal polarity.
+          When we use flag DUP_MODE_NOINVERT this - using regular serial USB - behavior is activated.
+        - 271 activated to check on things
+        - 241 OK 
+    v55f - restored back to v55b
+    v55e - erratic
+    v55d - works good, based on v55c but added some serial.debugs, a bit worse than v55b
+      - production:  epc1=0x401031f1, epc2=0x00000000, epc3=0x00000000, excvaddr=0x00000000,depc=0x00000000
+      - remove to ...../debug/SoftwareSerial
+      - commented
+      - reduplicated from v55b
+      - time 1 cycled updated from 497 to 500 in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp
+    v55c - woes completely on serial
+    v55b = perfectly tuned
+    v55a - debug to checkout code differences for: teststable
+      - introducing DUP_MODE to identically replicate TESYT/PROD_MODE with
+          reference DUP_MODE with TEST_MODE ip 185 = ip 185 with prefix e1 and version 3xxxx
+          reference DUP_MODE with PROD_MODE ip 35  = ip 185 with prefix d1 and version 4xxxx
+      - 2.7.1  started to use on production, LGTM
+      - 2.4.1. PROD_MODE require about 10-17 (unused) "delay()"" to arrange that code goes stable.
+              if not the use of an printf() statement (in section line 2585) causes a ridiculous instability
+    v55 comments new line
+      - this version looks to be very unstable
+    v54 from master to restart porting 2.4.1. where we left off
+      - 2.4.1 CRC succesfull, see NL article [https://gathering.tweakers.net/forum/list_message/82920194#82920194]
+      - 'T' command (diagnose data):
+            loopbackRx2Mode  0-9 , no data: swap/switch
+            loopbackRx2Mode == 1 --> switch off debug (outputOnSerial), activate RX2 read evey second (rx2ReadInterval = 1)
+            If set > 0: we produce diagnostic data when RX2 is read  {_   _}
+              myLength/telegram2 record
+            If set > 5: when CRC is valid, we output the hexbytes and reset back to 0
+            If set = 3: we print crc and record
+            If set = 2: we print crc and first 20 bytes of header in hex
+            If set = 1: we print echo while reading RX2 to debug console {_  }..len=3:'abc'.. _}  
+      - Note: on PROD_MODE we process serialdata inverted, using TEST_MODE this is standard (1=rising).
+    v53 unstable branch when we have (inactive) conditional prints which crashed, detached
+    V53 new version on V52 renamed to master
+      - using 2.4.1 i stable, 2.7.1 is less reliable
+        perhaps timing is different. TBI
       
-      internally TEST_MODE & PROD_MODE are different code lines to check and test
-        During TESTing we use real usb serial while PRODduction uses negative polaritye
-          DUP_MODE replicates and revert the active serial polarity and character termination
-          COP_MODE does not change any serial behavior and only differentiate on IP address and Mqtt prefix
-      
-      We now have (summarised) the following 6 code paths with platformio (Arduino framework 2.4.1):
-        PROD_MODE   : prefix p1 and versionid 21  - [env:p1meter-production_241]      LGTM 
-          DUP_MODE  : prefix d1 and versionid 41  - [env:p1meter-dup-production_241]  erratic ??
-          COP_MODE  : prefix x1 and versionid 61  - [env:p1meter-production_241_copy] limited
-        TEST_MODE   : prefix t1 and versionid 11  - [env:t1meter-test-OTA_241] 
-          DUP_MODE  : prefix e1 and versionid 31  - n.i.u.
-          COP_MODE  : prefix x1 and versionid 71  - n.i.u.
-    in addition we have (optional) flag:
-        DUP_MODE_NOINVERT which reverses serial polarity but keeps the end-data character
+      - initialised , note: v52 version (2.5GB) saved into /media/pafoxp/movies1/save_platformio/code-P1Meter
+        Force up to dat branch to be master: 
+          read: [https://www.geeksforgeeks.org/git/how-to-replace-master-branch-with-another-branch-in-git/]
+          git remote -v
+          git checkout v52        // ensure on branch
+          git pull origin v52     // sync
+          git branch -D master    // delete master
+          git branch -m master    // rename current to master
+          git push origin master --force  // force sync
+          git fetch origin        // get back
+          git checkout master     // checkout master
+          git log                 // check log status
+    V52 13jul25 02u35 renamed to master
+    V52 13jul25: restart information display
+      protection "suspend @getValues2FromP1Record while mqttCnt_Out < 5" unneeded, now commented
+      'e0'  = divide error
+      'e1'  = infinite loop fault
+      'E'   = Enforce read fault in Reading P1 data
+      testing serial processing on stable 2.4.1 and less stable 2.7.1
+    V52 06jul25: restart information display
+      command 'S'/'s' serial1Stop serial2Stop (prohibit serial data)
+      RX_yieldcount ignore serial if too many failures
+      print & save restart reason information en report this at first mqttCnt_Out into mqtt Errortopic
+      format localIp() address to string for display 'D', can also IPAddress just as an array of 4 ints.
+      diagnose state display using @-signal loop , &-got rx2 record
+      DEBUG_PRINTxx macros
+      counters for reads, misses, rx2, masks
+      relocated H/h test command_testH1 command_testH2 routines for inline casting etc.etc.
+      added and removed comments
+    V51 03jul25: skipped 50 trying to centralise p1mqtt which irratically corrupts things
+      added RX2 check availabiluy, we must have 1 read overy 7 mqttcnt record, else error:004 with successcount (bGot)
+      added verboseLevel (int  verboseLeve) do minimize data, default as it was, we van incease by command 'v'
+      made 'L' switch a toggle, 'l' will alsway go to off
+      using snprint(... with converting format to const* using formatdata.c_str())
+      assisted by deepseek  Serial.println(String("Value: " + analogRead(A0)).c_str());
+      hereafter removed/ commented out lots of no longer needed casting/toarry (amongst search key // rm)
+      skipped v50/v50a version as w.i.p.
+    V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
+      wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
+      replaced faulty device that had a blown schottky power diode 
+      Add code in to check valid processTemperatures() reading to prevent -127C reports
+      log to mqtt /error/... topic for failing sensors (p1-rj11, adc/light, temperature)
+    V48 05jun25: improve code style after inpecting
+      casting fix reinterpret_cast<unsigned char*>(telegram)
+      define unsigned literal using  unsigned char tempLiteral[] = {0x0A};
+      Fix some outbound array risks
+      add '?'on mqtt command for help
+      add ''M'/m' mqtt command to print masking and masked P1 record
+    V47 14may25: bugfix
+      Waterswitch sometimes stops when looptimer to check debounce transitioned to 0 after 70 minutes
+      WaterTrigger_ISR renamed to WaterTrigger0_ISR
+      Trigger routine made single threading
+      solved flaw1: will not process watercount during serial read.
+      solved issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
+    V46 23feb25:
+      27feb25 : ignore zero fields that (prefix field !) that should always > 0 (Like total Power/Heat/Flow)
+      Either Flow or Heat is reported (occupiy the samen telegram record)
+      modification to include Read GJ from warmtelink 0-1:24.2.1(250222224600W)(65.478*GJ)<| to HeatConsumption
+      Note: 0-1:24.2.1(230227190235W)(84.108*m3) was moved to HeatFlowConsumption (v39)
+    v45 Jan2025: 
+      start to compare difference for recovery crc
+      improved protection by not using BLUE-LED2 (gpio2) for debug when softwarematic rs232/Tx2Function is used
+      debugging rs232 use keytags (mskio /recovered characters  , R_ /recovered record)
+      implemented masked recovery using collected state of fixed positions.
+        reading reliability improved from approx 88% to 97%
+      mqttServer1 --> using coded  mqttServer or fallback to mqttServer2
+      tested IP address through dns by switching off setting P1_STATIC_IP
+      commented superfluous stability code
+      telegram_crcIn & telegram_crcOut in , source line 2800
+      add crcIn16() routine in order to have created a full datarecord for crcRecovery
+      done some straighlining
+      FYI:PLATFORM: Espressif 8266 (1.7.0) > NodeMCU 1.0 (ESP-12E Module)
+          PACKAGES: 
+          - framework-arduinoespressif8266 @ 1.20401.3 (2.4.1) 
+          - tool-esptool @ 1.413.0 (4.13) 
+          - tool-esptoolpy @ 1.30000.201119 (3.0.0) 
+          - toolchain-xtensa @ 2.40802.200502 (4.8.2)
+          Dependency Graph
+          |-- ArduinoOTA @ 1.0
+          |-- DallasTemperature @ 3.9.1
+          |-- ESP8266WiFi @ 1.0
+          |-- PubSubClient @ 2.7
+          |-- P1SoftwareSerial @ 2.4.1
+          RAM:   [=====     ]  53.7% (used 43988 bytes from 81920 bytes)
+          Flash: [=         ]   7.2% (used 303636 bytes from 4194304 bytes)
+          Compression reduced firmware size by 72% (was 307776 bytes, now 220591 bytes)
+    -------------------------------------------- comments to block v51
+    V44 enhanced comments alignment
+      array size for  rs232 increased to 1024 bytes.
+      display at command 'F' the toggle rx2_function (renamed from v38_function) statusfunction
+      reconnect(0 renamed to mqtt_reconnect()
+      add FindCharInArrayFwd to do forward search (corrected)
+      loop check yield1500 changed tigger from 1.030 second to 1.080 seconds
+    v43 removed 2 stability bytes, line 2215, readded+1 as this looks to be needed to improve 1/30 (more C then Z)
+      Compression reduced firmware size by 72% (was 305008 bytes, now 218719 bytes)
+      removal superfluous increased error rate from 1/12 to 1/7
+    v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to hget wifi stable see https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html
+    v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count
+    v40 improve WarmteLink detection, sometimes skipped....
+    v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
+    v38 rx2_function false LGTM stabilized by inter/procedure bytes
+    ------------------------------------------------------------------------------------------------------------------
+    require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
+            -- Arduino BoardsManager --> esp8266 --> ensure it has 2.4.1
+      additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
+        http://arduino.esp8266.com/stable/package_esp8266com_index.json,
+        https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
+ */
 
-    Note: Platformio is also used to differentiate Arduino on platform or framework:
-    All are using the SDK framework to generate/ompile code via the "toolchain-xtensa"
-      - Arduino 2.4.1 has it platform  espressif8266@1.7.0 as package framework-arduinoespressif8266@1.20401.3
-      - Arduino 2.7.1 has it platform  espressif8266@2.5.3 as package framework-arduinoespressif8266@3.20701.0
-        Note we have also others (2.4.0, 2.6.2, 2.7.4, 2.7.8, 3.1.2) but these are merely to check support issues 
-      
-    - copy PROD contents to testdevice, the thing collaapses as test data is temrinated with CR (\r = 0x0d)
-    - created 3 data options
-      --> sendp1_nl.sh = termnated solely by NewLine  (\n = 0x0A) (works on PROD_MODE)
-      --- sendp1_crlf.sh = termnated solely by Carriage Return & NewLine  (\r = 0x0D & \n = 0x0A)
-      --- sendp1_cr.sh = termnated solely by Carriage Return (\r = 0x0D)
-      Test op PROD_MOPDE 
-  v57 troubles  as master
-    - One way or the other the DUP_MODE of PROD_MODE behaves differently and crashes after approx 10-80 cycles
-      Possible while the routine collapses on unexpexted serialised input terminated by CR (0x0D)
-    - furthermore, we've had quite some problems to gfet the version numbers right.
-      Now on master, we created v58 as new syncrpoint
-  v57 improve state line diagnostics, updated Read.me, ensure P1/RX swapping
-      - 2.7.1 not stable on duptest goes after 20-100 mqtt  into wdt_reset @ 401031f1
-woes in Wifi/Lamx layer
-        read also https://www.esp8266.com/viewtopic.php?f=9&t=3979&start=20
-         "wdev.c 1166" is printed on the UART before the crash. 
-            401031e0:	0adc                	bnez.n	a10, 401031f4 <wDev_ProcessFiq+0x28c>
-            401031e2:	fe8e21               	l32r	a2, 40102c1c <rcReachRetryLimit+0x19c>
-            401031e5:	fe8e31               	l32r	a3, 40102c20 <rcReachRetryLimit+0x1a0>
-            401031e8:	8ba442               	movi	a4, 0x48b
-            401031eb:	fa2801               	l32r	a0, 40101a8c <ppTxqUpdateBitmap+0x28>
-            401031ee:	0000c0               	callx0	a0
-            401031f1:	ffff06               	j	401031f1 <wDev_ProcessFiq+0x289>
-      - tested using Arduino 2.7.1
-      - PlatformIO enhancements
-      - introducing P1 records via bash script command
-        $ while sleep 8; do ./sendp1.sh > /dev/ttyUSB2; sleep 2; ./sendp2.sh > /dev/ttyUSB2; done
-        -  P1: /home/pafoxp/code-P1Meter/sendp1.sh
-        -  P2: /home/pafoxp/code-P1Meter/sendp2.sh
-  master - 18jul25 - github stable
-  v56c - as merged from/to v52
-      - stabilized
-  v56c  investigage  erratic based on v56
-      - cosmetic: nam chanted to  readTelegramP1 readTelegramWL to ease usage
-      - RX_yieldcount = 8  --> RX_yieldcount = 3 when Yield1080 is hit uin a row to ease reads
-  v56 - reworked to stable
-      - rpelicated to test/production
-      - For DUP_MODE (running code on test device with different ID: d1 iso p1 we use normall serial
-        However, before V56  - for serial - this was slishtly different for the Test-duplicate device.
-        that was using regular PC/USB serial, hence reverse the invert for normal polarity.
-        When we use flag DUP_MODE_NOINVERT this - using regular serial USB - behavior is activated.
-      - 271 activated to check on things
-      - 241 OK 
-  v55f - restored back to v55b
-  v55e - erratic
-  v55d - works good, based on v55c but added some serial.debugs, a bit worse than v55b
-    - production:  epc1=0x401031f1, epc2=0x00000000, epc3=0x00000000, excvaddr=0x00000000,depc=0x00000000
-    - remove to ...../debug/SoftwareSerial
-    - commented
-    - reduplicated from v55b
-    - time 1 cycled updated from 497 to 500 in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp
-  v55c - woes completely on serial
-  v55b = perfectly tuned
-  v55a - debug to checkout code differences for: teststable
-    - introducing DUP_MODE to identically replicate TESYT/PROD_MODE with
-         reference DUP_MODE with TEST_MODE ip 185 = ip 185 with prefix e1 and version 3xxxx
-         reference DUP_MODE with PROD_MODE ip 35  = ip 185 with prefix d1 and version 4xxxx
-    - 2.7.1  started to use on production, LGTM
-    - 2.4.1. PROD_MODE require about 10-17 (unused) "delay()"" to arrange that code goes stable.
-            if not the use of an printf() statement (in section line 2585) causes a ridiculous instability
-  v55 comments new line
-    - this version looks to be very unstable
-  v54 from master to restart porting 2.4.1. where we left off
-    - 2.4.1 CRC succesfull, see NL article [https://gathering.tweakers.net/forum/list_message/82920194#82920194]
-    - 'T' command (diagnose data):
-          loopbackRx2Mode  0-9 , no data: swap/switch
-          loopbackRx2Mode == 1 --> switch off debug (outputOnSerial), activate RX2 read evey second (rx2ReadInterval = 1)
-          If set > 0: we produce diagnostic data when RX2 is read  {_   _}
-            myLength/telegram2 record
-          If set > 5: when CRC is valid, we output the hexbytes and reset back to 0
-          If set = 3: we print crc and record
-          If set = 2: we print crc and first 20 bytes of header in hex
-          If set = 1: we print echo while reading RX2 to debug console {_  }..len=3:'abc'.. _}  
-    - Note: on PROD_MODE we process serialdata inverted, using TEST_MODE this is standard (1=rising).
-  v53 unstable branch when we have (inactive) conditional prints which crashed, detached
-  V53 new version on V52 renamed to master
-    - using 2.4.1 i stable, 2.7.1 is less reliable
-      perhaps timing is different. TBI
-    
-    - initialised , note: v52 version (2.5GB) saved into /media/pafoxp/movies1/save_platformio/code-P1Meter
-      Force up to dat branch to be master: 
-        read: [https://www.geeksforgeeks.org/git/how-to-replace-master-branch-with-another-branch-in-git/]
-        git remote -v
-        git checkout v52        // ensure on branch
-        git pull origin v52     // sync
-        git branch -D master    // delete master
-        git branch -m master    // rename current to master
-        git push origin master --force  // force sync
-        git fetch origin        // get back
-        git checkout master     // checkout master
-        git log                 // check log status
-  V52 13jul25 02u35 renamed to master
-  V52 13jul25: restart information display
-     protection "suspend @getValues2FromP1Record while mqttCnt_Out < 5" unneeded, now commented
-    'e0'  = divide error
-    'e1'  = infinite loop fault
-    'E'   = Enforce read fault in Reading P1 data
-    testing serial processing on stable 2.4.1 and less stable 2.7.1
-  V52 06jul25: restart information display
-    command 'S'/'s' serial1Stop serial2Stop (prohibit serial data)
-    RX_yieldcount ignore serial if too many failures
-    print & save restart reason information en report this at first mqttCnt_Out into mqtt Errortopic
-    format localIp() address to string for display 'D', can also IPAddress just as an array of 4 ints.
-    diagnose state display using @-signal loop , &-got rx2 record
-    DEBUG_PRINTxx macros
-    counters for reads, misses, rx2, masks
-    relocated H/h test command_testH1 command_testH2 routines for inline casting etc.etc.
-    added and removed comments
-  V51 03jul25: skipped 50 trying to centralise p1mqtt which irratically corrupts things
-    added RX2 check availabiluy, we must have 1 read overy 7 mqttcnt record, else error:004 with successcount (bGot)
-    added verboseLevel (int  verboseLeve) do minimize data, default as it was, we van incease by command 'v'
-    made 'L' switch a toggle, 'l' will alsway go to off
-    using snprint(... with converting format to const* using formatdata.c_str())
-    assisted by deepseek  Serial.println(String("Value: " + analogRead(A0)).c_str());
-    hereafter removed/ commented out lots of no longer needed casting/toarry (amongst search key // rm)
-    skipped v50/v50a version as w.i.p.
-  V49 29jun25: flashed and take into production on MAC: 60:01:94:7b:7c:2a
-    wifi reboot loop issues, played around with WiFi.persistent(true); WiFi.persistent(false);
-    replaced faulty device that had a blown schottky power diode 
-    Add code in to check valid processTemperatures() reading to prevent -127C reports
-    log to mqtt /error/... topic for failing sensors (p1-rj11, adc/light, temperature)
-  V48 05jun25: improve code style after inpecting
-    casting fix reinterpret_cast<unsigned char*>(telegram)
-    define unsigned literal using  unsigned char tempLiteral[] = {0x0A};
-    Fix some outbound array risks
-    add '?'on mqtt command for help
-    add ''M'/m' mqtt command to print masking and masked P1 record
-  V47 14may25: bugfix
-    Waterswitch sometimes stops when looptimer to check debounce transitioned to 0 after 70 minutes
-    WaterTrigger_ISR renamed to WaterTrigger0_ISR
-    Trigger routine made single threading
-    solved flaw1: will not process watercount during serial read.
-    solved issue: sometimes watercount is not increasing when tapping, TBD: interloop check Gpio5 before and after
-  V46 23feb25:
-    27feb25 : ignore zero fields that (prefix field !) that should always > 0 (Like total Power/Heat/Flow)
-    Either Flow or Heat is reported (occupiy the samen telegram record)
-    modification to include Read GJ from warmtelink 0-1:24.2.1(250222224600W)(65.478*GJ)<| to HeatConsumption
-    Note: 0-1:24.2.1(230227190235W)(84.108*m3) was moved to HeatFlowConsumption (v39)
-  v45 Jan2025: 
-    start to compare difference for recovery crc
-    improved protection by not using BLUE-LED2 (gpio2) for debug when softwarematic rs232/Tx2Function is used
-    debugging rs232 use keytags (mskio /recovered characters  , R_ /recovered record)
-    implemented masked recovery using collected state of fixed positions.
-      reading reliability improved from approx 88% to 97%
-    mqttServer1 --> using coded  mqttServer or fallback to mqttServer2
-    tested IP address through dns by switching off setting P1_STATIC_IP
-    commented superfluous stability code
-    telegram_crcIn & telegram_crcOut in , source line 2800
-    add crcIn16() routine in order to have created a full datarecord for crcRecovery
-    done some straighlining
-    FYI:PLATFORM: Espressif 8266 (1.7.0) > NodeMCU 1.0 (ESP-12E Module)
-        PACKAGES: 
-        - framework-arduinoespressif8266 @ 1.20401.3 (2.4.1) 
-        - tool-esptool @ 1.413.0 (4.13) 
-        - tool-esptoolpy @ 1.30000.201119 (3.0.0) 
-        - toolchain-xtensa @ 2.40802.200502 (4.8.2)
-        Dependency Graph
-        |-- ArduinoOTA @ 1.0
-        |-- DallasTemperature @ 3.9.1
-        |-- ESP8266WiFi @ 1.0
-        |-- PubSubClient @ 2.7
-        |-- P1SoftwareSerial @ 2.4.1
-        RAM:   [=====     ]  53.7% (used 43988 bytes from 81920 bytes)
-        Flash: [=         ]   7.2% (used 303636 bytes from 4194304 bytes)
-        Compression reduced firmware size by 72% (was 307776 bytes, now 220591 bytes)
-  -------------------------------------------- comments to block v51
-  V44 enhanced comments alignment
-    array size for  rs232 increased to 1024 bytes.
-    display at command 'F' the toggle rx2_function (renamed from v38_function) statusfunction
-    reconnect(0 renamed to mqtt_reconnect()
-    add FindCharInArrayFwd to do forward search (corrected)
-    loop check yield1500 changed tigger from 1.030 second to 1.080 seconds
-  v43 removed 2 stability bytes, line 2215, readded+1 as this looks to be needed to improve 1/30 (more C then Z)
-    Compression reduced firmware size by 72% (was 305008 bytes, now 218719 bytes)
-    removal superfluous increased error rate from 1/12 to 1/7
-  v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to hget wifi stable see https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html
-  v41 slightly modify water intewrrupt to reset status to LOW at exceeding trigger count
-  v40 improve WarmteLink detection, sometimes skipped....
-  v39 LGTM collect data value from RX2/P1 & output to mqtt , 17mar23 stabilised
-  v38 rx2_function false LGTM stabilized by inter/procedure bytes
-  ------------------------------------------------------------------------------------------------------------------
-  require  core 2.4.1 , NodeMCU 1.0 ESP12E  @ 192.168.1.35, V2 lower memory, BuiltIn led (GPIO)16
-          -- Arduino BoardsManager --> esp8266 --> ensure it has 2.4.1
-    additional https://raw.githubusercontent.com/VSChina/azureiotdevkit_tools/master/package_azureboard_index.json,
-      http://arduino.esp8266.com/stable/package_esp8266com_index.json,
-      https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
-*/
-
-/* Water sensor logic: (doc v51)
+/* Water sensor logic: (doc v51) 
   ------------------------------------------------------------------------------------------------------------------------------
     WaterTrigger0/1_ISR() attach/detachWaterInterrupt is activated in loop( ) during peiodes not reading serial1/2 data.
       With command 'W' we can test/switch between WaterTrigger0/1_ISR (used for development reasons)
@@ -775,13 +805,13 @@ woes in Wifi/Lamx layer
       B) GPIO5=atciveLow to high, waited until wheelsensor left by pulling activeLow to VCC
             GPIO5 now goes H and we enable the pull resistor for ActiveHigh (mode Input PullUp)
   ------------------------------------------------------------------------------------------------------------------------------    
-*/
+ */
 
-/* Log errors v49 to topic /error/x1
+/* Log errors v49 to mqttlog topic /error/x1
   001 = RJ11 to P1 is not connected
   002 = Temperature sensort fault (< REQUIRED_DSB18B20_SENSORS of < 127C)
   003 = ADC lightlevel fault (< REQUIRED_ANALOG_ADC)
-*/
+ */
 
 // Todo1: safegurard routing if P1 expire often then 10-12 seconds... at 1sec rate routine is not honoured
 
@@ -863,297 +893,299 @@ woes in Wifi/Lamx layer
 // #define ARDUINO_<PROCESSOR-DESCRIPTOR>_<BOARDNAME>
 // tbd: extern "C" {#include "user_interface.h"}  and: long chipId = system_get_chip_id();
 
-/*
-// *
-// * * * * * L O G  B O O K
-// *
-// 28nov24 21u50: v43 PlatformIO 1.7.0 (=core 2.4.1), removed 2 stability bytes
-// 09jul23 14u53: v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to get wifi more stable
-// 17mar23 15u37: v40 improve WL value detection as value is sometimes missed when OK record is on position 1
-//    added char TranslateForPrint(char c); // to translate unprintable values <null>00_ nl=10| cr=13 val>127~
-// 28feb23 22u00: v39 stabilize bytes and output retrieved P2 code to mqtt
-//    Sketch uses 303800 bytes (29%) of program storage space. Maximum is 1044464 bytes.
-//    Global variables use 41504 bytes (50%) of dynamic memory, leaving 40416 bytes for local variables. Maximum is 81920 bytes.
-// 28feb23 03u29: v38 BLueLed re-assignment via command 'f' cycle: Waterpulse, HotWaterState, Off & P1-CrcFault
-//    Sketch uses 303740 bytes (29%) of program storage space. Maximum is 1044464 bytes.
-//    Global variables use 41500 bytes (50%) of dynamic memory, leaving 40420 bytes for local variables. Maximum is 81920 bytes
-// 28feb23 02u45: v38 Reandomlty added slack bytes (dummyxx) to check if this stabilize RX1/Crc (not sure)
-// 28feb23 01u55: v38 Added 3mS during loop to allow for  yield time delay if RX2 is used
-// 27feb23 22u45: v38 Implement reading RX2 Warmelink using gpio4 attached to mySerial2/115K2-8N1
-// 26feb23 22u19: v37 Disable TX2 serial function, , add loop-limit vor WatertriggerISR and defined BLUE_LED2 for Waterpuls
-// 06feb23 13u53: v36 Corrected debounce time *100 to *1000 & restructured mainloop "WaterPulse trigger when debounce " 
-//    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
-//    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
-// 03okt22 23u11: v35 serial2 inverted slightly better
-// 30sep22 22u26: v35 serial2Baudrate 115k2 for "warmtelink" 
-// 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
-// 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
-//  Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
-// 27apr21 23u38: getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
-//  - fixed Ip adress to eliminate iterference (if defined P1_STATIC_IP )
-    // Set your Static IP address IPAddress local_IP(192, 168, 1, 125);
-    // Set your Gateway IP address IPAddress gateway(192, 168, 1, 1);
-    // Subnet IPAddress subnet(255, 255, 255, 0);
-    // DNS1 IPAddress primaryDNS(192.168.1.8);   //optional
-    // DNS2 IPAddress secondaryDNS(192.168.1.1); //optional
-// ## [V21.25]    
-//  - Using SDK 2.4.1 to investigate stability
-// ## [V21.22]
-//  19apr21 23u39 added ESP.wdtFeed(); in loop ()
-//  - 19apr21 15u22 - added diagnostic information sdk version & emempry use etc.etc.
-//  - 15apr21 14u14
-//    Sketch uses 298836 bytes (28%) of program storage space. Maximum is 1044464 bytes.
-//    Global variables use 40276 bytes (49%) of dynamic memory, leaving 41644 bytes for local variables. Maximum is 81920 bytes.
-// 	- 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
-// 	- 15arp21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
-// 	- removed delay in local-yields
-// ## [V21.21]
-// - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
-// - 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
-// 	--- (+9sec after last mqtt)
-// - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop( ) during speific yields,
-// 	-- normal yield does support Wifi but NOT the (disconnected) Pubsubclient
-// 	-- Beautified
-// ## [V21.20]
-// - 11apr21 16u29 V20: added JSON error message to topic /error/.. if P1 serial is not (properly) connected
-// 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt_Out":28}
-// - 11apr21 15u16 mqtt timeout (override) set from 15 to 60 seconds #define MQTT_KEEPALIVE = 60
-// 	-- sometimes the mqtt server is very busy and we do not want a preliminary reboot
-// - 11apr21 15u15 Added mqtt server address  in serial debug at startup
-// 13apr21 V21.20/241 improved and added better yield that also calls the pubsub mqtt loop *(if connected)
-// __ap21  migrated to github repo and CHANGED.md
-// 08apr21 V21.20/241 adapted for PlatformIO AND Arduino 
-//             -
-// 07apr21 V21.19/241 adapted for PaltformIO
-// 04apr21 V21.19/241 Hardware Library 2.4.1 and use Lwip 2.0 lower memory, very stable
-/*
-                Sketch uses 297412 bytes (28%) of program storage space. Maximum is 1044464 bytes.
-                Global variables use 39676 bytes (48%) of dynamic memory, leaving 42244 bytes for local variables. Maximum is 81920 bytes.
-*/
-// 03apr21 V21.18/274 Lower mempry no features
-// 03apr21 V21.18/274 -68 bytes: Refactored incude libraries UseP1SoftSerialLIB will include <SoftwareSerial241>
-//                - which has the P1active() function between / & ! durign serial receive
-/*
-                  Executable segment sizes:
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-                  BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP 
-                  IROM   : 299984          - code in flash         (default or ICACHE_FLASH_ATTR) 
-                  IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-                  Sketch uses 334836 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-                  RODATA : 4472  ) / 81920 - constants             (global, static) in RAM/HEAP 
-                  Global variables use 34056 bytes (41%) of dynamic memory, leaving 47864 bytes for local variables. Maximum is 81920 bytes.
+/* L O G  B O O K old/or until 28nov24
+  // *
+  // * * * * * L O G  B O O K
+  // *
+  // 28nov24 21u50: v43 PlatformIO 1.7.0 (=core 2.4.1), removed 2 stability bytes
+  // 09jul23 14u53: v42 added WiFi.setSleepMode(WIFI_NONE_SLEEP); // trying to get wifi more stable
+  // 17mar23 15u37: v40 improve WL value detection as value is sometimes missed when OK record is on position 1
+  //    added char TranslateForPrint(char c); // to translate unprintable values <null>00_ nl=10| cr=13 val>127~
+  // 28feb23 22u00: v39 stabilize bytes and output retrieved P2 code to mqtt
+  //    Sketch uses 303800 bytes (29%) of program storage space. Maximum is 1044464 bytes.
+  //    Global variables use 41504 bytes (50%) of dynamic memory, leaving 40416 bytes for local variables. Maximum is 81920 bytes.
+  // 28feb23 03u29: v38 BLueLed re-assignment via command 'f' cycle: Waterpulse, HotWaterState, Off & P1-CrcFault
+  //    Sketch uses 303740 bytes (29%) of program storage space. Maximum is 1044464 bytes.
+  //    Global variables use 41500 bytes (50%) of dynamic memory, leaving 40420 bytes for local variables. Maximum is 81920 bytes
+  // 28feb23 02u45: v38 Reandomlty added slack bytes (dummyxx) to check if this stabilize RX1/Crc (not sure)
+  // 28feb23 01u55: v38 Added 3mS during loop to allow for  yield time delay if RX2 is used
+  // 27feb23 22u45: v38 Implement reading RX2 Warmelink using gpio4 attached to mySerial2/115K2-8N1
+  // 26feb23 22u19: v37 Disable TX2 serial function, , add loop-limit vor WatertriggerISR and defined BLUE_LED2 for Waterpuls
+  // 06feb23 13u53: v36 Corrected debounce time *100 to *1000 & restructured mainloop "WaterPulse trigger when debounce " 
+  //    Sketch uses 302548 bytes (28%) of program storage space. Maximum is 1044464 bytes.
+  //    Global variables use 41100 bytes (50%) of dynamic memory, leaving 40820 bytes for local variables. Maximum is 81920 bytes.
+  // 03okt22 23u11: v35 serial2 inverted slightly better
+  // 30sep22 22u26: v35 serial2Baudrate 115k2 for "warmtelink" 
+  // 25sep22 22u34: v34 test compile to ehck correctness chksum 0x2d csum 0x2d v614f7c32 Sketch uses 302312 bytes
+  // 28apr21 21u09: modified P1 adapted serial and put getCycleCountIram - used to calculate serial timing - into localised Iram of SoftwareSerial241-P1
+  //  Compiled on Arduino: p1-2133.24 getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1) 
+  // 27apr21 23u38: getFullVersion:SDK:2.2.1(cfd48f3)/Core:2.4.1/lwIP:2.0.3(STABLE-2_0_3_RELEASE/glue:arduino-2.4.1)
+  //  - fixed Ip adress to eliminate iterference (if defined P1_STATIC_IP )
+      // Set your Static IP address IPAddress local_IP(192, 168, 1, 125);
+      // Set your Gateway IP address IPAddress gateway(192, 168, 1, 1);
+      // Subnet IPAddress subnet(255, 255, 255, 0);
+      // DNS1 IPAddress primaryDNS(192.168.1.8);   //optional
+      // DNS2 IPAddress secondaryDNS(192.168.1.1); //optional
+  // ## [V21.25]    
+  //  - Using SDK 2.4.1 to investigate stability
+  // ## [V21.22]
+  //  19apr21 23u39 added ESP.wdtFeed(); in loop ()
+  //  - 19apr21 15u22 - added diagnostic information sdk version & emempry use etc.etc.
+  //  - 15apr21 14u14
+  //    Sketch uses 298836 bytes (28%) of program storage space. Maximum is 1044464 bytes.
+  //    Global variables use 40276 bytes (49%) of dynamic memory, leaving 41644 bytes for local variables. Maximum is 81920 bytes.
+  // 	- 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
+  // 	- 15arp21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
+  // 	- removed delay in local-yields
+  // ## [V21.21]
+  // - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
+  // - 13apr21 18u38 V21 added progress line-counter tio research where WDT hits....
+  // 	--- (+9sec after last mqtt)
+  // - 13apr21 18u38 V21 improved WDT as we call "mqtt client".loop( ) during speific yields,
+  // 	-- normal yield does support Wifi but NOT the (disconnected) Pubsubclient
+  // 	-- Beautified
+  // ## [V21.20]
+  // - 11apr21 16u29 V20: added JSON error message to topic /error/.. if P1 serial is not (properly) connected
+  // 	-- /error/t1 {"error":001 ,"msg":"serial not connected", "mqttCnt_Out":28}
+  // - 11apr21 15u16 mqtt timeout (override) set from 15 to 60 seconds #define MQTT_KEEPALIVE = 60
+  // 	-- sometimes the mqtt server is very busy and we do not want a preliminary reboot
+  // - 11apr21 15u15 Added mqtt server address  in serial debug at startup
+  // 13apr21 V21.20/241 improved and added better yield that also calls the pubsub mqtt loop *(if connected)
+  // __ap21  migrated to github repo and CHANGED.md
+  // 08apr21 V21.20/241 adapted for PlatformIO AND Arduino 
+  //             -
+  // 07apr21 V21.19/241 adapted for PaltformIO
+  // 04apr21 V21.19/241 Hardware Library 2.4.1 and use Lwip 2.0 lower memory, very stable
+  /*
+                  Sketch uses 297412 bytes (28%) of program storage space. Maximum is 1044464 bytes.
+                  Global variables use 39676 bytes (48%) of dynamic memory, leaving 42244 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 03apr21 V21.18/274 Lower mempry no features
+  // 03apr21 V21.18/274 -68 bytes: Refactored incude libraries UseP1SoftSerialLIB will include <SoftwareSerial241>
+  //                - which has the P1active() function between / & ! durign serial receive
+  /*
+                    Executable segment sizes:
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+                    BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP 
+                    IROM   : 299984          - code in flash         (default or ICACHE_FLASH_ATTR) 
+                    IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+                    Sketch uses 334836 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+                    RODATA : 4472  ) / 81920 - constants             (global, static) in RAM/HEAP 
+                    Global variables use 34056 bytes (41%) of dynamic memory, leaving 47864 bytes for local variables. Maximum is 81920 bytes.
 
-*/
-// 03apr21 V21.18/274 +332 bytes: sprintf causes corruption, use snprinf when using multiple formatted valaues 
-//                - removed unused librabries ESP8266mDNS.h ESP8266HTTPClient.h WiFiUdp.h OneWire.h
-/*                 
- *                Executable segment sizes:
-                  BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-                  IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-                  IROM   : 300016          - code in flash         (default or ICACHE_FLASH_ATTR) 
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-                  RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
-                  Sketch uses 334904 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.
- */
-// 03apr21 V21.18/274 +4bytes: Progress message changed to 
-//                - M#@t=15 @201, TimeP1="000309" (e#=0)    Gpio5:1, Water#:0, Hot#:0, WaterState:0, Trg#:0, DbC#:0, Int#:344 .
-//                = mqttcnt/secs  P1-readed hhmmss  CrcE    state    count     Ledl    sensor        #number Debounce Interval
-/*
-                  Executable segment sizes:
-                  IROM   : 299712          - code in flash         (default or ICACHE_FLASH_ATTR) 
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-                  RODATA : 4484  ) / 81920 - constants             (global, static) in RAM/HEAP 
-                  BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP 
-                  IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-                  Sketch uses 334576 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 34068 bytes (41%) of dynamic memory, leaving 47852 bytes for local variables. Maximum is 81920 bytes.
-*/ 
-// 03apr21 V21.17/274 mqtt buffer increated from 360 to 480
-//                    - if serial data contain a space, it is also counted as invalid character (field e#=xxx)
-//                    - buffer too small, leading to JSON failures
-//                    - when dynamically adding "Force, Ttrigger and PullUp fields causing "}" deletion overflow
-/*
-                  Executable segment sizes:
-                  BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-                  RODATA : 4496  ) / 81920 - constants             (global, static) in RAM/HEAP 
-                  IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-                  IROM   : 299696          - code in flash         (default or ICACHE_FLASH_ATTR) 
-                  Sketch uses 334572 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 34088 bytes (41%) of dynamic memory, leaving 47832 bytes for local variables. Maximum is 81920 bytes.
- */
-// 03apr21 V21.17/274 changed BLUE-LED state will invert during watertrigger (will reset at end by thermostate)
-//                    - Normally this wil show  & relfect the  (stable) Thermostate ON/OFF state
-//                    - during mqtt & active serial P1 read/processiong it will blink for that  (short) duration
-//                    - During Watertapping, the BLUE_LED will be pulsed by the attached interrupts (hence twice per liter).
-// 03apr21 V21.17/274 streamlined source and added loop-() check timer 1 second interval to limit WDT reset risks
-/*
-                  Executable segment sizes:
-                  IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-                  IROM   : 299376          - code in flash         (default or ICACHE_FLASH_ATTR)
-                  RODATA : 4436  ) / 81920 - constants             (global, static) in RAM/HEAP
-                  BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
-                  Sketch uses 334172 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 34020 bytes (41%) of dynamic memory, leaving 47900 bytes for local variables. Maximum is 81920 bytes.
-*/
-// 02apr21 V21.16/274 testOnly chekc ISR P1serial timings  Header/Trailer (hardly a cycle and near to a µSec)
-// 02apr21 V21.15/274 Using My changed 240 to display serial progress
-// 02apr21 V21.14/274 Only insert a date from P1Meter data in JSON mqtt if this fully nummeric else use previous (whioch could be "000000"
-// 02apr21 V21.14/274 Added runtime in Seconds at Timestamp to ease PD
-/*
-                  Executable segment sizes:
-                  RODATA : 4292  ) / 81920 - constants             (global, static) in RAM/HEAP
-                  IROM   : 299024          - code in flash         (default or ICACHE_FLASH_ATTR)
-                  BSS    : 28232 )         - zeroed variables      (global, static) in RAM/HEAP
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
-                  IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-                  Sketch uses 333676 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 33868 bytes (41%) of dynamic memory, leaving 48052 bytes for local variables. Maximum is 81920 bytes.
-*/
-// 01apr21 V21.14/274 Making CRC work with esp8266 is a change of 1 top 15 as as softserial often goes in missing characters
-/*
-                  Executable segment sizes:
-                  IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-                  RODATA : 4284  ) / 81920 - constants             (global, static) in RAM/HEAP
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
-                  IROM   : 298928          - code in flash         (default or ICACHE_FLASH_ATTR)
-                  BSS    : 28232 )         - zeroed variables      (global, static) in RAM/HEAP
-                  Sketch uses 333572 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 33860 bytes (41%) of dynamic memory, leaving 48060 bytes for local variables. Maximum is 81920 bytes.
-*/
-//                    - extended mqtt record with Json P1crc state 0=NotOk, 1=Valid CRC
-//                    - mqtt log record corrected "powerConsumptionLowTariff" exchanged with "powerConsumptionHighTariff"
-//                    - hardly no alternative that accepting that almost every tranaction has an error, as long
-//                      we can read the values in number fields, this is OK.
-//                    - cleaned comments and debugging to check why CRC16 constantly fails.
-/*
-                  Executable segment sizes:
-                  BSS    : 28224 )         - zeroed variables      (global, static) in RAM/HEAP
-                  IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-                  DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
-                  IROM   : 298944          - code in flash         (default or ICACHE_FLASH_ATTR)
-                  RODATA : 4332  ) / 81920 - constants             (global, static) in RAM/HEAP
-                  Sketch uses 333636 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 33900 bytes (41%) of dynamic memory, leaving 48020 bytes for local variables. Maximum is 81920 bytes.
-*/
-// 30mar21 v21.13/274 added yield time control (p1TriggerTime) to prevent we get a wdt reset while waiting for serial input
-/*
-                  Executable segment sizes:
-                  BSS    : 28736 )         - zeroed variables      (global, static) in RAM/HEAP
-                  RODATA : 4404  ) / 81920 - constants             (global, static) in RAM/HEAP
-                  DATA   : 1348  )         - initialized variables (global, static) in RAM/HEAP
-                  IROM   : 299568          - code in flash         (default or ICACHE_FLASH_ATTR)
-                  IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-                  Sketch uses 334336 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 34488 bytes (42%) of dynamic memory, leaving 47432 bytes for local variables. Maximum is 81920 bytes.
-*/
-// 30mar21 v11.13/274 added CRC , using/following [https://github.com/jantenhove/P1-Meter-ESP8266]
-/*
-                  Executable segment sizes:
-                  RODATA : 4272  ) / 81920 - constants             (global, static) in RAM/HEAP
-                  IROM   : 299088          - code in flash         (default or ICACHE_FLASH_ATTR)
-                  IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-                  DATA   : 1340  )         - initialized variables (global, static) in RAM/HEAP
-                  BSS    : 28096 )         - zeroed variables      (global, static) in RAM/HEAP
-                  Sketch uses 333716 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 33708 bytes (41%) of dynamic memory, leaving 48212 bytes for local variables. Maximum is 81920 bytes.
-*/
+  */
+  // 03apr21 V21.18/274 +332 bytes: sprintf causes corruption, use snprinf when using multiple formatted valaues 
+  //                - removed unused librabries ESP8266mDNS.h ESP8266HTTPClient.h WiFiUdp.h OneWire.h
+  /*                 
+  *                Executable segment sizes:
+                    BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+                    IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+                    IROM   : 300016          - code in flash         (default or ICACHE_FLASH_ATTR) 
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+                    RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
+                    Sketch uses 334904 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 03apr21 V21.18/274 +4bytes: Progress message changed to 
+  //                - M#@t=15 @201, TimeP1="000309" (e#=0)    Gpio5:1, Water#:0, Hot#:0, WaterState:0, Trg#:0, DbC#:0, Int#:344 .
+  //                = mqttcnt/secs  P1-readed hhmmss  CrcE    state    count     Ledl    sensor        #number Debounce Interval
+  /*
+                    Executable segment sizes:
+                    IROM   : 299712          - code in flash         (default or ICACHE_FLASH_ATTR) 
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+                    RODATA : 4484  ) / 81920 - constants             (global, static) in RAM/HEAP 
+                    BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP 
+                    IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+                    Sketch uses 334576 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 34068 bytes (41%) of dynamic memory, leaving 47852 bytes for local variables. Maximum is 81920 bytes.
+  */ 
+  // 03apr21 V21.17/274 mqtt buffer increated from 360 to 480
+  //                    - if serial data contain a space, it is also counted as invalid character (field e#=xxx)
+  //                    - buffer too small, leading to JSON failures
+  //                    - when dynamically adding "Force, Ttrigger and PullUp fields causing "}" deletion overflow
+  /*
+                    Executable segment sizes:
+                    BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+                    RODATA : 4496  ) / 81920 - constants             (global, static) in RAM/HEAP 
+                    IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+                    IROM   : 299696          - code in flash         (default or ICACHE_FLASH_ATTR) 
+                    Sketch uses 334572 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 34088 bytes (41%) of dynamic memory, leaving 47832 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 03apr21 V21.17/274 changed BLUE-LED state will invert during watertrigger (will reset at end by thermostate)
+  //                    - Normally this wil show  & relfect the  (stable) Thermostate ON/OFF state
+  //                    - during mqtt & active serial P1 read/processiong it will blink for that  (short) duration
+  //                    - During Watertapping, the BLUE_LED will be pulsed by the attached interrupts (hence twice per liter).
+  // 03apr21 V21.17/274 streamlined source and added loop-() check timer 1 second interval to limit WDT reset risks
+  /*
+                    Executable segment sizes:
+                    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+                    IROM   : 299376          - code in flash         (default or ICACHE_FLASH_ATTR)
+                    RODATA : 4436  ) / 81920 - constants             (global, static) in RAM/HEAP
+                    BSS    : 28240 )         - zeroed variables      (global, static) in RAM/HEAP
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
+                    Sketch uses 334172 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 34020 bytes (41%) of dynamic memory, leaving 47900 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 02apr21 V21.16/274 testOnly chekc ISR P1serial timings  Header/Trailer (hardly a cycle and near to a µSec)
+  // 02apr21 V21.15/274 Using My changed 240 to display serial progress
+  // 02apr21 V21.14/274 Only insert a date from P1Meter data in JSON mqtt if this fully nummeric else use previous (whioch could be "000000"
+  // 02apr21 V21.14/274 Added runtime in Seconds at Timestamp to ease PD
+  /*
+                    Executable segment sizes:
+                    RODATA : 4292  ) / 81920 - constants             (global, static) in RAM/HEAP
+                    IROM   : 299024          - code in flash         (default or ICACHE_FLASH_ATTR)
+                    BSS    : 28232 )         - zeroed variables      (global, static) in RAM/HEAP
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
+                    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+                    Sketch uses 333676 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 33868 bytes (41%) of dynamic memory, leaving 48052 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 01apr21 V21.14/274 Making CRC work with esp8266 is a change of 1 top 15 as as softserial often goes in missing characters
+  /*
+                    Executable segment sizes:
+                    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+                    RODATA : 4284  ) / 81920 - constants             (global, static) in RAM/HEAP
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
+                    IROM   : 298928          - code in flash         (default or ICACHE_FLASH_ATTR)
+                    BSS    : 28232 )         - zeroed variables      (global, static) in RAM/HEAP
+                    Sketch uses 333572 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 33860 bytes (41%) of dynamic memory, leaving 48060 bytes for local variables. Maximum is 81920 bytes.
+  */
+  //                    - extended mqtt record with Json P1crc state 0=NotOk, 1=Valid CRC
+  //                    - mqtt log record corrected "powerConsumptionLowTariff" exchanged with "powerConsumptionHighTariff"
+  //                    - hardly no alternative that accepting that almost every tranaction has an error, as long
+  //                      we can read the values in number fields, this is OK.
+  //                    - cleaned comments and debugging to check why CRC16 constantly fails.
+  /*
+                    Executable segment sizes:
+                    BSS    : 28224 )         - zeroed variables      (global, static) in RAM/HEAP
+                    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+                    DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP
+                    IROM   : 298944          - code in flash         (default or ICACHE_FLASH_ATTR)
+                    RODATA : 4332  ) / 81920 - constants             (global, static) in RAM/HEAP
+                    Sketch uses 333636 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 33900 bytes (41%) of dynamic memory, leaving 48020 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 30mar21 v21.13/274 added yield time control (p1TriggerTime) to prevent we get a wdt reset while waiting for serial input
+  /*
+                    Executable segment sizes:
+                    BSS    : 28736 )         - zeroed variables      (global, static) in RAM/HEAP
+                    RODATA : 4404  ) / 81920 - constants             (global, static) in RAM/HEAP
+                    DATA   : 1348  )         - initialized variables (global, static) in RAM/HEAP
+                    IROM   : 299568          - code in flash         (default or ICACHE_FLASH_ATTR)
+                    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+                    Sketch uses 334336 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 34488 bytes (42%) of dynamic memory, leaving 47432 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 30mar21 v11.13/274 added CRC , using/following [https://github.com/jantenhove/P1-Meter-ESP8266]
+  /*
+                    Executable segment sizes:
+                    RODATA : 4272  ) / 81920 - constants             (global, static) in RAM/HEAP
+                    IROM   : 299088          - code in flash         (default or ICACHE_FLASH_ATTR)
+                    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+                    DATA   : 1340  )         - initialized variables (global, static) in RAM/HEAP
+                    BSS    : 28096 )         - zeroed variables      (global, static) in RAM/HEAP
+                    Sketch uses 333716 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 33708 bytes (41%) of dynamic memory, leaving 48212 bytes for local variables. Maximum is 81920 bytes.
+  */
 
-// 30mar21 v11.13/274 started with fixing RX2 port on GPIO2 output and GPIO4 Input, rememeber we have two class instances
-//                    - added yield() after reading P1 available serial data....
-/*
-                  Executable segment sizes:
-                  IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-                  BSS    : 28080 )         - zeroed variables      (global, static) in RAM/HEAP
-                  RODATA : 4244  ) / 81920 - constants             (global, static) in RAM/HEAP
-                  DATA   : 1340  )         - initialized variables (global, static) in RAM/HEAP
-                  IROM   : 298976          - code in flash         (default or ICACHE_FLASH_ATTR)
-                  Sketch uses 333576 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-                  Global variables use 33664 bytes (41%) of dynamic memory, leaving 48256 bytes for local variables. Maximum is 81920 bytes.
-*/
-// 30mar21 v21.12/274 If mqtt is not connected, continue to support the primary/core thermostatic function
-//                    - the routines are implemented in doCritical(): processGpio() & handleOTA()
-//                    - the mqtt client.connect routine is added with extra code to increased wait loops
-//                      stating at 2 tot 30 seconds this to prevent that unnecessary load.
-//                    - Note: extensive printing can significantly impact total performance.
-//                      remember: the esp8266 is a single task machine that operates in a loop
-//    sudo cat /dev/ttyS4 | stdbuf -o0 grep -a -E '(started|stopped|wdt)' | stdbuf -o0 ts | stdbuf -o0  grep -a -A 1 -B 1 -E '(wdt)'
-//    mosquitto_pub -t nodemcu-p1/switch/port1 -m D
+  // 30mar21 v11.13/274 started with fixing RX2 port on GPIO2 output and GPIO4 Input, rememeber we have two class instances
+  //                    - added yield() after reading P1 available serial data....
+  /*
+                    Executable segment sizes:
+                    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+                    BSS    : 28080 )         - zeroed variables      (global, static) in RAM/HEAP
+                    RODATA : 4244  ) / 81920 - constants             (global, static) in RAM/HEAP
+                    DATA   : 1340  )         - initialized variables (global, static) in RAM/HEAP
+                    IROM   : 298976          - code in flash         (default or ICACHE_FLASH_ATTR)
+                    Sketch uses 333576 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+                    Global variables use 33664 bytes (41%) of dynamic memory, leaving 48256 bytes for local variables. Maximum is 81920 bytes.
+  */
+  // 30mar21 v21.12/274 If mqtt is not connected, continue to support the primary/core thermostatic function
+  //                    - the routines are implemented in doCritical(): processGpio() & handleOTA()
+  //                    - the mqtt client.connect routine is added with extra code to increased wait loops
+  //                      stating at 2 tot 30 seconds this to prevent that unnecessary load.
+  //                    - Note: extensive printing can significantly impact total performance.
+  //                      remember: the esp8266 is a single task machine that operates in a loop
+  //    sudo cat /dev/ttyS4 | stdbuf -o0 grep -a -E '(started|stopped|wdt)' | stdbuf -o0 ts | stdbuf -o0  grep -a -A 1 -B 1 -E '(wdt)'
+  //    mosquitto_pub -t nodemcu-p1/switch/port1 -m D
 
-// The next may be usefull in determining which Core version is (not) to be used.
-//  #if defined(ARDUINO_ESP8266_RELEASE_2_3_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_1) || defined(ARDUINO_ESP8266_RELEASE_2_4_2) || defined(ARDUINO_ESP8266_RELEASE_2_5_0) || defined(ARDUINO_ESP8266_RELEASE_2_5_1) || defined(ARDUINO_ESP8266_RELEASE_2_5_2)
-//   #warning "Arduino ESP8266 Core versions before 2.7.1 are not supported"
-//   #endif
-/*
-   Executable segment sizes:
-   IROM   : 298880          - code in flash         (default or ICACHE_FLASH_ATTR)
-   IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
-   RODATA : 4208  ) / 81920 - constants             (global, static) in RAM/HEAP
-   BSS    : 28088 )         - zeroed variables      (global, static) in RAM/HEAP
-   DATA   : 1340  )         - initialized variables (global, static) in RAM/HEAP
-   Sketch uses 333444 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-   Global variables use 33636 bytes (41%) of dynamic memory, leaving 48284 bytes for local variables. Maximum is 81920 bytes.
+  // The next may be usefull in determining which Core version is (not) to be used.
+  //  #if defined(ARDUINO_ESP8266_RELEASE_2_3_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_1) || defined(ARDUINO_ESP8266_RELEASE_2_4_2) || defined(ARDUINO_ESP8266_RELEASE_2_5_0) || defined(ARDUINO_ESP8266_RELEASE_2_5_1) || defined(ARDUINO_ESP8266_RELEASE_2_5_2)
+  //   #warning "Arduino ESP8266 Core versions before 2.7.1 are not supported"
+  //   #endif
+  /*
+    Executable segment sizes:
+    IROM   : 298880          - code in flash         (default or ICACHE_FLASH_ATTR)
+    IRAM   : 29016   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...)
+    RODATA : 4208  ) / 81920 - constants             (global, static) in RAM/HEAP
+    BSS    : 28088 )         - zeroed variables      (global, static) in RAM/HEAP
+    DATA   : 1340  )         - initialized variables (global, static) in RAM/HEAP
+    Sketch uses 333444 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+    Global variables use 33636 bytes (41%) of dynamic memory, leaving 48284 bytes for local variables. Maximum is 81920 bytes.
+  */
+ /*
+  // 30mar21 v21.12/274 source code added to distinquick Test from Production (TEST_MODE absent)
+  // 28mar21 v21.11/274 added ESP.wdtFeed() after yield() to feed the WDT timer.
+  // 27mar21 V21.11/274 If (inverted) ledlight1 is active (waterheating on), accumulate the watercnt also as "HotCnt"
+  //               added loop timers: overall 120mSec,
+  //               approx 2Sec is for 10Sec/P1 intervals minus margins 1-2 seconds,
+  //               which leaves about 6 seconds for other items.
+  //               added check not to process P1serial if we are already finished
+  //               in case serial reads a zerolength byte, innore this
+  //               improved/validation of timestamp. Without P1Meter we use millis() to calculate timestamp
+  //               During forced mode (to retain) temprature functions, Mqtt display "Force:cnt"
+  // 26mar21 V21.10 Changed library /home/pafoxp/Arduino/libraries/SoftwareSerial-2.4.0/SoftwareSerial240.cpp
+  //                  void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
+  //                     GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);  // 26mar21 Ptro done at start as per advice espressif
+  // 26mar21 V21.10 clearing interrupt for our WATERSENSOR_READ at start of routine
+  //
+  // 26mar21 V21.09 Corrected Debug print inactive/active state at command "D"
+  // 26mar21 V21.09 Stable version, improved reliability by fluctuating input pull-up to assist state.
+  // 23mar21 V21.08 hardware set to use external pullup, internal pullup  WaterSensor disabled
+  //                in LoopBack testmode, the WaterSensor readstate is forewarded to GPIO2 (TX2)
+  //                Introduced "W" to reWire ISR watersensor interrupt WaterTrigger1 (<>Watertrigger)
+  //                Introduced "w" to switch ON (<>OFF) internal pullup for watersensor pin
+  // 23mar21 V21.08 revise debounce WaterTrigger via ISR, add "Z" to zeroise counters
+  // 21mar21 V21.07 Arrange and use old SoftwareSerial code  (of hw 2.4.0) to accomodate rs232
+  //   allocated dedicated softeware serial librbary version 3.3.1. as (was) used in hardwaresetup 2.4.0
+  //   - newer librbaries are to slow and not useful at baudrate > 57600
+  //   - for this: allocate SoftwareSerial-2.4.0 with name SoftwareSerial240.h/.cpp
+  //   - code require the use for "#define UseP1SoftSerialLIB" to disinquish from new layout
+  //   - new serial layout as of version 2.6.0 uses a setup that's more compatible with hardware serial library.
+  //   P1 serial databuffer increased 600 bytes
+  // 20mar21 V21.06  prepare watertap meter T1MeterT.5.ino
+  //   structured D0-D8 Arduino port schema
+  //   added myserial2 (1200 baud for Kamstrup byte for byte interface)
+  // 29jun20 V13.05 renamed to T1MeterT.4.ino
+  // T1MeterT.4, external p1 renamed to t1
+  // 29jun20 V13.05 copied from /home/pafoxp/code-P1meter/P1Meter1.4 but for test only
+  // ----------------------------------------------------------------------------------------
+  // 29jun20 V13.05 testing OTA which failed at laptop
+  // 10jun20 V13.04 P1 timeout processing, allow do logic wihout P1 connected, i/I-nterval
+  // 19nov19 V13.03 tiem string with leading zeroes is sometimes/somewhere not acceptable as json-number, reverted to valu number
+  // 19nov19 V13.03 reverted back to 2.4.0 (2.5.2 instable rs232), add timestring is now substringed from timedate, eases conversion
+  // 19nov19 V13.03 l/L activates off/on Mqtt logging of kaifka meter
+  // 28okt18 V13.03 2.5.2 LwIP V2: solve double ,, in json output , add mqtt count
+  // 28okt18 V13.02 2.4.0 LwIP V2: S/W-inter time in "0-0:1.0.0(181028223640W)" message
+  // 13sep18 V13.01 2.4.0 LwIP V2: Default P1 follow mode
+  // 04sep18 V1.3 Compile with esp8266 expressif 2.3.0
+  // 27aug18 V1.3 MQTT pubsize expanded from 256 to 320 (as we added a field)
+  // 27aug18 V1.3 Added temperature device 6 (livingroom Whites=GND, Green=Signal, Orange=3.3V) 28aa93bb13130138 as T0 (??)
+  // 27aug18 V1.3 Thermistor replaces by LDR in Livingroom (Blue/white wire)
+  // 01aug18 V1.3 Added 4 devices DS18B20 JSON published as T2, T3, T4, T5
+  // 24jul18 V1.3 DS18B20 temperature reading which is JSON published as T1
+  // 14jul18 V1.2 MQTT subscription for commands mosquitto_pub -h 192.168.1.8 -p 1883 -t "nodemcu-p1/switch/port1" -m "L"
+  //  :: Reset, noLogmqtt, doDebugserialout, doP1mqtt, 1-heatD8/2-off/3-leave/2-followD7
+  // 25jun2018 00u00 - added Digital read D6 {LedLight1} for hotwater LedLight sensor
+  // 24jun2018 00u00 - added analog read A0 (Ajson: {analogRead} for temperature sensor
+  // D7 is input {ThermoState} On/low  , D8 is (planned) heat control {Hlight} On/high
+  // P1 meter report: {CurrentPowerConsumption} {powerConsumptionHighTariff} {powerConsumptionLowTariff}
+  //
+  // updated to rebooot in case millis interval if no messages were send
 */
-// 30mar21 v21.12/274 source code added to distinquick Test from Production (TEST_MODE absent)
-// 28mar21 v21.11/274 added ESP.wdtFeed() after yield() to feed the WDT timer.
-// 27mar21 V21.11/274 If (inverted) ledlight1 is active (waterheating on), accumulate the watercnt also as "HotCnt"
-//               added loop timers: overall 120mSec,
-//               approx 2Sec is for 10Sec/P1 intervals minus margins 1-2 seconds,
-//               which leaves about 6 seconds for other items.
-//               added check not to process P1serial if we are already finished
-//               in case serial reads a zerolength byte, innore this
-//               improved/validation of timestamp. Without P1Meter we use millis() to calculate timestamp
-//               During forced mode (to retain) temprature functions, Mqtt display "Force:cnt"
-// 26mar21 V21.10 Changed library /home/pafoxp/Arduino/libraries/SoftwareSerial-2.4.0/SoftwareSerial240.cpp
-//                  void ICACHE_RAM_ATTR SoftwareSerial::rxRead() {
-//                     GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);  // 26mar21 Ptro done at start as per advice espressif
-// 26mar21 V21.10 clearing interrupt for our WATERSENSOR_READ at start of routine
-//
-// 26mar21 V21.09 Corrected Debug print inactive/active state at command "D"
-// 26mar21 V21.09 Stable version, improved reliability by fluctuating input pull-up to assist state.
-// 23mar21 V21.08 hardware set to use external pullup, internal pullup  WaterSensor disabled
-//                in LoopBack testmode, the WaterSensor readstate is forewarded to GPIO2 (TX2)
-//                Introduced "W" to reWire ISR watersensor interrupt WaterTrigger1 (<>Watertrigger)
-//                Introduced "w" to switch ON (<>OFF) internal pullup for watersensor pin
-// 23mar21 V21.08 revise debounce WaterTrigger via ISR, add "Z" to zeroise counters
-// 21mar21 V21.07 Arrange and use old SoftwareSerial code  (of hw 2.4.0) to accomodate rs232
-//   allocated dedicated softeware serial librbary version 3.3.1. as (was) used in hardwaresetup 2.4.0
-//   - newer librbaries are to slow and not useful at baudrate > 57600
-//   - for this: allocate SoftwareSerial-2.4.0 with name SoftwareSerial240.h/.cpp
-//   - code require the use for "#define UseP1SoftSerialLIB" to disinquish from new layout
-//   - new serial layout as of version 2.6.0 uses a setup that's more compatible with hardware serial library.
-//   P1 serial databuffer increased 600 bytes
-// 20mar21 V21.06  prepare watertap meter T1MeterT.5.ino
-//   structured D0-D8 Arduino port schema
-//   added myserial2 (1200 baud for Kamstrup byte for byte interface)
-// 29jun20 V13.05 renamed to T1MeterT.4.ino
-// T1MeterT.4, external p1 renamed to t1
-// 29jun20 V13.05 copied from /home/pafoxp/code-P1meter/P1Meter1.4 but for test only
-// ----------------------------------------------------------------------------------------
-// 29jun20 V13.05 testing OTA which failed at laptop
-// 10jun20 V13.04 P1 timeout processing, allow do logic wihout P1 connected, i/I-nterval
-// 19nov19 V13.03 tiem string with leading zeroes is sometimes/somewhere not acceptable as json-number, reverted to valu number
-// 19nov19 V13.03 reverted back to 2.4.0 (2.5.2 instable rs232), add timestring is now substringed from timedate, eases conversion
-// 19nov19 V13.03 l/L activates off/on Mqtt logging of kaifka meter
-// 28okt18 V13.03 2.5.2 LwIP V2: solve double ,, in json output , add mqtt count
-// 28okt18 V13.02 2.4.0 LwIP V2: S/W-inter time in "0-0:1.0.0(181028223640W)" message
-// 13sep18 V13.01 2.4.0 LwIP V2: Default P1 follow mode
-// 04sep18 V1.3 Compile with esp8266 expressif 2.3.0
-// 27aug18 V1.3 MQTT pubsize expanded from 256 to 320 (as we added a field)
-// 27aug18 V1.3 Added temperature device 6 (livingroom Whites=GND, Green=Signal, Orange=3.3V) 28aa93bb13130138 as T0 (??)
-// 27aug18 V1.3 Thermistor replaces by LDR in Livingroom (Blue/white wire)
-// 01aug18 V1.3 Added 4 devices DS18B20 JSON published as T2, T3, T4, T5
-// 24jul18 V1.3 DS18B20 temperature reading which is JSON published as T1
-// 14jul18 V1.2 MQTT subscription for commands mosquitto_pub -h 192.168.1.8 -p 1883 -t "nodemcu-p1/switch/port1" -m "L"
-//  :: Reset, noLogmqtt, doDebugserialout, doP1mqtt, 1-heatD8/2-off/3-leave/2-followD7
-// 25jun2018 00u00 - added Digital read D6 {LedLight1} for hotwater LedLight sensor
-// 24jun2018 00u00 - added analog read A0 (Ajson: {analogRead} for temperature sensor
-// D7 is input {ThermoState} On/low  , D8 is (planned) heat control {Hlight} On/high
-// P1 meter report: {CurrentPowerConsumption} {powerConsumptionHighTariff} {powerConsumptionLowTariff}
-//
-// updated to rebooot in case millis interval if no messages were send
 
 // added for Visual Studio Code , check & include local Hardware paths /home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266
 //                                Note we momentariluy use Arduino IE, so this section mat require update
@@ -1164,7 +1196,7 @@ woes in Wifi/Lamx layer
 //
 
 
-/* 
+/* #define settings
    Note changing libarieslooks to be useless as only 2.4.1 seem to resist WDT reset and is 99% (Serial) reliable
         but we levae the oportunity to centrally control which specifx libary will be included/
         any library must be made available with(in) Arduino/esp8266 Boardmanager
@@ -1202,7 +1234,7 @@ woes in Wifi/Lamx layer
   // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/Arduino.h>
   // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/variants/nodemcu/pins_arduino.h>
   // #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/stdlib_noniso.h>
-#endif
+ #endif
 
 // Note 2.4.2  TBI
 #ifdef libuse242
@@ -1210,7 +1242,7 @@ woes in Wifi/Lamx layer
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/cores/esp8266/Arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/variants/nodemcu/pins_arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/cores/esp8266/stdlib_noniso.h>
-#endif
+ #endif
 
 // Note 2.5.0  to be checked
 #ifdef libuse250
@@ -1218,14 +1250,14 @@ woes in Wifi/Lamx layer
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/cores/esp8266/Arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/variants/nodemcu/pins_arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.0/cores/esp8266/stdlib_noniso.h>
-#endif
+ #endif
 
 // Note 2.5.2 is  not to be used, was unstable on softserial
 #ifdef libuse252
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/cores/esp8266/Arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/variants/nodemcu/pins_arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.5.2/cores/esp8266/stdlib_noniso.h>
-#endif
+ #endif
 
 // 2.6.0. give strange Git and Software sofserial errors, do not use
 #ifdef libuse260
@@ -1235,7 +1267,7 @@ woes in Wifi/Lamx layer
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/cores/esp8266/Arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/variants/nodemcu/pins_arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.6.0/cores/esp8266/stdlib_noniso.h>
-#endif
+ #endif
 
 #ifdef libuse274              // not very stable, we must use the (old 2.4.1 now) P1 adapted softserial
   #ifndef UseP1SoftSerialLIB   // do we use an old library
@@ -1244,26 +1276,28 @@ woes in Wifi/Lamx layer
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/Arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/variants/nodemcu/pins_arduino.h>
   #include </home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/stdlib_noniso.h>
-#endif
+ #endif
 
 #ifndef P1_VERSION_TYPE         // if not defined, fallback to test version
-#define P1_VERSION_TYPE "t1"    // "t1" test "p1" production
-#endif
+ #define P1_VERSION_TYPE "t1"    // "t1" test "p1" production
+ #endif
 
-/*
+/* 
   Define debug using Macros https://forum.arduino.cc/t/sketch-espconn-error/1028011
     DEBUG_PRINTLN("ESPConn - Looks not connected.");
     DEBUG_PRINT("Sending: ");
     str = esp.readStringUntil(':'); DEBUG_PRINT(str);
     DEBUG_WRITE_BYTES(data, myLength); DEBUG_PRINTLN();
 */
+
+// DEBUG macroś  per advise of Arduino
 #define DEBUG
-#ifdef DEBUG
+ #ifdef DEBUG
   #define DEBUG_PRINTLN(x) Serial.println(x)
   #define DEBUG_PRINT(x) Serial.print(x)
   #define DEBUG_WRITE_BYTES(x, y) Serial.write(x, y)
   #define DEBUG_WRITE(x) Serial.write(x)
-#else
+ #else
   #define DEBUG_PRINTLN(x)
   #define DEBUG_PRINT(x)
   #define DEBUG_WRITE_BYTES(x, y)
@@ -1281,7 +1315,7 @@ woes in Wifi/Lamx layer
     bool bSERIAL2_INVERT = false; // Simulated GJ meter is USB interface , does not require invert v53
   #endif
 
-#else
+ #else
   // note: DUP_MODE will invert to allow regular USB/serial, else we'll use the default (inverted polarity of serial-P1)
   #ifdef DUP_MODE_NOINVERT    // v56 reverse for PROD_MODE normally inverted
     bool bSERIAL_INVERT  = false; // v53a Simulated P1 meter is USB interface of a PC to GPIO, does not required invert
@@ -1290,7 +1324,7 @@ woes in Wifi/Lamx layer
     bool bSERIAL_INVERT  = true;  // Direct P1 GPIO connection require inverted serial levels (TRUE) for RS232
     bool bSERIAL2_INVERT = true;  // GJ meter is inverted (output RX2 does pulldown Gpio) v53
   #endif
-#endif
+ #endif
 
 // #define bSERIAL2_INVERT false // GJ meter is as far as we  know normal  serial (FALSE) RS232  < 03okt22
 // #define bSERIAL2_INVERT true // GJ meter is as far as we  know normal (FALSE) RS232
@@ -1360,7 +1394,21 @@ woes in Wifi/Lamx layer
 
 const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
 
-#ifndef ARDUINO_ESP8266_RELEASE 
+/* doDUMMY_MACRO doYIELD_MACRO v77a  ------------------------------------------- dummy code insertions
+    default of nullify by activation
+  */
+
+  // #define doDUMMY_MACRO { };            // do background processing required for wifi etc.
+  // #define doYIELD_MACRO { };            // do background processing required for wifi etc.
+  #ifndef doDUMMY_MACRO
+  #define doDUMMY_MACRO { delay(0);delay(0);delay(0); };  // do some dummy delay code 
+  #endif
+  #ifndef doYIELD_MACRO
+  #define doYIELD_MACRO { yield(); ESP.wdtFeed(); };      // do background processing wifi etc.
+  #endif
+// ------------------------------------------------------------------------------- dummy code insertions
+
+#ifndef ARDUINO_ESP8266_RELEASE     // include #include <core_version.h>
   /*
    2.4.1: file /home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/cores/esp8266/core_version.h
      main file:   [/home/pafoxp/.arduino15/packages/esp8266/hardware/esp8266/2.4.1/cores/esp8266/core_esp8266_main.cpp]
@@ -1389,7 +1437,7 @@ const char *mqttLogTopic2  = "/log/wl"  P1_VERSION_TYPE;            // 'l' on/of
 #ifdef P1_Override_Settings      // include our P1_Override_Settings
   #include "P1OverrideSettings.h"   // which contains our privacy/site related setting 
   // #warning Using override settings
-#else
+ #else
   #warning Using default settings, please use override for settings
   #ifdef TEST_MODE                  // Note: we use the override file at compile
     const char *ssid = "Production ssid";    // "Pafo SSID4"    //  T E  S T   setting
@@ -1594,7 +1642,7 @@ int  setMaskLimitCnt  = 18;      // number of mask poisition in masking array, p
 volatile bool useWaterTrigger1 = false;   // 'W" Use standard WaterTrigger or (on) WaterTrigger1 ISR routine,
 volatile bool useWaterPullUp   = false;   // 'w' Use external (default) or  internal pullup for Wattersensor readpin
 volatile bool loopbackRx2Tx2   = RX2TX2LOOPBACK; // 'T' Testloopback RX2 to TX2 (OFF, ON is also WaterState to TX2 port)
-int  loopbackRx2Mode  = 0;       // '0' Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc, 6=print
+int  loopbackRx2Mode  = 0;       // 'T' +0-9 Testloopback RX2 to TX2 (OFF, 1 test-check, 5=crc, 6=print
 bool outputMqttLog    = false;   // "l" false -> true , output to /log/p1
 bool outputMqttPower  = true;    // "P" true  -> false , output to /energy/p1
 bool outputMqttPower2 = true;    // "p" true  -> false , output to /energy/p1power
@@ -1732,7 +1780,8 @@ bool telegramP1header = false;      // used to trigger/signal Header window /KFM
 //DebugCRC char testTelegram[MAXLINELENGTH];   // use to copy over processed telegram // ptro 31mar21
 
 unsigned int dataInCRC  = 0;          // CRC routine to calculate CRC of data telegram_crcIn
-int publishP1ToMqttCrc = 0;           // 0=failed, 1=OK, 2=recovered
+int publishP1ToMqttCrc = 0;           // P1 0=failed, 1=OK, 2=recovered
+int publishWLToMqttCrc = 0;           // v77 WL 0=failed, 1=OK, 2=recovered
 bool validCrcInFound = false;         // Set by Decode when Full (recovered) datarecord has valid Crc
 int  telegram_crcIn_rcv = 0;          // number of times DataIn could be recovered
 int  telegram_crcIn_cnt = 0;          // number of times CrcIn was called
@@ -1746,7 +1795,8 @@ char telegram_crcOut[MAXLINELENGTH+32];  // processed telegram with changed posi
 int  telegram_crcOut_len = 0;         // myLength of this record
 // int  telegram_crcIn_cnt2 = 0;      // number of times CrcIn was called
 
-/* At header: initialise telegram_crcin
+/* telegram logic documentation
+  At header: initialise telegram_crcin
   during CRC we accumulate record positions into telegram_crcin
   At trailer:
     if telegram_crcIn_len = telegram_crcOut_len and crcValidCounter > 0
@@ -1907,10 +1957,10 @@ void setup()
     asm(".global _printf_float");            // include floating point support
 
   pinMode(BLUE_LED, OUTPUT);               // Declare Pin mode Builtin LED Blue (nodemcu-E12: GPIO16)
-// used for debug diagnostics wifi but gpio5 does not monitor wifi in Arduino/NONOS
-//  #ifdef COP_MODE           // set for Arduino to prevent default production compilation
-//     pinMode(D1, INPUT);        // Declare Pin D1 GPIO5 as input for Wifi monitoring
-// #endif
+  // used for debug diagnostics wifi but gpio5 does not monitor wifi in Arduino/NONOS
+  //  #ifdef COP_MODE           // set for Arduino to prevent default production compilation
+  //     pinMode(D1, INPUT);        // Declare Pin D1 GPIO5 as input for Wifi monitoring
+  // #endif
  
   // struct rst_info *rtc_info = system_get_rst_info();
   // Serial.printf(("reset reason: %x\n", rtc_info->reason);
@@ -2692,15 +2742,14 @@ void setup()
    
  */
 
-} // setup
+} // setup() end
 
 
 
 // If only one tx or rx wanted then use this as parameter for the unused pin
 
 
-/* 
-  Mainloop:
+/* Mainloop documentation
     - supervise timers to prevent wdt reset
     - manage serialconnection during P1 intervals
     - handle/decode P1 readings
@@ -2730,8 +2779,8 @@ void loop()
     cntHeapStart = ESP.getFreeHeap();   // v75d1 start
     // cntHeapStart++;
   #endif   
-  
-  if (verboseLevel == VERBOSE_ON) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
+
+   if (verboseLevel == VERBOSE_ON) Serial.print("\b \b"); // exit loop to check if we have entered the the buulding
   // note this loop( ) routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
   
   // declare global timers loop(s)
@@ -2741,6 +2790,7 @@ void loop()
   previousMicros = currentMicros; // get V47 previous loop time
   currentMicros = micros(); // get current cycle time
 
+  // /*  v76 deactivate 
     // v58c: check if this stabilizes
     for (int i = 14; i < 11; i--) {
       asm(
@@ -2756,6 +2806,7 @@ void loop()
         "NOP;"
       );
     }
+  // */
 
   /*
     time how long the P1 record took
@@ -2858,6 +2909,9 @@ void loop()
                                                     // that reset
 
   } else {                         // else we are allowed to do other acivities
+
+    cmdSerialInputConsole();   // v76 process hardware serial input commands
+
     // if (loopbackRx2Mode == 3) Serial.print((String) loopbackRx2Mode 
     //         + (p1SerialFinish  ? "f" : "g")
     //         + (p1SerialActive  ? "a" : "b")
@@ -3208,7 +3262,7 @@ void loop()
   #endif  
 
   // cntHeapFinish++;
-}
+} // loop() end
 
 
 /* 
@@ -3267,7 +3321,7 @@ void mqtt_reconnect() {                 // mqtt read usage doc https://pubsubcli
     Serial.print((String)"; NOT connected to >" + mqttServer) ;
   }
   Serial.println("< .");
-} // end setup
+} // mqtt_reconnect()
 
 /* 
     Do the critical core functions: reading thermostat and setting the heating
@@ -3329,6 +3383,7 @@ void readTelegramP1() {
   // if (!outputOnSerial) Serial.print((String) "\rDataCnt "+ (mqttCnt_Out+1) +" started at " + micros());
   
   // "Tn_D2diClc1 = RxYield# Cycle# Tstate# Tread-dT Twrite-Ai Water-hl Prsrve_CW Hot-cw "
+  //  loop() --> readTelegramP1()  :==> " ReadT3:  5.853802204 D2diChc1:   451 start:  276.13143 ...."
   if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s%d: %5u start: %11.6f \b\b ", 
         RX_yieldcount,    // v52: check countlevel
           ((float)ESP.getCycleCount()/80000000),
@@ -3955,6 +4010,8 @@ void readTelegramWL() {
 
           /*
               add CRC check on WL record, required as we have clearly wrong read values.
+              WL>245-0=245:244,s=0,e=239,v=233]    &+r. s=/, e=!, crt=3579, cr1=3579, ;                                                                                          
+              crc OK: /WARMTELINK-VI\<|<|1-3:0.2.8(50)<|0-0:1.1.0(260818205954W)<|0-0:96.1.1(3037386633663736366566333065393434643561326461643162646237373865)<|0-1:24.1.0(012)<|0-1:96.1.0(37323632353436343243324433343043)<|0-1:24.2.1(260818205900W)(95.308*GJ)<|!3579 
           */
           if  ( startChar >= 0  && endChar > startChar && valChar < endChar) {    // we have a start to end, ten do CRC check
 
@@ -3965,139 +4022,14 @@ void readTelegramWL() {
                 validTelegram2CRCFound = (strtol(messageCRC2, NULL, 16) == currentCRC2);   // check if we have a 16base-match https://en.cppreference.com/w/c/string/byte/strtol
 
               
-
+                if ( validTelegram2CRCFound) publishWLToMqttCrc = 1; else publishWLToMqttCrc = 0; // v77 sent out Crc
                 if ( validTelegram2CRCFound && loopbackRx2Mode == 5 ) {   // v55 debug/print one validated hex characters
                   Serial.println("");
                   Serial.printf(" crt=%s, crc=%04x \r\n", messageCRC2, currentCRC2);    // v54 insert textual CRC and calculated CCRC
 
                   for (int i = startChar ; i  < ((endChar-startChar)+1+4); i++ ) {
-                    
+                    // v77 removed: commented obsolete instability code  ubtil v76
                     // diagnose instability of code.....
-                    // Serial.print(telegram2_org[i]);             // 001 only, is stable
-                    // -------------------------------------------------------------------------------------
-                    
-                    // Serial.print(telegram2_org[i]);             // 002 try to unlock, just somewhat more stable
-
-                    /*
-                    Serial.print(telegram2_org[i]);             // 003 try to unlock, instable
-                    Serial.print(telegram2_org[i]);
-                    */
-                    
-
-                    // ---------------------------------------------------------------------------- keep below
-                    // Serial.printf(" %02x", telegram2_org[i]);      // 000-005 causing unstablity
-                    // ---------------------------------------------------------------------------- keep above
-
-                    // Serial.print(telegram2_org[i]);             // 004 after try to unlock, instable
-
-                    /*
-                      asm(                    // 005 try to insert unsued code, no effect
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                        "NOP;"
-                      );
-                    */     
-                  // // teststable2-only
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   // ---------------------------- 009 line 2585 added printf (unstable) 
-                  //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                  //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // add13 + add 014 stable (rx2-70%)
-
-                  // // teststable3&2
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   delay(0);     // 008 adding here without printf above , stable
-                  //   // ---------------------------- 009 line 2585 added printf (unstable) 
-                  //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                  //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                  //   delay(0);     // add13 + add 014 stable (rx2-70%)
-
-
-                    //  // teststable0
-                    //  // move020 to void command_testH3() to check if location influnces things
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding here wihout printf above , stable
-                    //   delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                    //   delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-                    //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 011 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // 008 adding 009 test remove, add 010 unstable
-                    //   delay(0);     // add13 + add 014 stable (rx2-70%)
-                    //   delay(0);     // add14 + add015 stable (rx2=40%)
-                    //   delay(0);     // add15 + add016 less stable (rx2=20%)
-                    //   delay(0);     // add16 + add017 stable (rx2=50%)
-                    //   delay(0);     // add17 + add018 stable  (rx2=10%)
-                    //   delay(0);     // add18 + add019 stable  (rx2=75%)
-                    
-                   /*
-                      if (false) {
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable
-                        // delay(0);     // 008 adding here without printf above , unstable 30% (comment = 22c2 problem)
-                        delay(0);     // 008 adding here without printf above , unstable 20%
-                        delay(0);     // 008 adding here without printf above , untstale 25%
-                        delay(0);     // 008 adding here wihout printf above , stable
-                        delay(0);     // 008 adding 009 test remove, add 013 more stable (rx2-30%)
-                        delay(0);     // 008 adding 009 test remove, add 012 stable (rx2-10%)
-                        delay(0);     // 008 adding 009 test remove, add 011 unstable
-                        delay(0);     // 008 adding 009 test remove, add 011 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // 008 adding 009 test remove, add 010 unstable
-                        delay(0);     // add13 + add 014 stable (rx2-70%
-                      }
-                    */                      
-                    // no zzzzz = instable
-                    // z     = instable 20%
-                    // zz    = instable
-                    // zzz   = less 50% instable
-                    // zzzz  = very 60% instable
                     Serial.printf(" %02x", telegram2_org[i]);      // 000-005, 008 causing unstablity
                   }
                   
@@ -4236,7 +4168,7 @@ void readTelegramWL() {
       Serial.println("");
     }
   }  // if mySerial2.available 
-} // void readTelegram2
+} // void readTelegramWL
 
 
 /* 
@@ -4288,7 +4220,7 @@ void processGpio() {    // Do regular functions of the system
     Serial.println( " ." );
   }
   // publishP1ToMqtt();      // PUBLISH this mqtt
-} 
+} // processGpio()
 
 /* 
     Mqtt input received, callled whenever a MQTT subscription message arrives
@@ -4333,7 +4265,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int myLength) {
   Processing queued mqttCommand, received by callbackMqtt 
 */
 void ProcessMqttCommand(char* payload, unsigned int myLength) { 
-  /* Commands: (single byte)
+  /* Commands: (single byte) (TBD)
 
     ? Print brief helptexst on serial output
     0 heating On  valve relay D8=Gpio15
@@ -4903,124 +4835,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             else                                 serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
 
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
-          Serial.println((String)"\r\n? (bell) \a Help commands"  + __FILE__ 
-                                                        + " version " + DEF_PROG_VERSION 
-                                                        + ", compiled " __DATE__ + " " + __TIME__ );
-          // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
-          Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
-          Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
-          Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") Thermostate"  
-                                                    + (new_ThermostatState == 2 ? " <--" : "" ) );
-          Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
-                                                    + (new_ThermostatState == 3 ? " <--" : "" ) );
-          Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
-          Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
-          Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-          Serial.println((String)"e 1/2 force exception "
-                          + "( heap:" + ESP.getFreeHeap() +")"
-                          // + "( stack:" + ESP.getFreeContStack() + ")"      // v75b4 (2.4.1) // 2.4.2 function
-                        );   // v52: display FreeHeap
-          Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-          Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
-                                    + " serial1=" +  serial1Baudrate
-                                    + " serial2=" +  serial2Baudrate);
-          Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
-          Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-          Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
-          Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
-                                                                         + (blue_led2_Water ? "Y" : "N") 
-                                                                         + (blue_led2_HotWater ? "Y" : "N") );
-          Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
-                                                                  + ", mode:" + loopbackRx2Mode );
-          Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
-          // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
-          Serial.println((String)"W on/OFF Watertrigger1 (Err="+waterErrorSwitch+") :" + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
-          Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
-          Serial.println((String)"y print water debounce");
-          Serial.println((String)"Z zero counters " + 
-                + "(mqtt=" + mqttCnt_Out              // v63 Output count
-                + " cmd=" + mqttCnt_In            // v72 display input number
-                + " faults: " 
-                + " Miss=" + p1MissingCnt         // v52 failed to read any P1
-                + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
-                + ", LenE=" + p1ShortCnt          // v74 updated when we have a length mismatch between Input and Mask
-                + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-                + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
-                + ", Yld="+  RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
-                + ", lT2="+  loopTelegram2cnt     // V53 print current loopTelegram2cnt
-                + " )" );
-          Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
-          Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
-          Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
-          Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
-          Serial.println((String)"M {+-} print Masking array(limiter) "
-                          + "( MaskX="+ telegram_crcOut_cnt    // v52 number of X maskings
-                          + "<"+ setMaskLimitCnt + " )"       // v74 display masklimit count
-                          + " Masking("+ (switchMaskingCmd  ? "+m" : "-m")  + ")="  // v74 display state of masking command
-                          + (switchMaskingOut  ? "Active" : "Inactive")             // v74: display state masking array
-                  );
-          Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )"      // v52 number of Times we validated
-                          + " & flips Masking(m) to " + (switchMaskingCmd  ? "Off" : "On")   // v74: display state
-                 );
-          Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
-          int temp1 = mySerial1.m_bitWait * 1;
-            // S P/T|0-1 serial1 on/off finish
-            // s P/T|0-9 serial2 interval
-          Serial.println((String)"S (p|Test|0-1) ON/off "
-                        + "\t" + (!serial1Stop  ? "Yes" : "No") 
-                        + "\tserial1P1-"
-                        + (bSerial1State  ? "A" : "i")
-                        +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
-                        + " , bitWait=" + temp1
-                        + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
-                        + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
-                        + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
-                        );
-          
-          int temp2 = mySerial2.m_bitWait * 1;
-          Serial.println((String)"s (p|Test|0-9) ON/off" 
-                        + " \t" + (!serial2Stop  ? "Yes" : "No")          
-                        + "\tserial2P2-"
-                        + (bSerial2State  ? "A" : "i")
-                        +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
-                        + " , bitWait=" + temp2
-                        + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
-                        + ", interval:"+ rx2ReadInterval  
-                        );
-          
-          Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
-          Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
-                                                      // + "/" + (mySerial1.m_bitWait % 1) + "/"
-                                                      + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
-                                                      + ", jserial2=" + mySerial2.m_bitWait);
-          
-          Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
-          
-          Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
-          
-          /* // cannot do here as resetInfo is not defined and cannot be not globalised
-          Serial.printf("Restart reason: 0x%08x epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x" , 
-            resetInfo->reason, resetInfo->epc1, resetInfo->epc2, resetInfo->epc3, resetInfo->excvaddr, resetInfo->depc); // v52: print registers
-          */
-          Serial.printf("\t restart reason 0x%08x  epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x ",
-                             save_reason, save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
-          Serial.println();
-          Serial.println("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)");          // v51 print portstatus 
-          Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
-                                + "\t" + WATERSENSOR_READ  + "=WATERSENSOR_READ:" + !digitalRead(WATERSENSOR_READ) 
-                                + "\t" + SERIAL_RX2        + "=SERIAL_RX2:"       + !digitalRead(SERIAL_RX2)       
-                                + "\t" + DS18B20_SENSOR    + "=DS18B20_SENSOR:"   + !digitalRead(DS18B20_SENSOR)   
-                                + "\t" + BLUE_LED2         + "=BLUE_LED2:"        + !digitalRead(BLUE_LED2)       ); 
-          Serial.println((String) "\t" + SERIAL_RX         + "=SERIAL_RX:"        + !digitalRead(SERIAL_RX)        
-                                + "\t" + LIGHT_READ        + "=HOT_READ:"         + !digitalRead(LIGHT_READ)       
-                                + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
-                                + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
-                                + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
-              } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
+            doCmdHelp();
+    } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
 
      if (outputOnSerial) Serial.println();   // ensure crlf
   }
-}
+} // ProcessMqttCommand()
 
 
 /* 
@@ -5062,25 +4882,26 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     String msg = "{"; // build mqtt frame 
     // msg.concat("\"currentTime\": %lu");                // P1 19nov19 17u12 remove superflous comma
     msg.concat("\"currentTime\":\"%s\"");                  // %s is string
-    msg.concat(",\"CurrentPowerConsumption\":%lu");    // P1
+    msg.concat(",\"P1crc\":%u");                       // v77 moved to start Validity CRC 0 or 1
+    msg.concat(", \"CurrentPowerConsumption\":%lu");    // P1
     msg.concat(",\"ThermoState\":%u");                 // Johnson
     msg.concat(",\"AnalogRead\":%u");                  // adc
     msg.concat(",\"LedLight1\":%u");                   // Hot water witch on
 
     if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0 ) {
-        msg.concat(",\"powerConsumptionLowTariff\":%lu");  // P1   always > 0
+        msg.concat(", \"powerConsumptionLowTariff\":%lu");  // P1   always > 0
         msg.concat(",\"powerConsumptionHighTariff\":%lu"); // P1   always > 0
     } else {
         msg.concat(",\"!powerConsumptionLowTariff\":%lu");  // v46 P1 false or missing read, ignore field
         msg.concat(",\"!powerConsumptionHighTariff\":%lu"); // v46 P1 false or missing read, ignore field
     }
     
-    msg.concat(",\"P1crc\":%u");                       // Validity CRC 0 or 1
+    // msg.concat(",\"P1crc\":%u");                       // v77 moved to start Validity CRC 0 or 1
 
     char temperatureString[7];
     // sequence does matter
     // TBD: consider logic to ignore if we have a missing sensorcount
-    msg.concat(",\"T0\":"); dtostrf(tempDev[5], 2, 1, temperatureString); msg.concat(temperatureString);  // T0
+    msg.concat(", \"T0\":"); dtostrf(tempDev[5], 2, 1, temperatureString); msg.concat(temperatureString);  // T0
     msg.concat(",\"T1\":"); dtostrf(tempDev[0], 2, 1, temperatureString); msg.concat(temperatureString);  // T1
     msg.concat(",\"T2\":"); dtostrf(tempDev[1], 2, 1, temperatureString); msg.concat(temperatureString);  // T2
     msg.concat(",\"T3\":"); dtostrf(tempDev[2], 2, 1, temperatureString); msg.concat(temperatureString);  // T3
@@ -5095,7 +4916,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       msg.concat(temperatureString); 
     } 
 
-    msg.concat(",\"Heating\":%u");                     // Heating valve (out)
+    msg.concat(", \"Heating\":%u");                     // Heating valve (out)
     if (new_ThermostatState == old_ThermostatState) {  // Heating mode 0=Off, 1=On, 2=Follow, 3=NotUsed-Skip
       msg.concat(",\"HeatMode\":%u");                  // current state
     } else {
@@ -5125,7 +4946,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(", \"mqttCnt\":%u");      // as of 19nov19 include our message counter, v72 keep field name
 
     // msg.concat(", \"WaterSwitch\":%u");        // as of 19nov19 include Watersensor waterReadState
-    msg.concat( ((waterErrorSwitch != 0) ? "\", !WaterSwitch\":%u" : ", \"WaterSwitch\":%u")); // v75e 15aug26 print not sign in case of active error switch
+    msg.concat( ((waterErrorSwitch != 0) ? ", \"!WaterSwitch\":%u" : ", \"WaterSwitch\":%u")); // v75e 15aug26 print not sign in case of active error switch
 
     if (loopbackRx2Tx2) {
       msg.concat(", \"WaterTst\":%u");       // as of 25mar21 Use this Json to indicate Testmode
@@ -5147,6 +4968,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
         msg.concat(", \"!HeatMJ\":%u");   // invalid count
     }
     // HeatConsumptionOld = HeatConsumption;  // check for next cycle 
+
+    msg.concat(", \"WLcrc\":%u");                       // Validity WarmteLnk CRC 0 or 1
 
     if (useWaterTrigger1) msg.concat(", \"Trigger1\":1");  // show triggernumber
     if (useWaterPullUp)   msg.concat(", \"PullUp\":1");    // show pullupmode
@@ -5189,6 +5012,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             // currentTime,                // metertime difference 52 seconds can also use millis()
             currentTimeS,               // meter time in string format from timedate record
             // millis(),
+            publishP1ToMqttCrc,         // v77 to start, v45 1=validTelegramCRCFound or 2=recovered validCrcInFound
             CurrentPowerConsumption,
             !thermostatReadState,       // input setting Switch press 1=ON low , Not active High 0=OFF
             filteredValueAdc,           // read analog value
@@ -5198,7 +5022,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 
             // myCrcFound,                         // v45 either original validTelegramCRCFound or recovered validCrcInFound
             // validTelegramCRCFound,              // P1crc=0 or 1 for valid CRC
-            publishP1ToMqttCrc,                    // v45 unsigned original validTelegramCRCFound or recovered validCrcInFound
+            // publishP1ToMqttCrc,                    // v45 unsigned original validTelegramCRCFound or recovered validCrcInFound
 
             // powerProductionLowTariff,
             // powerProductionHighTariff,
@@ -5224,6 +5048,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             waterReadHotCounter,        // Watersensor state 26mar21 number during Hotwater
             HeatFlowConsumption,        // v39 28feb23 show HeatFlowConsumption RX2
             HeatConsumption,            // v46 23feb25 show HeatConsumption MJ counter RX2
+            publishWLToMqttCrc,         // v77 unsigned original validWarmteLimkCRCFound 
             
             prog_Version );             // (fixed) Version from program , see top
 
@@ -5234,6 +5059,8 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       Serial.println((String)"v");        // indicate no connection at datarecord
     }
 
+    // (p)reset WL Crc after reporting on MQTT 
+    publishWLToMqttCrc |= 2;    // i WL=0->2/1->3 indicate it was not yeat read for next report
 
     if (Got_Telegram2Record_cnt > Got_Telegram2Record_prev) {
         Got_Telegram2Record_prev = Got_Telegram2Record_cnt;   // count for this record
@@ -5254,9 +5081,9 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     // digitalWrite(BLUE_LED, HIGH);   //Turn the ESPLED off
     digitalWrite(BLUE_LED, thermostatReadState);   //Turn the ESPLED according to input thermostate
   }
-}
+} // publishP1ToMqtt
 
-/* 
+/* thermostatReadState
     if output = input then false changed
     bool thermostatChanged = processThermostat(LOW) || thermostatReadState = processThermostat(HIGH) || processThermostat(thermostatWriteState)
     true state was changed , false state was already as instructed
@@ -5342,7 +5169,7 @@ bool processThermostat(bool myOperation)    // my operation is currently readed 
 
   if (outputOnSerial) Serial.println(" Overruling the request.") ;
   return true ;  // was actively changed
-}
+} // processThermostat()
 
 
 /* 
@@ -5374,7 +5201,7 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
     // }
   }
   return filteredValueAdc;
-}
+} // processAnalogRead
 
 
 /* 
@@ -5447,11 +5274,10 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     }
   }
 
-}
+} // publishMqtt
 
 
-/*
-  bool processLightRead_v70(bool myOperation)
+/* bool processHotLedRead v70
   {
     lightReadState   = digitalRead(LIGHT_READ); // read D6
     #ifdef NoTx2Function                      
@@ -5464,8 +5290,8 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     if (outputOnSerial and !lightReadState) Serial.print("\r\nLightReadState D6 HIGH..");  // debug
     return lightReadState;  // return status
   }
-*/
-/*
+  */
+  /*
   process / hold Ledlightstatus indicating if Hotwater was tapped during this P1 interval
     LOW  = read (hold) state
     HIGH = reset/renew until LOW
@@ -5529,7 +5355,7 @@ bool processHotLedRead(bool notkeep_HoldState) {
   }   
 
   return local_lightReadState;  // return active status
-}
+} // processHotLedRead
 
 
 /* 
@@ -6037,9 +5863,10 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
     GasConsumption = getValue(telegram, myLen);
 
   return endOfMessage;
-}
+} // decodeTelegram
 
 /*
+  Recover telegram fields
   v45 Move recovered Datavalues back to  processed values
 */
 void RecoverTelegram_crcIn() {
@@ -6065,9 +5892,8 @@ void RecoverTelegram_crcIn() {
   Serial.printf(" currentTimeS2=%s ", currentTimeS2 );
 }
 
-// ---------------------------------------
 
-/*
+/* getValues2FromP1Record ()
   v45 Get field values from full CRC validated P1 record 2872
     currentTimeS2,powerConsumptionLowTariff2...CurrentPowerProduction2
     v56c: every field found is also copied back to its segmented (copyback1) equivilent 
@@ -6196,8 +6022,7 @@ void  getValues2FromP1Record(char buf[], int myLen) {  // 716
     CurrentPowerProduction    = CurrentPowerProduction2;        // v56c copyback1
   }
 
-}
-// ---------------------------------------
+} // getValues2FromP1Record
 
 
 /* 
@@ -6205,43 +6030,44 @@ void  getValues2FromP1Record(char buf[], int myLen) {  // 716
 */ 
 long getValue(char *buffer, int maxlen)
 {
-  // 1234567890123456789012345678901234567890   = 40    18061   000   // countlist 1
-  // 01234567890123456789012345678901234567890  = 40                  // countlist 0
-  //           123456789012                                           // countlist after first bracket
-  // 0-0:1.0.0(180611014816S)                   = data record myLen=25, string myLength datalen 12
-  // 0-1:24.2.1(150531200000S)(00811.923*m3)    = gaz date record which we do not have at our P1
-  // 0-1:24.2.1(250222224600W)(65.478*GJ)       = new GJ
-  // 1-0:1.8.2(010707.720*kWh)                  = power consumption record myLen=26 datalen 10
-  // /ISk5\2MT382-1000...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record 0-162bytes
-  //  .........1.........2.........3.........4.........5
+  /* records layout & tests
+    // 1234567890123456789012345678901234567890   = 40    18061   000   // countlist 1
+    // 01234567890123456789012345678901234567890  = 40                  // countlist 0
+    //           123456789012                                           // countlist after first bracket
+    // 0-0:1.0.0(180611014816S)                   = data record myLen=25, string myLength datalen 12
+    // 0-1:24.2.1(150531200000S)(00811.923*m3)    = gaz date record which we do not have at our P1
+    // 0-1:24.2.1(250222224600W)(65.478*GJ)       = new GJ
+    // 1-0:1.8.2(010707.720*kWh)                  = power consumption record myLen=26 datalen 10
+    // /ISk5\2MT382-1000...{<0-1:24.2.1(230228155652W)(84.707*m3){<!0F0C   // v39 RX2/P1 record 0-162bytes
+    //  .........1.........2.........3.........4.........5
 
-  //  buf+109   901234567890123456789012345
-  //            012345678901234567890123456  109+26=135       
-  //   lT=25   [1-0:1.8.1(019061.182*kWh)_]
-  //                     (          *
-  //                   s=9          20
+    //  buf+109   901234567890123456789012345
+    //            012345678901234567890123456  109+26=135       
+    //   lT=25   [1-0:1.8.1(019061.182*kWh)_]
+    //                     (          *
+    //                   s=9          20
+   */
+
+    int s = FindCharInArrayRev(buffer, '(', maxlen - 2);  // search buffer fro bracket (s=25)
+    if (s < 8) return 0;    // no valid string
+    if (s > 32) s = 32;     // no bracket in range, try at end backward search
+
+                  //                          (          *       s=9 l=20 val=0 -->  l-s=11-1=10
+                  //                           0123456780                                 s+1=10
+                  //                 0123456789012345678901234567
+                  // 108             9012345678901234567890123456
+                  //                           019061.182*kWh)_
+
+    int l = FindCharInArrayRev(buffer, '*', maxlen - 2) - s - 1;    // search end of * , s=start of (
 
 
-  int s = FindCharInArrayRev(buffer, '(', maxlen - 2);  // search buffer fro bracket (s=25)
-  if (s < 8) return 0;    // no valid string
-  if (s > 32) s = 32;     // no bracket in range, try at end backward search
-
-                //                          (          *       s=9 l=20 val=0 -->  l-s=11-1=10
-                //                           0123456780                                 s+1=10
-                //                 0123456789012345678901234567
-                // 108             9012345678901234567890123456
-                //                           019061.182*kWh)_
-
-  int l = FindCharInArrayRev(buffer, '*', maxlen - 2) - s - 1;    // search end of * , s=start of (
-
-
-  /*    // ignore this, we only process data starting at bracket ( en finished with * asterisk
-    if (l < 0) {   // no asterisk in message, check for Summer or Winter Time date record
-      // 11jun20 yield();  // do background processing else things will not work
-      // l = FindCharInArrayRev(buffer, 'S', maxlen - 0) - s - 1;  // search S , s=start of (
-      if (buffer[22] == 'S') l = 6; // myLength 7-digits does not work vaue too large
-      if (buffer[22] == 'W') l = 6; // myLength 7-digits does not work vaue too large
-  */
+    /*    // ignore this, we only process data starting at bracket ( en finished with * asterisk
+      if (l < 0) {   // no asterisk in message, check for Summer or Winter Time date record
+        // 11jun20 yield();  // do background processing else things will not work
+        // l = FindCharInArrayRev(buffer, 'S', maxlen - 0) - s - 1;  // search S , s=start of (
+        if (buffer[22] == 'S') l = 6; // myLength 7-digits does not work vaue too large
+        if (buffer[22] == 'W') l = 6; // myLength 7-digits does not work vaue too large
+    */
 
   if (l < 4)  return 0;    // myLength from (-* too short
   if (l > 12) return 0;   // myLength from (-* too long
@@ -6269,6 +6095,14 @@ char TranslateForPrint(char c)
   if (c == 00) c = '_' ;                 // translate NULL to _
   if (c < 32 || c > 127 ) c = '~' ;    // translate unprintable
   return c;
+}  
+
+bool CheckFaultCharacter(char c)      // v77b 21aug26 check if chracter is a valid one for P1 data
+{
+  if (c == 10  || c == 13 || c == 00 ) return false ;   // translate NL CR are/can be OK
+  if (c >= 'a' && c <=  'g' ) return true ;  // a-g is anyway a dataread fault
+  if (c < 32   || c >= 127  ) return true ;  // space to DEL
+  return false ;
 }  
 
 /* 
@@ -6305,6 +6139,7 @@ int FindCharInArrayFwd(const char array[], char c, int myLen) {              // 
   }
   return -1;
 }
+
 /*
   Find position of between 2 characters for for myLen bytes 
 */
@@ -6338,7 +6173,7 @@ int FindWordInArrayFwd(const char array[], const char word[], int alen, int wlen
 }
 
 
-/*
+/* Crc16I
   process CRC16 while accumulating the input to an array
     input:
      crc unsigned integer (2 bytes 0x0000-0xFFFF)
@@ -6410,7 +6245,7 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
   telegram_crcIn_cnt++;
   
   return CRC16(crc, reinterpret_cast<unsigned char*>(dataIn), dataInLen);  // initialise using header, v48-casting
-}
+} // Crc16I()
 
 /* 
   Check if we are complete on data retrieval
@@ -6530,7 +6365,7 @@ bool CheckData()        //
   }
   // Serial.println("Debug5, Checkdata..true");
   return true;
-}
+} // CheckData()
 
 /* 
   Initise consumption variables to zero
@@ -6550,7 +6385,7 @@ void InitialiseValues()  // executed at every telegram new run
   powerProductionLowTariff2   = 0;    // v45
   powerProductionHighTariff2  = 0;    // v45
   
-}
+} // InitialiseValues()
 
 /*
  set OldPower.... values to consumption
@@ -6577,8 +6412,10 @@ bool isNumber(const char *res, int myLen)       // False/true if numeriv
   return true;
 }
 
-// =============================================== routines added for temperature processing
-/* 
+
+
+/* Temperature processing
+
   Setting the temperature sensor []
   read for howto: https://randomnerdtutorials.com/guide-for-ds18b20-temperature-sensor-with-arduino/
 */
@@ -6719,7 +6556,8 @@ void attachWaterInterrupt() {   // activate waterinerrupt sensor
       }
       waterTriggerCnt = 1;          // indicate ISR has been activated
     }
-  }
+}
+
 /*
   ISR Detach WATERSENSOR_READ interrupt , setting waterTriggerCnt to 0
 */
@@ -6735,8 +6573,7 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interfe
   will gLow Blueled if sensor triggered
   will detach during more excessive vibration
 */
-void WaterTrigger0_ISR()
-{
+void WaterTrigger0_ISR() {
   // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
     if (waterISRActive) {    // set routine already active
         if (outputOnSerial) Serial.print( (String) ".W" );
@@ -6780,7 +6617,7 @@ void WaterTrigger0_ISR()
       waterISRActive = false;    // alow next interrupt
   }
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // v65 at end , as per advice espressif
-}
+} // WaterTrigger0_ISR()
 
 
 /*
@@ -6825,7 +6662,7 @@ void WaterTrigger1_ISR()
 
     waterISRActive = false;    // alow next interrupt
   }
-}
+} // WaterTrigger1_ISR()
 
 /*
   V47 Unstable ISR2 water pulse primary (select via W,w command --> 0) 
@@ -6863,7 +6700,7 @@ void WaterTrigger2_ISR()
 
     waterISRActive = false;    // alow next interrupt
   }
-}
+} // WaterTrigger2_ISR
 
 
 /* 20mar21 ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec */
@@ -7166,10 +7003,10 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability
                     delay(0);     // v58 add to check for stability   // v58c 267 + asm 10
-#ifdef TEST_MODE    // v56c
+  #ifdef TEST_MODE    // v56c
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability  // v58c 10
-// #ifdef TEST_MODE    // v56c
+    // #ifdef TEST_MODE    // v56c
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability   // v58c 3
                     delay(0);     // v57 add to check for stability
@@ -7198,7 +7035,7 @@ void command_testH4(){    // code to maken things stable teststable
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
                     delay(0);     // v57 add to check for stability
-#endif
+   #endif
 
 }
 
@@ -7209,38 +7046,38 @@ void throwExceptionFunction(void) {
 }
 */
 
-
-// useless data to be kept for reference
-/*
- * // lwip lower memory no features
-        Executable segment sizes:
-        RODATA : 4500  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        IROM   : 289728          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        BSS    : 28184 )         - zeroed variables      (global, static) in RAM/HEAP 
-        Sketch uses 324608 bytes (31%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34028 bytes (41%) of dynamic memory, leaving 47892 bytes for local variables. Maximum is 81920 bytes.
-  // lwip lower memory no features
-        Executable segment sizes:
-        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.        
-  // removed httpclient
-        Executable segment sizes:
-        IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
-        BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
-        RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
-        DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
-        IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
-        Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
-        Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
+/* useless data be kept for reference
+  * // lwip lower memory no features
+          Executable segment sizes:
+          RODATA : 4500  ) / 81920 - constants             (global, static) in RAM/HEAP 
+          IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+          IROM   : 289728          - code in flash         (default or ICACHE_FLASH_ATTR) 
+          DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+          BSS    : 28184 )         - zeroed variables      (global, static) in RAM/HEAP 
+          Sketch uses 324608 bytes (31%) of program storage space. Maximum is 1044464 bytes.
+          Global variables use 34028 bytes (41%) of dynamic memory, leaving 47892 bytes for local variables. Maximum is 81920 bytes.
+    // lwip lower memory no features
+          Executable segment sizes:
+          BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+          IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+          DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+          RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
+          IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
+          Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+          Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.        
+    // removed httpclient
+          Executable segment sizes:
+          IROM   : 299792          - code in flash         (default or ICACHE_FLASH_ATTR) 
+          BSS    : 28248 )         - zeroed variables      (global, static) in RAM/HEAP 
+          RODATA : 4508  ) / 81920 - constants             (global, static) in RAM/HEAP 
+          DATA   : 1344  )         - initialized variables (global, static) in RAM/HEAP 
+          IRAM   : 29036   / 32768 - code in IRAM          (ICACHE_RAM_ATTR, ISRs...) 
+          Sketch uses 334680 bytes (32%) of program storage space. Maximum is 1044464 bytes.
+          Global variables use 34100 bytes (41%) of dynamic memory, leaving 47820 bytes for local variables. Maximum is 81920 bytes.           
         
- */
+*/
+
+
 
 void command_testH5(){    // code to maken things stable teststable v57c-1 no-effect
   //                   // we remoived some unused protection arrays, improved ISR-time,
@@ -7328,7 +7165,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
         Serial.printf("\r\nWrong call %d using seria %d mode %d , states:\r\n", __LINE__, serial_port_number, serial_port_mode );
         printf_port_state_isr();
       }
-}      
+}  // openCloseSerial()    
 
 /*
     Print our serial portstates and their ISR status
@@ -7344,7 +7181,20 @@ void printf_port_state_isr() {
   Diagnose, print a series of Times as collected by softserial
 */
 void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
+  doDUMMY_MACRO;    // dv77a do some dummy code
   if (time_port == 1) {
+    /* tt re              +25213841    327691760 
+                      START      RXstart      RX-end      START-rxE = B_start     Be-RX=  B_start  +Bend-start= TA-start  TA-e-TA-s = TA-end
+     p1 serial1 setup 2573572863 2598786704.  2926478464 +3967261228= 2598772396 +15027=2598787423 +609998452 =3208785875 +17       =3208785892
+
+     first      ISRstart     s1-s2 R-s1     ISRend-rd   Exit-End   =E-e                 ISR2-ISR1_start   
+     ISR1st:  2819141676:    +44 +150    +1475825426 +2819147762   =6086 , ISRstart2-1= 79925857
+
+     last      ISR2start    s1-s2 Rd-s1     End-Read    Exit-End   E-e                  ISR2-ISR1_exit
+     ISR2ls:  2899067533:    +48 +449    +1395899266 +2899073723   =6190 ,  ISRexit2-1= 79925961
+    
+    
+    */
     Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 setup"     // print first 4 (time initiated an port allocated)
         + " "  +  mySerial1.peekTime(M_TIME_START)
         + " "  +  mySerial1.peekTime(M_TIME_RX_START)
@@ -7352,7 +7202,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + " "  +  mySerial1.peekTime(M_TIME_RX_END));
     if (m_time_request >= M_TIME_RX_END )              // print all standard
       Serial.print((String) 
-        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
+        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))         
         + "= " +  mySerial1.peekTime(M_TIME_BEGIN_START) 
         + " +" + (mySerial1.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
         + "="  +  mySerial1.peekTime(M_TIME_BEGIN_END) 
@@ -7408,9 +7258,9 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
   Diagnose, print a series of Bit Times as collected by softserial
 */
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
-
+  doDUMMY_MACRO;    // dv77a do some dummy code
   if (bit_port == 1) {
-    unsigned long temp,tempc1,tempc2,tempc3,tempc4 = 0UL;               // check duplicates          
+    unsigned long temp,tempc1,tempc2,tempc3 = 0UL;               // check duplicates          
     unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
@@ -7429,11 +7279,12 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     // bm ----> print serial_Print_PeekBits bittime table
     bool tmpdataFaultDetected = false;   // v75d on/off previous data contained Hash$gfault (character a-h)
     
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {  // print bitTimeA character field
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {  // print bitTimeA character field
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
           Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
           temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
+          /*
           tempc1 = temp;
           tempc2 = temp / 10000;
           tempc3 = temp / 100000000;
@@ -7444,7 +7295,19 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           else if (temp <= 9999999) tempc1 = tempc2;      // large
           else                      tempc1 = tempc3;      // excessive
           Serial.printf("%4d "  , tempc1);
+          */
 
+        /* v77b retry this one
+
+          */
+         if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&       // Print/indicate excessive  values ~
+                 temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
+                 temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
+                                  Serial.printf("%.4d~" , temp     );      // variation
+          else  if (temp <= 9999) Serial.printf("%04d " , temp     );      // normal
+          else  if (temp <= 9999999) Serial.printf("_%.3d " , temp/10000     );      // large
+          else                       Serial.printf("__%.2d " , temp/100000000);      // excessive
+          
           /* These codeslocks, commented below to achieve column formatted printing below will corrupt somehwere 
               
               so we use bove a more elementary approach.
@@ -7515,7 +7378,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           */
 
           Serial.print((char) convert_p1_print( mySerial1.peekByte(i-1)) );
-          // if (mySerial1.peekByte(i-1) >= 'a'  && mySerial1.peekByte(i-1) <= 'f' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+          // if (mySerial1.peekByte(i-1) >= 'a'  && mySerial1.peekByte(i-1) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
         }
 
 
@@ -7533,6 +7396,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           temp = mySerial1.peekBit(i);
           if (i > 0) {
               Serial.printf("\t(l=%8d)", (temp - mySerial1.peekBit(i-8) ) ); // finish previous line with total)
+              
               if (tmpdataFaultDetected) {
                   Serial.print(" #"); // finish line v75d indicate possible datafault  
                   tmpdataFaultDetected = false;   // v75d reset fault error switch
@@ -7560,15 +7424,16 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
        }
 
       if ( convert_p1_print( mySerial1.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
-      if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
-    }
+      if ( CheckFaultCharacter(mySerial1.peekByte(i)) ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
 
+
+    }
+    doYIELD_MACRO;  // v77a execute yeield and wdtfeed
    
     /*
       Print data In <> Mask   :C line1  :m Line2  :d Line3
     */
     int temp0 = mySerial1.peekBit(0);  // get zero reference
-    int temp1 = temp0;                 // get zero reference
     if (bit_sequence >=0 )  {
         Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
     }
@@ -7589,7 +7454,12 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     */
     tmpdataFaultDetected = false;  // v75d indicate we have a possible datafault
     int j = 0;    // v61a: to print CRC character
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
+
+    /*
+        Print A input B mask  C  delta table
+      */
+     doYIELD_MACRO;  // v77a execute yeield and wdtfeed
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH; i++ )  {
         /* A) print data input :
             data  0 -    0.0000:C  /KFM5KAIFA-METER<|
             data018 -    1.4924:C  <| 
@@ -7609,7 +7479,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                       (float)((((mySerial1.peekBit(i) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
         }
         Serial.print((char) convert_p1_print( mySerial1.peekByte(i)) );
-        if (mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g' ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+        if ( CheckFaultCharacter(mySerial1.peekByte(i) ) ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+
         
         if (convert_p1_print( mySerial1.peekByte(i)) == '|' || convert_p1_print( mySerial1.peekByte(i)) == '!')  {   // check if we are going to new P1 record
           
@@ -7666,6 +7537,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         Serial.print((String) "\t <M> Check binary Mask: 0  to " +  (bit_sequence * -1) );
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
+        doYIELD_MACRO;  // v77a execute yeield and wdtfeed
         for (int m = 0; m <= ( (bit_sequence % MAXLINELENGTH) * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
           if ( m == 0 ||
               mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
@@ -7699,7 +7571,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
         int temp1 = mySerial1.peekBit(0);  // get zero previous
-        for (int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
+        for (volatile int m = 0; m <= (bit_sequence * -1) && m < MAXLINELENGTH ; m++ )  {      // v61 print differences line for caring positions
           if ( m == 0 ||
               mySerial1.peekByte(m) == '/' || mySerial1.peekByte(m) == '!' ||
               !(telegram_crcOut[m+1]  == mySerial1.peekByte(m+1)  || telegram_crcOut[m+1] == 'X') ||   // triple detect
@@ -7745,7 +7617,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                   + " #Inpos=" + mySerial2.peekBitPos()
                   + "-------------time:" + micros()
                   + " \r\n");
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
       // Serial.print((String) "\t" + mySerial2.peekBit(i));
       if (i > 0) {
           if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&
@@ -7759,7 +7631,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
       if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
     Serial.print((String) "\r\n data0:\t");                 // print character line data
-    for (int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
+    for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
          Serial.print((char) convert_p1_print( mySerial2.peekByte(i)) );
          if (convert_p1_print( mySerial2.peekByte(i)) == '|')     // check if we are going to new P1 record
              Serial.print((String) "\r\n data"+ i + ":\t");  
@@ -7774,14 +7646,22 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     v74g 10aug26 Print the input array table split from command sequences
 */
 void printCrcInTable() {
+  doDUMMY_MACRO;    // dv77a do some dummy code
+  bool tmpdataFaultDetected = false;
   Serial.print((String) "\r\nsI=0\t");   // initialise
   for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
+    if ( CheckFaultCharacter(telegram_crcIn[cnt]) ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
+
     if (isprint(telegram_crcIn[cnt])) {             // if printable
         Serial.print(telegram_crcIn[cnt]);
     } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
         Serial.print("_");
     } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
-        Serial.print((String) "\r\n"+ cnt +"\t>");
+        if (tmpdataFaultDetected) {             // v76 print lower case fault
+            Serial.print((String) "\r\t\b\b#");   // CR tab backspace print # for lowercase a-g
+            tmpdataFaultDetected = false;       // v76 reset fault error switch
+        } 
+        Serial.print((String) "\r\n"+ cnt +"\t>");  
     } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
         Serial.print("|");
         // break;
@@ -7796,6 +7676,7 @@ void printCrcInTable() {
     v74g 10aug26 Print the Masking array table split from command sequences
 */
 void printcrcOutTable() {
+      doDUMMY_MACRO;    // dv77a do some dummy code
       Serial.print((String) "\r\nsM=0\t");   // initialise
       for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
         if (isprint(telegram_crcOut[cnt])) {             // if printable
@@ -7844,4 +7725,247 @@ int convert_p1_print(int data_in) {
   else if ( data_in == '\x0a') data_out = '|';
   else if ( data_in == '\x00') data_out = '_';
   return data_out;
+}
+
+/*
+  check process erial input
+*/
+
+void cmdSerialInputConsole() {    // v76 do check console commands on serial input
+    // for details read: https://deepwiki.com/esp8266/Arduino/4.1-serial-communication
+
+    if (Serial.available()) { 
+       // Check if data is available to read    
+       String data = Serial.readStringUntil('\n'); // Read until newline    
+       Serial.println("\t>>"+data+"=="+(char) data[0] +"<<\t");      // Print the received data  }
+
+        publishMqtt(mqttLogTopic, (String) "ESP P1 console:" 
+                          + (char) data[0] 
+                          + "=" + (int) data[0] 
+                          + ", (" + mqttCnt_In + "/"  + mqttCnt_Out + ")."  
+                    );  // v76 report to log
+
+       if         ((char) data[0] == '?') doCmdHelp();              // '?' - Help
+       else if    ((int) data[0] == 8 )  
+                    Serial.println((String)"\r\n Reconnect console"); //  v77 ^H
+       else if    ((char) data[0] == 't') {                         // 't'= 
+             serial_Print_PeekBits(1, 1024);                    // print time table P1
+             serial_Print_PeekBits(1, 2048);                    // print diff table P1
+             serial_Print_PeekBits(1,(-2 * MAXLINELENGTH));     // print mask compare P1
+       } else if  ((char) data[0] == 'T') {                         // 't'= 
+             serial_Print_PeekBits(2, 1024);                    // print time table P2 
+             serial_Print_PeekBits(2, 2048);                    // print diff table P2
+             serial_Print_PeekBits(2,(-2 * MAXLINELENGTH));     // print mask compare P2
+       } else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
+         else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
+         else if  ((char) data[0] == 'm') {       // v48 10jun25 print m-asked Input array
+                   Serial.println((String)"\r\n dataIn telegram_crcIn"
+                    + " myLen=" + telegram_crcIn_len 
+                    + " Masking("+ (switchMaskingOut ? "m" : "M") +") now " + (switchMaskingCmd ? "Active" : "Inactive")   // v74: display state
+                    + " MaskCount=" + telegram_crcOut_cnt     // v74 print number of masked poisitions
+                    + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
+                    + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
+                    + " som>>");
+                  printCrcInTable();    // v74g split to subroutine 
+       } else  if ((char) data[0] == 'M') {       // v48 10jun25 print M-asked array
+                  Serial.println((String)"\r\n Recovery telegram_crcOut"      // display states
+                    + " myLen="     + telegram_crcOut_len                    // lenth of output record
+                    + " Masking("
+                            + setMaskLimitCnt                   // v74 display maslimiter
+                            +")=" + (switchMaskingOut  ? "Active" : "Inactive")   // v74: display state
+                    + " MaskCount=" + telegram_crcOut_cnt      // v74 print number of masked poisitions in Masking array
+                    + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
+                    + " Elen=" + p1ShortCnt                    // v74 number of errors length Input != Mask
+                    + " som>>");
+                  printcrcOutTable();    // v74g split to subroutine 
+       }
+     }
+}
+
+/* print time table related to ISR  
+ */
+void serial_Print_m_buffer_time() {      // print tiem table offset
+   doDUMMY_MACRO;    // dv77a do some dummy code
+   unsigned long offset  = -1;   // time offset setup
+   unsigned long offset2 = -1;   // time offset ISR timing
+
+      // v77a 19aug26 23u19  dummy code which improves before the next two (whoich have no volatile in their in=i defintion
+      // unsigned long offset3 =  0;   // time offset ISR timing
+      //      for ( volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      //         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) > offset3 ) offset3 = mySerial1.peekTime(i);
+      //      }
+
+      // return; // does not improve things
+   #ifdef M_TIME_NAMES
+      // v77a 19aug26 23u19 the fornext must use volatile as without, things become unstable
+      for (  volatile int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
+      // for ( int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
+         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset ) offset = mySerial1.peekTime(i);
+      }
+      // v77a 19aug26 23u19  then next is sensitive required in combination to previous loop to stabilize reliability
+      for (  volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      // for (  int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset2 ) offset2 = mySerial1.peekTime(i);
+      }
+
+      // dummy code which improves when wat least one of before loop one of them have volatile
+      // unsigned long offset3 =  0;   // time offset ISR timing
+      //      for (int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
+      //         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) > offset3 ) offset3 = mySerial1.peekTime(i);
+      //      }
+   #endif
+
+      Serial.print((String) "\r\n M_TIME_ENTRIES #" + M_TIME_ENTRIES + " , currentcycle=" + ESP.getCycleCount() + " , SSoffset= " + offset + " , ISRoffset= " + offset2);
+      serial_Print_PeekTime(1,M_TIME_ENTRIES);  // print calculation(s)
+
+   #ifdef M_TIME_NAMES
+      Serial.print((String) "\r\n M_TIME_START             2 =  start of Object                         = " +   mySerial1.peekTime(M_TIME_START) )    ;
+      Serial.print((String) "\r\n M_TIME_BIT_WAIT          0 =  first ISR wait                          = " +   mySerial1.peekTime(M_TIME_BIT_WAIT))  ;
+      Serial.print((String) "\r\n M_TIME_BIT_WAIT1         1 =  last ISR wait                           = " +   mySerial1.peekTime(M_TIME_BIT_WAIT1)) ;
+      Serial.print((String) "\r\n M_TIME_RX_START          3 =  start of SoftwareSerial::enableRx Attach= " + ((mySerial1.peekTime(M_TIME_RX_START)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_START)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_RX_START)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_RX_END            4 =  end of SoftwareSerial::enableRx Detach  = " + ((mySerial1.peekTime(M_TIME_RX_END)           == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_END)          - offset )) + "\t( " + mySerial1.peekTime(M_TIME_RX_END)          + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BEGIN_START       5 =  start SoftwareSerial::begin             = " + ((mySerial1.peekTime(M_TIME_BEGIN_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_START)     - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BEGIN_START)     + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BEGIN_END         6 =  end  SoftwareSerial::begin              = " + ((mySerial1.peekTime(M_TIME_BEGIN_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_END)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BEGIN_END)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_AVAIL_START       7 =  start SoftwareSerial::enableRx Attach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_START)     - offset )) + "\t( " + mySerial1.peekTime(M_TIME_AVAIL_START)     + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_AVAIL_END         8 =  start SoftwareSerial::enableRx Detach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_END)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_AVAIL_END)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_START         9 =  ISR START                               = " + ((mySerial1.peekTime(M_TIME_BIT_START)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_START)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_STOP         10 =  ISR AFTER STOPBIT                       = " + ((mySerial1.peekTime(M_TIME_BIT_STOP)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOP)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_START1       10 =  ISR Nominal end Actual End              = " + ((mySerial1.peekTime(M_TIME_BIT_START1)       == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START1)      - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_START1)      + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_STOPT        11 =  ISR Nominal to save                     = " + ((mySerial1.peekTime(M_TIME_BIT_STOPT)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOPT)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOPT)       + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_STOP1        12 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_STOP1)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP1)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOP1)       + " )" ) ;
+      doYIELD_MACRO;  // v77a execute yeield and wdtfeed
+      Serial.print((String) "\r\n M_TIME_BIT_END1         13 =  ISR END                                 = " + ((mySerial1.peekTime(M_TIME_BIT_END1)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END1)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END1)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_END2         14 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_END2)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END2)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END2)        + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_START    15 =  first ISR entered                       = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_START)   + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_START1   16 =  first ISR getCycleCountIram()           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START1)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START1)  - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_START1)  + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_READ     17 =  first ISR start read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_READ)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_READ)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_READ)    + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_END      18 =  first ISR finish read                   = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_END)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_END)     - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_END)     + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR_EXIT     19 =  first ISR exit                          = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START   20 =  last ISR entered                        = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START)  - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_START)  + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START1  21 =  last ISR getCycleCountIram()            = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START1)  == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_START1) + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_READ    22 =  last ISR start read                     = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_READ)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_END     23 =  last ISR finish read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_END)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_END)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_END)    + " )" ) ;
+      Serial.print((String) "\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   + " )" ) ;
+      Serial.print((String) "\r\n");
+  #endif
+}   
+
+/*  
+  facilitate Help command
+*/
+void doCmdHelp() {    // v76
+      doDUMMY_MACRO;    // dv77a do some dummy code
+      Serial.println((String)"\r\n? (bell) \a Help commands "  + __FILE__ 
+                                                    + " version " + DEF_PROG_VERSION 
+                                                    + ", compiled " __DATE__ + " " + __TIME__ );
+      // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
+      Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
+      Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
+      Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") Thermostate"  
+                                                + (new_ThermostatState == 2 ? " <--" : "" ) );
+      Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
+                                                + (new_ThermostatState == 3 ? " <--" : "" ) );
+      Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
+      Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
+      Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
+      Serial.println((String)"e 1/2 force exception "
+                      + "( heap:" + ESP.getFreeHeap() +")"
+                      // + "( stack:" + ESP.getFreeContStack() + ")"      // v75b4 (2.4.1) // 2.4.2 function
+                    );   // v52: display FreeHeap
+      Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
+      Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
+                                + " serial1=" +  serial1Baudrate
+                                + " serial2=" +  serial2Baudrate);
+      Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
+      Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
+      Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
+      Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
+                                                                      + (blue_led2_Water ? "Y" : "N") 
+                                                                      + (blue_led2_HotWater ? "Y" : "N") );
+      Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
+                                                              + ", mode:" + loopbackRx2Mode );
+      Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
+      // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
+      Serial.println((String)"W on/OFF Watertrigger1 (Err="+waterErrorSwitch+") :" + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
+      Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
+      Serial.println((String)"y print water debounce");
+      Serial.println((String)"Z zero counters " + 
+            + "(mqtt=" + mqttCnt_Out              // v63 Output count
+            + " cmd=" + mqttCnt_In            // v72 display input number
+            + " faults: " 
+            + " Miss=" + p1MissingCnt         // v52 failed to read any P1
+            + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
+            + ", LenE=" + p1ShortCnt          // v74 updated when we have a length mismatch between Input and Mask
+            + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
+            + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
+            + ", Yld="+  RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
+            + ", lT2="+  loopTelegram2cnt     // V53 print current loopTelegram2cnt
+            + " )" );
+      Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
+      Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
+      Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
+      Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
+      Serial.println((String)"M {+-} print Masking array(limiter) "
+                      + "( MaskX="+ telegram_crcOut_cnt    // v52 number of X maskings
+                      + "<"+ setMaskLimitCnt + " )"       // v74 display masklimit count
+                      + " Masking("+ (switchMaskingCmd  ? "+m" : "-m")  + ")="  // v74 display state of masking command
+                      + (switchMaskingOut  ? "Active" : "Inactive")             // v74: display state masking array
+              );
+      Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )"      // v52 number of Times we validated
+                      + " & flips Masking(m) to " + (switchMaskingCmd  ? "Off" : "On")   // v74: display state
+              );
+      Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
+      int temp1 = mySerial1.m_bitWait * 1;
+        // S P/T|0-1 serial1 on/off finish
+        // s P/T|0-9 serial2 interval
+      Serial.println((String)"S (p|Test|0-1) ON/off "
+                    + "\t" + (!serial1Stop  ? "Yes" : "No") 
+                    + "\tserial1P1-"
+                    + (bSerial1State  ? "A" : "i")
+                    +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
+                    + " , bitWait=" + temp1
+                    + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
+                    + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
+                    + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
+                    );
+      
+      int temp2 = mySerial2.m_bitWait * 1;
+      Serial.println((String)"s (p|Test|0-9) ON/off" 
+                    + " \t" + (!serial2Stop  ? "Yes" : "No")          
+                    + "\tserial2P2-"
+                    + (bSerial2State  ? "A" : "i")
+                    +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
+                    + " , bitWait=" + temp2
+                    + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
+                    + ", interval:"+ rx2ReadInterval  
+                    );
+      
+      Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
+      Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+                                                  // + "/" + (mySerial1.m_bitWait % 1) + "/"
+                                                  + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
+                                                  + ", jserial2=" + mySerial2.m_bitWait);
+      
+      Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
+      
+      Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
+      
+      /* // cannot do here as resetInfo is not defined and cannot be not globalised
+      Serial.printf("Restart reason: 0x%08x epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x" , 
+        resetInfo->reason, resetInfo->epc1, resetInfo->epc2, resetInfo->epc3, resetInfo->excvaddr, resetInfo->depc); // v52: print registers
+      */
+      Serial.printf("\t restart reason 0x%08x  epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x ",
+                          save_reason, save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
+      Serial.println();
+      Serial.println("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)");          // v51 print portstatus 
+      Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
+                            + "\t" + WATERSENSOR_READ  + "=WATERSENSOR_READ:" + !digitalRead(WATERSENSOR_READ) 
+                            + "\t" + SERIAL_RX2        + "=SERIAL_RX2:"       + !digitalRead(SERIAL_RX2)       
+                            + "\t" + DS18B20_SENSOR    + "=DS18B20_SENSOR:"   + !digitalRead(DS18B20_SENSOR)   
+                            + "\t" + BLUE_LED2         + "=BLUE_LED2:"        + !digitalRead(BLUE_LED2)       ); 
+      Serial.println((String) "\t" + SERIAL_RX         + "=SERIAL_RX:"        + !digitalRead(SERIAL_RX)        
+                            + "\t" + LIGHT_READ        + "=HOT_READ:"         + !digitalRead(LIGHT_READ)       
+                            + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
+                            + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
+                            + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
 }

@@ -1,3 +1,4 @@
+
 ## OS specific ########
 .DS_Store
 .fuse_hidden*
@@ -17,6 +18,8 @@ debug/
 compile_commands.json
 
 ## Program related ##
+## do not sync spreadsheets
+*.ods*
 P1Meter/*.txt
 ## do not sync save/copy files
 P1Meter/*.ino*
