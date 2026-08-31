@@ -1,4 +1,5 @@
-/* SoftwareSerial.h v77b - 20aug26 bittiming/bitshift in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp 
+/* SoftwareSerial.h  v78 31aug26 base version
+   v77b - 20aug26 bittiming/bitshift in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp 
    v77a  - 19aug26 - using RXREAD59 iso RXREAD58 to improve bit realiabiloity, added some volatiles
    v77   - 
    v76   - 15aug26 new master branch/*

@@ -1,5 +1,6 @@
 
-#define VERSION_NUMBER "77b" // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
+#define VERSION_NUMBER "78" // v78 31aug26 base version
+                            // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
                             // v77a adapted dummy code on sectiont o stabilise
                             // v77a 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
                             // periodic Z en many Restarts doe make this a candidate
@@ -66,7 +67,8 @@
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
-/* code documentation v77.... starting 18aug26
+/* code documentation v78.... starting 31aug26
+      v77b - very stable, fixed a small Json error
       v77b - 20aug26 wip enhanced bittiming & bitshifting libs/SoftwareSerial241-P1/SoftwareSerial241.cpp to prevent superfluous byte insertion 
           - heavily changed SoftwareSerial241.cpp and bsically back to v69a using timeshift  with bitwait=417
       v77a - 20aug26 stable
@@ -458,14 +460,14 @@
         ESP8266-ResetReason: Software Watchdog
         Crash after line: --> ESP8266-chip-size: 4194304 , ESP8#'+/37;?BFJNRVZ^bfjnrvz
         (ESP8266-sdk-version: 2.2.1(cfd48f3) )
-    tbd: power protection
+    tbx: power protection
           -- check excessive power usage
-    tbd: smart thermostat
+    tbx: smart thermostat
         controls heat based on own thermo couple
             -- learn feedback time
-    tbd: feed check, 
+    tbx: feed check, 
         veriy we have commands on a daily basis
-    tbd: activate antifreeze protection 
+    tbx: activate antifreeze protection 
         for 1 hour when any of the temperature below average threshold 10-12°C during > 15 minutes
         check if heat is produced by monitoring warmtelink
     tbd: alarm flashing blueleds ??

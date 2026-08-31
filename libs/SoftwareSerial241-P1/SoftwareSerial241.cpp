@@ -1,5 +1,6 @@
-/* SoftwareSerial.cpp v77b 21aug26 added bittime version of previous stable version to be (s)elected by bit-wait
-   
+/* SoftwareSerial.cpp v78 - 31aug26 base version
+
+   v77b 21aug26 added bittime version of previous stable version to be (s)elected by bit-wait
    v77b 20aug26 try to adapt bittiming with bitshift to prevent byte isnertions
    v77a 19aug26 - RXREAD59 (as copy of RXREASD 58), added redundant code doYIELD_MACRO, doDUMMY_MACRO, stable OK
    v77   -
