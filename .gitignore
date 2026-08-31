@@ -47,7 +47,7 @@ p1-analyse-*.txt
 *.o
 
 ## local ######
-*.ods#
+*.ods 
 
 ## Visual Studio Code specific ######
 .vscode
