@@ -6581,10 +6581,13 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interfe
 */
 void WaterTrigger0_ISR() {
   // GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
+    // ETS_INTR_LOCK();  // v78 Enable as suggested by DeepSeek  at v63a
     if (waterISRActive) {    // set routine already active
         if (outputOnSerial) Serial.print( (String) ".W" );
     } else {
       waterISRActive = true;    // V47 - prevent calling while routine is active
+      // .3   jL jL jL jL jL jL jL jH iH iH iH iH iH iH iH iH iH iH iH iH iH Set Gpio5=L INPUT_PULLUP  _4.5.6.7p1 serial started at 131537
+      if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) (waterTriggerState ? "i" : "j") );
 
       // implement  secondary debounce routine to check ISR compliance
       ISR_time = millis();
@@ -6592,11 +6595,9 @@ void WaterTrigger0_ISR() {
           last_ISR_time = ISR_time;
           ISR_time_cnt++ ;          // increase our change counter      
       }
-      if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) (waterTriggerState ? "i" : "j") );
       interval_delay(1); // V47 wait 1ms --> implemented by flat plain while loop, all other types forbidden in ISR
-      if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
+       if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
           waterTriggerState = !waterTriggerState; // revert to make the same
-
           waterTriggerCnt++ ;             // increase our call counter
           // long time = micros();           // current counter µSec ; Debounce is wait timer to achieve stability
           // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
@@ -6608,8 +6609,8 @@ void WaterTrigger0_ISR() {
           //  not really a solution but we can insert code to delay the use until a later time.
           //
           if ( (waterTriggerCnt) > LIMIT_WATERTRIGGERCNT ) {   // v78 v37 ensure we will not loop here, like WaterTrigger1_ISR
-            detachWaterInterrupt();
             Serial.print( (String) ", Detach>ISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
+            detachWaterInterrupt();
             waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used
             // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
             // waterTriggerState = LOW;      // v41 v47 force to low to ease things
@@ -6618,19 +6619,21 @@ void WaterTrigger0_ISR() {
             if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
           #endif
        }
-      waterISRActive = false;    // alow next interrupt
-  }
-  /*
-   Ensure next interrupt is dedicated to the state
-   This to preven wiggling changes which happens with CHANGE that seems to operate on only rising
-   see https://github.com/esp8266/Arduino/issues/322
-   If we continue RISING that we get a lot of unchanged interrupts.
-  */
-  if (outputOnSerial && verboseLevel >= VERBOSE_GPIO) Serial.print( (String) (waterTriggerState ? "H " : "L ") );    // V47 print ISR call counterwaterTriggerTime
-  if   (waterTriggerState)  attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, RISING ); // v78 High wait for High
-  else                      attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, FALLING); // v78 establish trigger
-
+   }
+  if (waterISRActive) {   // only revert when not (to be) detached
+      /* // revert trigger
+        Ensure next interrupt is dedicated to the other state
+        This to preven wiggling changes which can happens with RISING/CHANGE 
+        see https://github.com/esp8266/Arduino/issues/322
+        else we continue RISING that we get a lot of unchanged interrupts.
+      */
+      if   (!waterTriggerState) attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, RISING ); // v78 High wait for Low
+      else                      attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, FALLING); // v78 establish trigger
+   }
+  waterISRActive = false;    // alow next interrupt
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // v65 at end , as per advice espressif
+  // ETS_INTR_UNLOCK();  // v78 Enable as suggested by DeepSeek  at v63a
+  if (outputOnSerial && verboseLevel >= VERBOSE_GPIO) Serial.print( (String) (waterTriggerState ? "H " : "L ") );    // V47 print ISR call counterwaterTriggerTime
 } // WaterTrigger0_ISR()
 
 
