@@ -1362,6 +1362,14 @@
 // D9   = 2;
 // D10  = 2;
 
+#define NOP_MACRO128 asm( \   // used to seprrate function in switchcmd......
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  32
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  64
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  96
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 128
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 160
+  );
+
 #define NOP_MACRO354 asm( \   // used to seprrate function in switchcmd......
               "NOP;NOP;" \ //  32
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  32
@@ -1723,7 +1731,7 @@ volatile int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering
      #define WATER_ERROR_SWITCH_done    0x02  // v75    0x02 = error has been displayed
      #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
 volatile long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
-#define LIMIT_WATERTRIGGERCNT 100     // value after we hold the excessive interrupt
+#define LIMIT_WATERTRIGGERCNT 15       // value after we hold the excessive interrupt during a read cycle
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
 bool waterReadState    = LOW; // switchsetting
@@ -3389,14 +3397,32 @@ void readTelegramP1() {
   
   // "Tn_D2diClc1 = RxYield# Cycle# Tstate# Tread-dT Twrite-Ai Water-hl Prsrve_CW Hot-cw "
   //  loop() --> readTelegramP1()  :==> " ReadT3:  5.853802204 D2diChc1:   451 start:  276.13143 ...."
-  if (!outputOnSerial) Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s%d: %5u start: %11.6f \b\b ", 
+
+  /*
+    at new cycle and when no error, check water interrupt status and optionally reset Wattertriggercount
+    Note: water interrupt is primary to protect the routine against runaway
+  */
+  NOP_MACRO512;   // v78 to stabilize code NOP_MACRO128 was insufficeint;
+  if ( !(waterErrorSwitch & ~WATER_ERROR_SWITCH_ok) && waterTriggerCnt > 1) {   // v78 check reset watertrigger
+    waterTriggerCnt = 1;    // reset count
+    Serial.printf("zw");   // backspace 1 and print "_"
+  } 
+
+  if (!outputOnSerial) { 
+      Serial.printf("\r\n ReadT%d: %12.9f D%d%s%sC%s%s%d: %5u start: %11.6f \b\b ", 
         RX_yieldcount,    // v52: check countlevel
           ((float)ESP.getCycleCount()/80000000),
           (int) new_ThermostatState, (thermostatReadState ? "d" : "T"),  (thermostatWriteState ? "A" : "i"),
-          (digitalRead(WATERSENSOR_READ) ? "h" : "l"), 
+          
+          ( !(waterErrorSwitch & ~WATER_ERROR_SWITCH_ok)  ?             // v78 display if any error state
+                     (digitalRead(WATERSENSOR_READ) ? "h" : "l") : 
+                     (digitalRead(WATERSENSOR_READ) ? "E" : "e") ), 
+
           (preserve_lightReadState_for_mqtt ? (lightReadState ? "C" : "W") :(digitalRead(LIGHT_READ) ? "c" : "w") ),  // v70a
           (digitalRead(LIGHT_READ)),  // v70a
         (mqttCnt_Out + 1), ((float) startMicros / 1000000));
+
+  }
 
   // Cycle: 04.781228065
 
@@ -4644,12 +4670,15 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         }
       }
     } else  if ((char)payload[0] == 'y') {
+        printWaterTriggerStatus(); // v78 print waterstatus line
+      /*
         Serial.println((String) "\r\n debounce_time=" + debounce_time 
               + ", waterTriggerTime=" + waterTriggerTime 
               + ", waterTriggerCnt="  + waterTriggerCnt 
               + ", ISR_time="         + ISR_time
               + ", ISR_time_cnt="     + ISR_time_cnt
               );
+      */
     } else  if ((char)payload[0] == 'Z') {
       debounce_time    = 0 ;     // v47 Zero out debounce time
       waterTriggerCnt  = 0 ;     // v47 reset waterTriggerCnt
@@ -6618,19 +6647,20 @@ void WaterTrigger0_ISR() {
           #ifdef NoTx2Function
             if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED2, waterTriggerState); // monitor expected to go have/went low 
           #endif
-       }
-   }
-  if (waterISRActive) {   // only revert when not (to be) detached
+            if (outputOnSerial && verboseLevel >= VERBOSE_GPIO) Serial.print( (String) (waterTriggerState ? "H " : "L ") );    // V47 print ISR call counterwaterTriggerTime
+            
       /* // revert trigger
         Ensure next interrupt is dedicated to the other state
         This to preven wiggling changes which can happens with RISING/CHANGE 
         see https://github.com/esp8266/Arduino/issues/322
         else we continue RISING that we get a lot of unchanged interrupts.
       */
-      if   (!waterTriggerState) attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, RISING ); // v78 High wait for Low
-      else                      attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, FALLING); // v78 establish trigger
-   }
-  waterISRActive = false;    // alow next interrupt
+      // if   (!waterTriggerState) attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, RISING ); // v78 High wait for Low
+      // else                      attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, FALLING); // v78 establish trigger
+
+       }
+      waterISRActive = false;    // alow next interrupt
+  }
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // v65 at end , as per advice espressif
   // ETS_INTR_UNLOCK();  // v78 Enable as suggested by DeepSeek  at v63a
   if (outputOnSerial && verboseLevel >= VERBOSE_GPIO) Serial.print( (String) (waterTriggerState ? "H " : "L ") );    // V47 print ISR call counterwaterTriggerTime
@@ -6649,8 +6679,8 @@ void WaterTrigger1_ISR()
   if (!waterISRActive) {    // set routine already active
     waterISRActive = true;
 
-    if (outputOnSerial && verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) (waterTriggerState ? "p" : "q") );
     if (outputOnSerial) {
+        if (verboseLevel >= VERBOSE_GPIO ) Serial.print( (String) (waterTriggerState ? "p" : "q") );
         interval_delay(20); // wait 20ms --> implemented by flat plain while loop, all other types forbidden in ISR
     }
     if (waterTriggerState != (digitalRead(WATERSENSOR_READ)) ) { // check if we have really a change
@@ -6676,8 +6706,8 @@ void WaterTrigger1_ISR()
       #endif
       Serial.print( (String) (waterTriggerState ? "H " : "L ") );    // V47 print ISR call counterwaterTriggerTime
       }
-    if   (waterTriggerState)  attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, RISING ); // v78 High wait for High
-    else                      attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, FALLING); // v78 establish trigger
+    // if   (waterTriggerState)  attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, RISING ); // v78 High wait for High
+    // else                      attachInterrupt(WATERSENSOR_READ, WaterTrigger1_ISR, FALLING); // v78 establish trigger
 
     waterISRActive = false;    // alow next interrupt
   }
@@ -6689,6 +6719,7 @@ void WaterTrigger1_ISR()
   will gLow Blueled if sensor triggered
   will detach during if excessive due bounces on reflective surface 
 */
+/*
 void WaterTrigger2_ISR()
 {
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // 26mar21 Ptro done at start as per advice espressif
@@ -6721,6 +6752,7 @@ void WaterTrigger2_ISR()
     waterISRActive = false;    // alow next interrupt
   }
 } // WaterTrigger2_ISR
+*/
 
 
 /* 20mar21 ISR read water sensor on default pin grpio4 and respect debouncetime 40mSec */
@@ -7693,6 +7725,32 @@ void printCrcInTable() {
 }
 
 /*
+    v78 01sep26 Print out state
+*/
+void printWaterTriggerStatus() {
+    Serial.println((String) "\r\n"
+        + " printWaterTriggerStatus"
+        + " mqttCnt_Out="       + mqttCnt_Out + "\r\n\t"
+        + "  debounce_time="    + debounce_time 
+        + ", waterTriggerState="+ (waterTriggerState ? "HIgh" : "Low" ) 
+        + ", waterTriggerTime=" + waterTriggerTime 
+        + ", waterTriggerCnt="  + waterTriggerCnt 
+        + ", ISR_time="         + ISR_time
+        + ", ISR_time_cnt="     + ISR_time_cnt
+        + "\r\n\t"
+        + "  useWaterTrigger1=" + (useWaterTrigger1 ? "ON" : "off")
+        + ", waterISRActive="   + (waterISRActive ? "Yes" : "No")
+        + ", GPIO" + WATERSENSOR_READ + "=" + (digitalRead(WATERSENSOR_READ) ? "1" : "0") 
+        + ", useWaterPullUp="   + (useWaterPullUp ? "1" : "0") 
+        + "\r\n\t"
+        + "  waterErrorSwitch=" + waterErrorSwitch
+        + ", waterReadState="   + waterReadState
+        + ", waterReadCounter=" + waterReadCounter
+        + ", waterReadHotCounter=" + waterReadHotCounter
+     );
+}
+
+/*
     v74g 10aug26 Print the Masking array table split from command sequences
 */
 void printcrcOutTable() {
@@ -7776,7 +7834,8 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
              serial_Print_PeekBits(2, 1024);                    // print time table P2 
              serial_Print_PeekBits(2, 2048);                    // print diff table P2
              serial_Print_PeekBits(2,(-2 * MAXLINELENGTH));     // print mask compare P2
-       } else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
+       } else if  ((char) data[0] == 'y') printWaterTriggerStatus(); // v78 Print Water trigger state lines
+         else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
          else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
          else if  ((char) data[0] == 'm') {       // v48 10jun25 print m-asked Input array
                    Serial.println((String)"\r\n dataIn telegram_crcIn"
