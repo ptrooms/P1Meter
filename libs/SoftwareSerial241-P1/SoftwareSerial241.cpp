@@ -221,8 +221,10 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
    m_start   = getCycleCountIram() + (10 * m_bitTime) + 200;     // v63b bitshift timing
    m_bitWait = BITWAIT1;  // v61a                 // v60 changed from 515 to 521 to 539 (interbyte time 6931)
    
-   m_d4_isr_state = false;              // v61b track ISR
-   digitalWrite(D4, m_d4_isr_state);  // v61b track ISR
+   #if defined (USE_RXREAD60)
+      m_d4_isr_state = false;              // v61b track ISR
+      digitalWrite(D4, m_d4_isr_state);  // v61b track ISR
+   #endif
 
                                            // 539
    if (isValidGPIOpin(receivePin)) {
@@ -1123,9 +1125,9 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    
    /* Signal short times */
    if (bit_shift != 8 ||  (rec & (1 << 7)) )  {   // bit high is set ?
-                       GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  BLUE ON/high
+                       GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);  // set monitor HIGH=0V 112nS  BLUE ON/high
                        rec = '\x60' + bit_shift;   // indicate abcd efghi  lowercase as checksum can be UPPERCASE HEX
-   } else              GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor LOW               BLUE OFF/low
+   } else              GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);  // set monitor LOW=3.3V    BLUE OFF/low
   
    /*
       Update databyte buffer
@@ -1180,7 +1182,9 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
    void SoftwareSerial::rxRead60() {
    #endif
 
- digitalWrite(D4, m_d4_isr_state); // cycle down-up = 1.0µsec
+ #if defined (USE_RXREAD60)
+   digitalWrite(D4, m_d4_isr_state); // cycle down-up = 1.0µsec
+ #endif
  // cli();         // v62a 30jul25 trial and error
  ETS_INTR_LOCK();  // v63a Disable as suggested by DeepSeek 
                    //      (cannot do: uint32_t oldInterruptLevel = xt_rsil(3); // Blocks GPIO/timers, not WiFi)
@@ -1273,7 +1277,9 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead60() {
  ETS_INTR_UNLOCK(); // v63a Re-enable as suggested by DeepSeek 
                     // (cannot do: xt_rsil(oldInterruptLevel); // Re-enable blocked interrupts 
  GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << m_rxPin);    // 26mar21 Ptro done at ISR start as per advice espressif //clear interrupt status
- digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
+ #if defined (USE_RXREAD60)
+   digitalWrite(D4, m_d4_isr_state);     // v61 track ISR state
+ #endif
 }
 
 

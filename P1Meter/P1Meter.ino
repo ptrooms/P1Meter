@@ -1403,6 +1403,10 @@
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 224
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 256
   );
+#undef NOP_MACRO128
+#undef NOP_MACRO254
+#undef NOP_MACRO512
+#define NOP_MACRO512
 
 const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
 
@@ -2916,7 +2920,7 @@ void loop()
 
   //  --------------------------------------------------------------------------------------------- START allowOtherActivities
   if (!allowOtherActivities) {     // are we outside P1 Telegram processing (require serial-timeing)
-    if (waterTriggerCnt != 0) detachWaterInterrupt();
+    if (waterTriggerCnt != 0) detachWaterInterrupt(0);
     // Serial.print ((String) waterTriggerCnt );    // v56c checking why this is alway activated
                                                     // likely while decode telgram was not executed 
                                                     // that reset
@@ -3652,6 +3656,7 @@ void readTelegramP1() {
                             //  333.200  without 2Nops 0i/2s/0z/5r of 34  very stable
                             // "NOP;NOP;"
 
+                        /* inactivated 2026-09-04 14:27:27
                             // adding block to (slack 333.200+2) base version 333.216 total size 333.568, very stable
                             "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
                             "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
@@ -3664,6 +3669,7 @@ void readTelegramP1() {
                             "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 288
                             "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 320
                             "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 352
+                        */
 
                           /* 
                             // massive blocks to check where this is shown in object
@@ -4541,15 +4547,17 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       }
 
     } else  if ((char)payload[0] == 'f') {  // control Blue_led2 assignment     //v61a revise CRC->Off->Water->Hot
-      if ((char)payload[1] == '0'  ||(char)payload[1] == '1') {
+      if ((char)payload[1] == '0'  || (char)payload[1] == '1'  ||(char)payload[1] == '2') {
           blue_led2_Water    = false;
           blue_led2_Crc      = false;
           blue_led2_HotWater = false;
           #ifdef NoTx2Function                    
-            if ((char)payload[1] == '0'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
-            if ((char)payload[1] == '1'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);  // OFF
+            if      ((char)payload[1] == '0'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);   // ON
+            else if ((char)payload[1] == '1'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH);  // OFF
+            else if ((char)payload[1] == '2'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, !digitalRead(BLUE_LED2));  // ON/OFF
+            Serial.print("BlueLed2 = Bluef" + ((char)payload[1]) );           // BlueLed2 Off
           #endif                    
-          Serial.print("BlueLed2 = Inact");           // BlueLed2 Off
+          // Serial.print("BlueLed2 = Inact");           // BlueLed2 Off
       } else if (blue_led2_Water) {
           blue_led2_Water    = false;
           blue_led2_Crc      = false;
@@ -4639,10 +4647,10 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       if       ((char)payload[1] == '0') waterErrorSwitch  = 0;                           // v75d 15aug26 reset state
       else  if ((char)payload[1] == '1') {
           waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop;  // v75d 15aug26 set ISR
-          detachWaterInterrupt();                          // v75d deactivate water trigger
+          detachWaterInterrupt(0);                          // v75d deactivate water trigger
       } else {
         useWaterTrigger1 = !useWaterTrigger1;  // Rewrite ISR
-        detachWaterInterrupt();
+        detachWaterInterrupt(0);
         waterTriggerTime = micros();       // set our time
         // waterTriggerCnt  = 1;              // indicate we are in detached mode
         if (outputOnSerial) {
@@ -6595,10 +6603,10 @@ void attachWaterInterrupt() {   // activate waterinerrupt sensor
 /*
   ISR Detach WATERSENSOR_READ interrupt , setting waterTriggerCnt to 0
 */
-void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interference while doing serial communication
+void detachWaterInterrupt(int tmp) {   // disconnectt Waterinterrupt to prevent interference while doing serial communication
   detachInterrupt(WATERSENSOR_READ); // trigger at every change
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // Prevent calls as per expressif intruction
-  waterTriggerCnt = 0;          // indicate ISR has been withdrawn
+  if (tmp == 0) waterTriggerCnt = 0;          // indicate ISR has been withdrawn
   waterISRActive = false;   
 }
 
@@ -6639,7 +6647,7 @@ void WaterTrigger0_ISR() {
           //
           if ( (waterTriggerCnt) > LIMIT_WATERTRIGGERCNT ) {   // v78 v37 ensure we will not loop here, like WaterTrigger1_ISR
             Serial.print( (String) ", Detach>ISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
-            detachWaterInterrupt();
+            detachWaterInterrupt(0);
             waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used
             // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
             // waterTriggerState = LOW;      // v41 v47 force to low to ease things
@@ -6659,6 +6667,7 @@ void WaterTrigger0_ISR() {
       // else                      attachInterrupt(WATERSENSOR_READ, WaterTrigger0_ISR, FALLING); // v78 establish trigger
 
        }
+      // if (waterISRActive) detachWaterInterrupt(waterTriggerCnt);
       waterISRActive = false;    // alow next interrupt
   }
   GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, 1 << WATERSENSOR_READ);  // v65 at end , as per advice espressif
@@ -6695,7 +6704,7 @@ void WaterTrigger1_ISR()
       //  if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // monitor by invert BLUE ked
       // #endif
         if ( (waterTriggerCnt) > LIMIT_WATERTRIGGERCNT ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
-          detachWaterInterrupt();
+          detachWaterInterrupt(0);
           Serial.print( (String) ", Detach2>ISR1="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
           waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used          
           // waterTriggerCnt = 1;          // indicate ISR has been withdrawn
