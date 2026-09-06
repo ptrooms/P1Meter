@@ -1,5 +1,5 @@
 
-#define VERSION_NUMBER "78" // v78 31aug26 base version
+#define VERSION_NUMBER "78c" // v78c 06sep26 base version
                             // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
                             // v77a adapted dummy code on sectiont o stabilise
                             // v77a 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
@@ -1719,6 +1719,7 @@ volatile int  waterErrorSwitch  = 0;   // > 1 is error, wait with ISR triggering
      #define WATER_ERROR_SWITCH_done    0x02  // v75    0x02 = error has been displayed
      #define WATER_ERROR_SWITCH_isrLoop 0x10  // v75 >= 0x10 we have a fault, triggering is suspended
 volatile long waterTriggerCnt   = 0;   // initialize trigger count  0-ISRdetached , > 0 attached interrupt and counting
+#define LIMIT_WATERTRIGGERCNT 15       // value after we hold the excessive interrupt during a read cycle
 long debounce_time     = 0;   // v47 used in loop to check if things are stabilised
 long waterDebounceCnt  = 0;   // administrate usage  for report
 bool waterReadState    = LOW; // switchsetting
@@ -6569,6 +6570,7 @@ void detachWaterInterrupt() {   // disconnectt Waterinterrupt to prevent interfe
 }
 
 /*
+  v78 currently the default master
   V47 Stable live ISR water pulse, alternate (Debug select via W,w command --> 1) 
   will gLow Blueled if sensor triggered
   will detach during more excessive vibration
@@ -6602,7 +6604,8 @@ void WaterTrigger0_ISR() {
           //        liky the water sensor is vibrating
           //  not really a solution but we can insert code to delay the use until a later time.
           //
-          if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+          if ( (waterTriggerCnt) > LIMIT_WATERTRIGGERCNT ) {   // v78 v37 ensure we will not loop here, like WaterTrigger1_ISR
+            // Serial.print( (String) ", Detach>ISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
             detachWaterInterrupt();
             Serial.print( (String) ", Detach>100WaterISR0="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
             waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used
@@ -6647,7 +6650,7 @@ void WaterTrigger1_ISR()
       #ifdef NoTx2Function
         if (!loopbackRx2Tx2 && blue_led2_Water) digitalWrite(BLUE_LED, !digitalRead(BLUE_LED)); // monitor by invert BLUE ked
       #endif
-        if ( (waterTriggerCnt) > 200 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+        if ( (waterTriggerCnt) > LIMIT_WATERTRIGGERCNT ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           Serial.print( (String) ", Detach>200WaterISR1="+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
           waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used          
@@ -6665,6 +6668,7 @@ void WaterTrigger1_ISR()
 } // WaterTrigger1_ISR()
 
 /*
+  fyi: v78 --> is currently not used anywhere
   V47 Unstable ISR2 water pulse primary (select via W,w command --> 0) 
   will gLow Blueled if sensor triggered
   will detach during if excessive due bounces on reflective surface 
@@ -6685,7 +6689,7 @@ void WaterTrigger2_ISR()
         // waterTriggerTime  = time + 1;       // set time of this read and ensure not 0
         waterTriggerTime  = micros() + 1UL;       // set time of this read and ensure not 0, v55b
 
-        if ( (waterTriggerCnt) > 100 ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
+        if ( (waterTriggerCnt) > LIMIT_WATERTRIGGERCNT ) {    // v37 ensure we will not loop here, like WaterTrigger1_ISR
           detachWaterInterrupt();
           if (outputOnSerial) Serial.print( (String) ", Detach>100WaterISR2"+waterTriggerCnt );    // V47 print ISR call counterwaterTriggerTime
           waterErrorSwitch |= WATER_ERROR_SWITCH_isrLoop; // v74d prevent error loop and delay until hot water is used          
@@ -7728,7 +7732,7 @@ int convert_p1_print(int data_in) {
 }
 
 /*
-  check process erial input
+  check process serial input
 */
 
 void cmdSerialInputConsole() {    // v76 do check console commands on serial input

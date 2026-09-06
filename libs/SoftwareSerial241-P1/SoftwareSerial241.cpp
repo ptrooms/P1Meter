@@ -1,4 +1,4 @@
-/* SoftwareSerial.cpp v78 - 31aug26 base version
+/* SoftwareSerial.cpp v78c - 06sep26 base version
 
    v77b 21aug26 added bittime version of previous stable version to be (s)elected by bit-wait
    v77b 20aug26 try to adapt bittiming with bitshift to prevent byte isnertions
