@@ -1,5 +1,9 @@
-/* SoftwareSerial.cpp v78c - 06sep26 base version
+/* SoftwareSerial.cpp v78c - 2026-09-06 23:12:04 master base version
 
+   v78c introduced and deactivated #define ENABLE_RXREAD59_INLINE which test/executes specialised bitwait timing 
+         without this additional (approx 400 bytes of IRAM code), we only execute the basic, though, stable bitbang.
+         howver we have some instabilities which might be caused dueto  codepath length.
+   v78c deactivated Blueled2 in RXREAD59 used to signal shorts, when bitwait is standard to 417, this to signalling in mainprogram.
    v77b 21aug26 added bittime version of previous stable version to be (s)elected by bit-wait
    v77b 20aug26 try to adapt bittiming with bitshift to prevent byte isnertions
    v77a 19aug26 - RXREAD59 (as copy of RXREASD 58), added redundant code doYIELD_MACRO, doDUMMY_MACRO, stable OK
@@ -303,7 +307,7 @@ void SoftwareSerial::begin(long speed) {
 }
 
 /*
-   Simulate input: 
+   Simulate input recordtype: 
    0 = none, use physical
    1 = produce P1/power telegram
    2 = produce WL/heat telegram
@@ -311,8 +315,48 @@ void SoftwareSerial::begin(long speed) {
 
 void SoftwareSerial::begin(long speed, int recordtype) {
    // str1 and str2 are simulation, terminated by 0xff
-   const char * str1 = "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n\xFF";                 
-   const char * str2 = "_/VALID-VI\\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
+   // const char * str1 =  "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n\xFF";                 
+      const char * str1 =  "/KFM5KAIFA-METER\r\n"
+                           "\r\n"
+                           "1-3:0.2.8(42)\r\n"
+                           "0-0:1.0.0(210420113523S)\r\n"
+                           "0-0:96.1.1(1234567890123456789012345678901234)\r\n"
+                           "1-0:1.8.1(012345.111*kWh)\r\n"
+                           "1-0:1.8.2(012345.222*kWh)\r\n"
+                           "1-0:2.8.1(000000.000*kWh)\r\n"
+                           "1-0:2.8.2(000000.000*kWh)\r\n"
+                           "0-0:96.14.0(0002)\r\n"
+                           "1-0:1.7.0(00.560*kW)\r\n"
+                           "1-0:2.7.0(00.000*kW)\r\n"
+                           "0-0:96.7.21(00003)\r\n"
+                           "0-0:96.7.9(00003)\r\n"
+                           "1-0:99.97.0(5)(0-0:96.7.19)"
+                              "(210407073103W)(0000001404*s)"
+                              "(181103114840W)(0000008223*s)"
+                              "(180911211118S)(0000003690*s)"
+                              "(160606105039S)(0000003280*s)"
+                              "(000101000001W)(2147483647*s)"
+                              "\r\n"
+                           "1-0:32.32.0(00000)\r\n"
+                           "1-0:32.36.0(00000)\r\n"
+                           "0-0:96.13.1()\r\n"
+                           "0-0:96.13.0()\r\n"
+                           "1-0:31.7.0(002*A)\r\n"
+                           "1-0:21.7.0(00.560*kW)\r\n"
+                           "1-0:22.7.0(00.000*kW)\r\n"
+                           "!078E validated CR , normal=078E\r\n"
+                           "\xFF";                
+   // const char * str2 =  "_/VALID-VI\\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
+      const char * str2 =  "_/VALID-VI\\"
+                           " 1-3:0.2.8(50) "
+                           "0-0:1.1.0(250714103614W) "
+                           "0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) "
+                           "0-1:24.1.0(012) "
+                           "0-1:96.1.0(20000000000000000000000000000000) "
+                           "0-1:24.2.1(250714103600W)(12.000*GJ)"
+                           "!A5AE_E621_B"
+                           "\xff";
+
    // Serial.print((String) "\r\nBegin port" + m_rxPin  + " cycle" + GET_CYCLE_COUNT + "\r\n");
    m_buffer_time[M_TIME_BEGIN_START] = GET_CYCLE_COUNT;   // initialise
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
@@ -1002,7 +1046,8 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead58() {
 
 
 
-/* below WAITIram4w59 WAITIram4t59 DSMR_READ taken from stable version 58
+/* 
+   below WAITIram4w59 WAITIram4t59 DSMR_READ taken from stable version 58
 */
 // --59 //------------------------------------------------------------
 #define WAITIram4w59 { while (SoftwareSerial::getCycleCountIram()-start < wait && wait<7000); wait += l_bitTime; }
@@ -1014,7 +1059,7 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
 
    /*
       Hold / lock Interrupts
- 77*/
+   */
    unsigned long start = getCycleCountIram();         // 15-18cycles 77cle counter, which increments with each clock cycle  (doc: v55d)      
    ETS_INTR_LOCK();  // v63a Disable as sugge77ed by DeepSeek  , v63: require 440 --> 515 (300nS) (==> cli() )
    if (m_inPos == 0) m_buffer_time[M_TIME_BIT_ISR_START]  = start;                 // v77a get timing
@@ -1025,12 +1070,12 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    unsigned long wait = (m_bitTime + (m_bitTime/3)) - m_bitWait;	// v77 = 508
    unsigned long bit_diff = start - m_buffer_bits[m_inPos - ((m_inPos!=0) ? 1 : 0) ]; // v77 get this or previous
    unsigned long l_bitTime = m_bitTime;      // get proposal 694
-
+   // #define ENABLE_RXREAD59_INLINE     // saving 392bytes
    /*
       Compensate for timing and missing bit which else would shift bits
    */
    if (m_inPos > 0) { // only to reccculation after first start of rs232
-
+   #if defined (ENABLE_RXREAD59_INLINE)         // v78c add check on develope code variants, adds 392 bytes
       if (m_bitWait % 2 ) {              // use m_bitWait as switch to control bit compensation
             // take from SoftwareSerial241_19aug26_14u51.cpp_save
             // code will shift bits to time differently
@@ -1084,7 +1129,22 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
          if      (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
          else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
        // original logic from stable rxread58
-      } else {                          // use m_bitWait from RXREAD58 as switch to control bit compensation
+      } else
+   #else
+         // add slack code instead of pexecution
+         asm(   // used to seprrate function in switchcmd......
+                  //   "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  27 -- takes 5 records to fortstread
+                     "NOP;NOP;NOP;NOP;"  // 8
+                  //   "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
+                  //   "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
+                  //   "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
+                  //   "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
+                  //   "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
+         );
+
+   #endif
+      {                          // use m_bitWait from RXREAD58 as switch to control bit compensation
+
          if     (bit_diff > (wait) && (bit_diff < ((m_bitTime*5)/3)) )  wait -= (bit_diff - m_bitTime) ;   // compensate too late
          else if (bit_diff > m_bitTime/2 && bit_diff < m_bitTime*21/2)  bit_shift -= (bit_diff / m_bitTime) + 1;
          else if (bit_diff > m_bitTime*8 && bit_diff < m_bitTime*17  )  bit_shift -= ((bit_diff - 10*m_bitTime) / m_bitTime) + 1;
@@ -1121,12 +1181,11 @@ volatile void ICACHE_RAM_ATTR SoftwareSerial::rxRead59() {
    if (m_invert) rec = ~rec;     // invert data in case of negative polarity
    
    
-   /* Signal short times */
-   if (bit_shift != 8 ||  (rec & (1 << 7)) )  {   // bit high is set ?
-                       GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4);              // set monitor HIGH-LOW = 112nS  BLUE ON/high
-                       rec = '\x60' + bit_shift;   // indicate abcd efghi  lowercase as checksum can be UPPERCASE HEX
-   } else              GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4);              // set monitor LOW               BLUE OFF/low
-  
+   /* Signal short times if not on our standardised regular bitwait 417 */
+      if (bit_shift != 8 ||  (rec & (1 << 7)) )  {   // bit high is set ?
+               if (m_bitWait != 417) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<< D4); // set monitor HIGH-LOW = 112nS  BLUE ON/high
+               rec = '\x60' + bit_shift;   // indicate abcd efghi  lowercase as checksum can be UPPERCASE HEX
+      } else   if (m_bitWait != 417) GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<< D4); // set monitor LOW               BLUE OFF/low
    /*
       Update databyte buffer
    */
