@@ -2276,8 +2276,15 @@ void setup()
   save_excvaddr = resetInfo->excvaddr;
   save_depc     = resetInfo->depc;
 
-  Serial.println("Firmware version: "+ (String)P1_VERSION_TYPE + "-" 
-                  + "(" + __DATE__ + " " + __TIME__ + ")." );
+    Serial.println((String) "Firmware version: "+ (String)P1_VERSION_TYPE + "-" 
+                            + "(" + __DATE__ + " " + __TIME__ + ")." );
+  #ifdef BUILD_TIMESTAMP                          
+    Serial.println((String) "PlatformIO TsGit: " + BUILD_TIMESTAMP );
+  #endif
+  #ifdef BUILD_GITHASH
+    Serial.println((String) "Platform HashGit: " + BUILD_GITHASH );
+  #endif
+  
   Serial.println   ("ESP getFullVersion:" + ESP.getFullVersion());
   Serial.println ((String)"Arduino esp8266 core: "+ ARDUINO_ESP8266_RELEASE);  // from <core.version>
   // DNO:  Serial.println ((String)"LWIP_VERSION_MAJOR: "+ LWIP_VERSION_MAJOR);

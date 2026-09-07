@@ -8,8 +8,10 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 
-## [v21.78c] - Base version working new RXREAD59  
+## [v21.78d] - Base version working new RXREAD59  
 
+    - introduced PlatformIO time/hash stamping 
+        - using (latest) git log -1 --pretty=%ct && git log -1 --pretty=%H
     - softserial: inactivated RXREAD59 code #define ENABLE_RXREAD59_INLINE as simplified bitwait=417 routine is near to perfect.
         - however we have more recoveries without the (actually) unused code segment.
     - etext size = 0x40107f98 , giving 104 bytes free for IRAM.
