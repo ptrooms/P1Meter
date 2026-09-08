@@ -8,7 +8,11 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 
-## [v21.78d] - Base version working new RXREAD59  
+## [v21.79] - Base version working new RXREAD59
+
+    - consolidate v78d as new master with 95% readsuccess stability
+
+## [v21.78d] - Base version working new RXREAD59
 
     - introduced PlatformIO time/hash stamping 
         - using (latest) git log -1 --pretty=%ct && git log -1 --pretty=%H

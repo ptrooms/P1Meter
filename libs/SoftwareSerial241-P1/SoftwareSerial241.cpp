@@ -1,8 +1,10 @@
-/* SoftwareSerial.cpp v78d - 07sep26 base version
+/* SoftwareSerial.cpp  v79 - 2026-09-08 13:50:11 new master
 
+   v78d - 07sep26 base version, using RXREAD59 now reduced to basic function.
+         deactivate variable bittiming and blueled signalling via bitwai value.
    v78c introduced and deactivated #define ENABLE_RXREAD59_INLINE which test/executes specialised bitwait timing 
          without this additional (approx 400 bytes of IRAM code), we only execute the basic, though, stable bitbang.
-         howver we have some instabilities which might be caused dueto  codepath length.
+         however we have some instabilities which might be caused dueto  codepath length.
    v78c deactivated Blueled2 in RXREAD59 used to signal shorts, when bitwait is standard to 417, this to signalling in mainprogram.
    v77b 21aug26 added bittime version of previous stable version to be (s)elected by bit-wait
    v77b 20aug26 try to adapt bittiming with bitshift to prevent byte isnertions
