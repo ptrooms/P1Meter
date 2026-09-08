@@ -1,5 +1,5 @@
 
-#define VERSION_NUMBER "78d" // v78c 2026-09-06 23:12:58 06sep26 base version
+#define VERSION_NUMBER "79" // v78c 2026-09-06 23:12:58 06sep26 base version
                             // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
                             // v77a adapted dummy code on sectiont o stabilise
                             // v77a 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
@@ -68,6 +68,9 @@
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
 /* code documentation v78.... starting 31aug26
+      v79 - 2026-09-08 13:41:00 cosolidate to new master. 
+          - v78d after imprtoving ISR routines en specially, adding dummy code at end of program, is very stable.
+           - At 5000 reads, we now have 95% (Miss=116, Crc=112, LenE=91, Rcvr=763)
       v78d - 2026-09-07 12:12:03 rework v78 master
           - isolate/remove D4 (= BLUE_LED2 = gpio2) on SoftwareSerial241.cpp()
           - rewrite f0/f1/f2 command to (in)activate Blueled2
