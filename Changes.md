@@ -10,12 +10,17 @@ create stable Versions-Vxx which when stable are merged into master.
 
 ## [v21.80] -  syslog function
 
+    - and end of code we reduced actual size by // NOP_MACRO_END1K
+    - updated README.md to informa about syslog submodule
+    - loop() hold serial.print while P1 is active, this to stabilize P1
+    - deactivated the 14 times NOP loop at beginning of loop(), residu from a previous stabilitt test
+    - added serial console command 'l' to print a syslog message 
     - addded prefix for syslog 
     - incorperated git submodule add https://github.com/jerryr/EspSyslog libs/EspSyslog (having Syslog.cpp & Syslog.h)
 
 ## [v21.79] - Base version working new RXREAD59
 
-    - master very stabke
+    - master very stable
     - consolidate v78d as new master with 95% readsuccess stability
 
 ## [v21.78d] - Base version working new RXREAD59
