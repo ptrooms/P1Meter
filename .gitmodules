@@ -2,3 +2,6 @@
 	path = Arduino
 	url = https://github.com/esp8266/Arduino
 	branch = 2.4.1
+[submodule "libs/EspSyslog"]
+	path = libs/EspSyslog
+	url = https://github.com/jerryr/EspSyslog
