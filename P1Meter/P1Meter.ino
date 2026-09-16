@@ -1417,6 +1417,14 @@
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 256
   );
 
+/*
+  v79 This does do return followed by 512 bytes of NOP
+*/  
+#define RETURN_NOP_MACRO512 \
+      return;
+      // NOP_MACRO512;
+
+
 const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
 
 /* doDUMMY_MACRO doYIELD_MACRO v77a  ------------------------------------------- dummy code insertions
@@ -7188,6 +7196,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
         Serial.printf("\r\nWrong call %d using seria %d mode %d , states:\r\n", __LINE__, serial_port_number, serial_port_mode );
         printf_port_state_isr();
       }
+  RETURN_NOP_MACRO512;      
 }  // openCloseSerial()    
 
 /*
@@ -7198,6 +7207,7 @@ void printf_port_state_isr() {
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 2, (bSerial2State ? 1 : 0) , (mySerial2.portActive() ? 1 : 0));
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 3, (bSerial3State ? 1 : 0) , (mySerial3.portActive() ? 1 : 0));
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 4, (bSerial4State ? 1 : 0) , (mySerial4.portActive() ? 1 : 0));
+  RETURN_NOP_MACRO512;         
 }
 
 /*
@@ -7274,7 +7284,7 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + "\r\n"
         );
   }                
-
+  RETURN_NOP_MACRO512;
 }
 
 /*
@@ -7663,6 +7673,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   }    
 
   Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
+  RETURN_NOP_MACRO512;
 }
 
 /*
@@ -7693,6 +7704,7 @@ void printCrcInTable() {
     }
   }
   Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+  RETURN_NOP_MACRO512;  
 }
 
 /*
@@ -7716,6 +7728,7 @@ void printcrcOutTable() {
         }
       }
       Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+  RETURN_NOP_MACRO512;      
 }
 
 /*
@@ -7738,6 +7751,7 @@ void print_binary(unsigned int number) {
     if (number >> 1) print_binary(number >> 1);
     Serial.print((String) (number & 1 ? '1' : '0'));
   }
+  RETURN_NOP_MACRO512;  
 }
 
 /* return printabel character for diagnose */
@@ -7804,6 +7818,7 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
                   printcrcOutTable();    // v74g split to subroutine 
        }
      }
+  RETURN_NOP_MACRO512;     
 }
 
 /* print time table related to ISR  
@@ -7872,6 +7887,7 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
       Serial.print((String) "\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   + " )" ) ;
       Serial.print((String) "\r\n");
   #endif
+  RETURN_NOP_MACRO512;
 }   
 
 /*  
@@ -7992,6 +8008,7 @@ void doCmdHelp() {    // v76
                             + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
                             + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
                             + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
+  RETURN_NOP_MACRO512;
 }
 
 /* v78c -2026-09-06 21:37:58
@@ -8037,7 +8054,7 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
         }
       }
   }
-
+  RETURN_NOP_MACRO512;
 }  
 
 #define NOP_MACRO_END1K asm( \   // 1KBYTE
