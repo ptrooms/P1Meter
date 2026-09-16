@@ -1,5 +1,5 @@
 
-#define VERSION_NUMBER "79" // v78c 2026-09-06 23:12:58 06sep26 base version
+#define VERSION_NUMBER "80" // v78c 2026-09-06 23:12:58 06sep26 base version
                             // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
                             // v77a adapted dummy code on sectiont o stabilise
                             // v77a 19aug26 this version RXREAD59 finally unstable (master, rebased from stable v77)
@@ -1384,7 +1384,7 @@
 // D10  = 2;
 
 #define NOP_MACRO354 asm( \   // used to seprrate function in switchcmd......
-              "NOP;NOP;" \ //  32
+              "NOP;NOP;" \ //  02
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  32
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  64
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  96
@@ -1397,6 +1397,15 @@
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 320
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 352
   );
+
+#define NOP_MACRO04 asm( \   // used to seprate functions......
+              "NOP;NOP;" \ //  02
+  );              
+
+#define NOP_MACRO64 asm( \   // used to seprate functions......
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  64
+  );              
 
 #define NOP_MACRO512 asm( \   // used to seprate functions......
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
@@ -1421,9 +1430,18 @@
   v79 This does do return followed by 512 bytes of NOP
 */  
 #define RETURN_NOP_MACRO512 \
+      NOP_MACRO04; \
+      return;
+    /*  
+      NOP_MACRO64; \
+      NOP_MACRO64; \
+      NOP_MACRO64; \
+      NOP_MACRO64; \
+      NOP_MACRO512; \
+      NOP_MACRO512; \
       return;
       // NOP_MACRO512;
-
+    */
 
 const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
 
@@ -1457,9 +1475,9 @@ const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 
 
 // Standard includes for Wifi, OTA, ds18b20 temperature
 #include <ESP8266WiFi.h>           // standard, from standard Arduino/esp8266 platform
-
-const char *hostName = "nodemcu"        P1_VERSION_TYPE;    // Note our hostname nodemcup1 nodemcut1
-const char *mqttClientName = "nodemcu-" P1_VERSION_TYPE;    // Note our ClientId nodemcu-p1 nodemcu-t1
+#define P1HOSTNAME "nodemcu"
+const char *hostName = P1HOSTNAME       P1_VERSION_TYPE;    // Note our hostname nodemcup1 nodemcut1
+const char *mqttClientName = P1HOSTNAME P1_VERSION_TYPE;    // Note our ClientId nodemcu-p1 nodemcu-t1
 const char *mqttTopic      = "/energy/" P1_VERSION_TYPE;            // 'P' on/off outputMqttPower
 const char *mqttLogTopic   = "/log/"    P1_VERSION_TYPE;            // 'L' on/off outputMqttLog
 const char *mqttErrorTopic = "/error/"  P1_VERSION_TYPE;            // The error topic will also log into serverlog
@@ -1952,6 +1970,15 @@ PubSubClient client(espClient);   // Use this connection client
 #include <user_interface.h>     // v52: support to display/ger restart reasons
 // rst_info *resetInfo;            // v52: pointer (global)
 
+/* 
+  v80 2026-09-16 21:03:48 syslog
+*/
+#include <WiFiUdp.h>
+#include <Syslog.h>     // from submodule add https://github.com/jerryr/EspSyslog libs/EspSyslog
+// WiFiClient client;   // already defines, see above WiFiClient espClient; 
+// WiFiUDP udp;            // define udp messageing
+// Syslog logger("gadget", "testapp", "192.168.1.8");
+Syslog logger("P1", hostName, "192.168.1.8"); // Our identification to our syslog
 
 void command_testH6(){    // v57c-2
   //                   // we remoived some unused protection arrays, improved ISR-time,
@@ -2242,8 +2269,10 @@ void setup()
 
   ArduinoOTA.setHostname(hostName);   // nodemcut1/p1
   Serial.println("ArduinoOTA.setHostname set" );
+  logger.info("connected to wifi");
   
   ArduinoOTA.onStart([]() {
+    logger.info("OTA new software version");
     Serial.println("Start");
   });
 
@@ -2831,7 +2860,8 @@ void loop()
   previousMicros = currentMicros; // get V47 previous loop time
   currentMicros = micros(); // get current cycle time
 
-  // /*  v76 deactivate 
+  
+  /*  v76 deactivate , ativate until v80 deactivate 
     // v58c: check if this stabilizes
     for (int i = 14; i < 11; i--) {
       asm(
@@ -2847,7 +2877,7 @@ void loop()
         "NOP;"
       );
     }
-  // */
+  */
 
   /*
     time how long the P1 record took
@@ -2873,6 +2903,7 @@ void loop()
   // if (test_WdtTime < currentMillis and !outputOnSerial )  {  // print progress 
   if (test_WdtTime < currentMillis ) {
     loopCnt++ ;
+    test_WdtTime = currentMillis - test_WdtTime;          
     /* 
         here we display the number of line loops -0-1-2-3-4-5-6-7-8-9    
     */
@@ -2881,26 +2912,28 @@ void loop()
     // Serial.print((String) (
     //   (waterReadCounter != waterReadCounterPrevious) ? "_" : "-") +(loopCnt % 10)+" \b"); // v47 test water tapping 
     
-    Serial.print((String) (                             // display diagnostic second loopcounter
-          (waterReadCounter != waterReadCounterPrevious) ?   // v47 check test water tapping active
-              (bSerial1State ? 
-                  (bSerial2State ? "*"  : "\'")         // water &  and P1:  P2 -->  On* Off"
-                 :(bSerial2State ? "\"" : "_") )       // water &   no P1:  P2 -->  On' Off_
-              :   
-              (bSerial1State ? 
-                  (bSerial2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
-                 :(bSerial2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
-          ) );
-    // -Ee -->  serial1state active while port is inactive, serial2state inactive and port2 is active, 
+    if (!mySerial1.P1active()) {  // only print activity when P1 is not activated
+      Serial.print((String) (                             // display diagnostic second loopcounter
+            (waterReadCounter != waterReadCounterPrevious) ?   // v47 check test water tapping active
+                (bSerial1State ? 
+                    (bSerial2State ? "*"  : "\'")         // water &  and P1:  P2 -->  On* Off"
+                  :(bSerial2State ? "\"" : "_") )       // water &   no P1:  P2 -->  On' Off_
+                :   
+                (bSerial1State ? 
+                    (bSerial2State ? ":" : "-")          // no water and P1:  P2 -->  On: Off-
+                  :(bSerial2State ? ";" : ".") )        // no water  no P1:  P2 -->  On; Off.
+            ) );
+      // -Ee -->  serial1state active while port is inactive, serial2state inactive and port2 is active, 
 
-    if (mySerial1.portActive() !=  bSerial1State) Serial.print((String) "E");   // v59 check if driver matches the portstate
-    if (mySerial2.portActive() !=  bSerial2State) Serial.print((String) "e");   // v59 check if driver matches the portstate
+      if (mySerial1.portActive() !=  bSerial1State) Serial.print((String) "E");   // v59 check if driver matches the portstate
+      if (mySerial2.portActive() !=  bSerial2State) Serial.print((String) "e");   // v59 check if driver matches the portstate
 
-    Serial.print((String) +   (loopCnt % 10)+" \b");                          // display diagnostic second loopcounter
+      Serial.print((String) +   (loopCnt % 10)+" \b");                          // display diagnostic second loopcounter
 
-    test_WdtTime = currentMillis - test_WdtTime;          
-    if (verboseLevel == VERBOSE_ON && test_WdtTime != 1UL )  {      // v58 print long looptimes to diagnose excessive delays
-        Serial.printf(" looptime=%lu ",  test_WdtTime);
+
+      if (verboseLevel == VERBOSE_ON && test_WdtTime != 1UL )  {      // v58 print long looptimes to diagnose excessive delays
+          Serial.printf(" looptime=%lu ",  test_WdtTime);
+      }
     }
     bP1Active_signalled = false; // v57 reset his inteval of signalled situation
     waterReadCounterPrevious = waterReadCounter; 
@@ -7786,6 +7819,8 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
        if         ((char) data[0] == '?') doCmdHelp();              // '?' - Help
        else if    ((int) data[0] == 8 )  
                     Serial.println((String)"\r\n Reconnect console"); //  v77 ^H
+       else if    ((int) data[0] == 'l' )  
+                    logger.info("Test command executed");
        else if    ((char) data[0] == 't') {                         // 't'= 
              serial_Print_PeekBits(1, 1024);                    // print time table P1
              serial_Print_PeekBits(1, 2048);                    // print diff table P1
@@ -8126,10 +8161,22 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"     \  // 254
   );
 
+/*
+void Syslog::dolog(uint8_t pri, char *message) {    // v80 2026-09-16 21:04:13 syslog
+  uint8_t buffer[MAX_PACKET_SIZE];
+  uint16_t len = snprintf((char *)buffer, MAX_PACKET_SIZE, "<%d> %s %s: %s", pri, _host,
+                                            _app, message);
+  len = (len > MAX_PACKET_SIZE)?MAX_PACKET_SIZE:len; // handle truncation if message too long
+  udp.beginPacket(_server, _port);
+  udp.write(buffer, len);
+  udp.endPacket();
+}
+*/
+
 void DummyEndCode() { // plus 4KBYTE
   
   // NOP_MACRO_END1K;
-  NOP_MACRO_END1K;
+  // NOP_MACRO_END1K;
   NOP_MACRO_END1K;
   NOP_MACRO_END1K2;
 }

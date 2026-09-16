@@ -8,8 +8,14 @@ Note : upto V66 we developed on Vxx, master is production.
 Note2: supended deveopment branch
 create stable Versions-Vxx which when stable are merged into master.
 
+## [v21.80] -  syslog function
+
+    - addded prefix for syslog 
+    - incorperated git submodule add https://github.com/jerryr/EspSyslog libs/EspSyslog (having Syslog.cpp & Syslog.h)
+
 ## [v21.79] - Base version working new RXREAD59
 
+    - master very stabke
     - consolidate v78d as new master with 95% readsuccess stability
 
 ## [v21.78d] - Base version working new RXREAD59
