@@ -1,15 +1,16 @@
 
 # Changelog
 
-All notable changes to this project will be documented in this file.
-Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
+    All notable changes to this project will be documented in this file.
+    Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 
-Note : upto V66 we developed on Vxx, master is production. 
-Note2: supended deveopment branch
-create stable Versions-Vxx which when stable are merged into master.
+    Note : upto V66 we developed on Vxx, master is production. 
+    Note2: supended deveopment branch
+    create stable Versions-Vxx which when stable are merged into master.
 
 ## [v21.80] -  syslog function
 
+    - version is not stable we have about 400 failures during 12hrs, we return to v79/master
     - and end of code we reduced actual size by // NOP_MACRO_END1K
     - updated README.md to informa about syslog submodule
     - loop() hold serial.print while P1 is active, this to stabilize P1
@@ -259,6 +260,7 @@ create stable Versions-Vxx which when stable are merged into master.
     - 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
     - 15apr21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
     - removed delay in local-yields
+
 ## [V21.21]
 
     - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 
