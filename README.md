@@ -1,16 +1,20 @@
 W.i.P Home Automation via ESP8266 WiFi chip
 ===========================================
 
+Note this repo is using Syslog from: git submodule add https://github.com/jerryr/EspSyslog libs/EspSyslog
+
 This project brings control using the ESP8266 NodeMCU 12E board to the Home.
 The project aims control throught MQTT as a central control module for
+
 - Thermostat state and Heating control
 - measure/reading serial 115K2 serial connected P1 electricity status
 - Measuring Pulsed Watermeter using an Infraded Optocoupler
 - getting Lux/Light state using a LDR in Living room
 - measuring Hotwater usage using a LDR on th Boiler Led
-- reading Heat  delivery using 2nd erial on P1 heat-exchange device.
+- reading Heat delivery using 2nd serial on P1 heat-exchange device.
 
 ### Installing / using Arduino IDE
+
 - TBD
 
 - Install the current upstream Arduino IDE at the 1.8 level or later. The current version is at the [Arduino website](http://www.arduino.cc/en/main/software).
@@ -20,6 +24,7 @@ The project aims control throught MQTT as a central control module for
 
 
 ### Installing / using Platform IO
+
 - see file: platformio.ini
 - see file: platformio_p1meter_env.ini 
 

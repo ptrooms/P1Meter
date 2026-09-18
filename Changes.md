@@ -1,15 +1,33 @@
 
 # Changelog
 
-All notable changes to this project will be documented in this file.
-Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
+    All notable changes to this project will be documented in this file.
+    Co-authored-by: Peter Ooms <34420738+ptrooms@users.noreply.github.com>
 
-Note : upto V66 we developed on Vxx, master is production. 
-Note2: supended deveopment branch
-create stable Versions-Vxx which when stable are merged into master.
+    Note : upto V66 we developed on Vxx, master is production. 
+    Note2: supended deveopment branch
+    create stable Versions-Vxx which when stable are merged into master.
+
+## [v21.80a] -  Return to V79: investigate instability caused by using syslog
+
+    - we for test start to only include the syslog function without using it.
+    - version 80 is not stable we have about 400 failures during 12hrs, we return to v79/master
+    - incorperated git submodule add https://github.com/jerryr/EspSyslog libs/EspSyslog (having Syslog.cpp & Syslog.h)
+
+## [v21.80] -  syslog function
+
+    - version is not stable we have about 400 failures during 12hrs, we return to v79/master
+    - and end of code we reduced actual size by // NOP_MACRO_END1K
+    - updated README.md to inform about syslog submodule
+    - loop() hold serial.print while P1 is active, this to stabilize P1
+    - deactivated the 14 times NOP loop at beginning of loop(), residu from a previous stabilitt test
+    - added serial console command 'l' to print a syslog message 
+    - addded prefix for syslog 
+    - incorperated git submodule add https://github.com/jerryr/EspSyslog libs/EspSyslog (having Syslog.cpp & Syslog.h)
 
 ## [v21.79] - Base version working new RXREAD59
 
+    - master very stable
     - consolidate v78d as new master with 95% readsuccess stability
 
 ## [v21.78d] - Base version working new RXREAD59
