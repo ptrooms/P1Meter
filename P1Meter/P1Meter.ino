@@ -4300,7 +4300,7 @@ void readTelegramWL() {
       Serial.print((String) F(" [myLenTelegram2=")     + myLenTelegram2 );  // debug print transaction myLength
       Serial.print((String) F(", loopTelegram2cnt=") + loopTelegram2cnt );
       Serial.print((String) F(", Got_Telegram2Record_cnt=") + Got_Telegram2Record_cnt + F("]."));
-      Serial.println("");
+      Serial.println(F(""));
     }
   }  // if mySerial2.available 
 } // void readTelegramWL
@@ -4328,31 +4328,31 @@ void processGpio() {    // Do regular functions of the system
     //  condition ? expression-true : expression-false
     //  printf(i < 0 ? "i is below 0" : i == 0 ? "i equal 0" : "i is over 0");
     
-    Serial.print((String) "\nM#@t=" + (mqttCnt_Out+1) + " @" + (millis() / 1000) + ", TimeP1="  + currentTimeS);  // as - including any errors -  extracted from P1 read
+    Serial.print((String) F("\nM#@t=") + (mqttCnt_Out+1) + F(" @") + (millis() / 1000) + F(", TimeP1=")  + currentTimeS);  // as - including any errors -  extracted from P1 read
 
-    Serial.print((String) ((validTelegramCRCFound) ? " (E#=" : " (e#=") + telegramError + ")" );  // cleaner code; display errors
+    Serial.print((String) ((validTelegramCRCFound) ? F(" (E#=") : F(" (e#=")) + telegramError + F(")") );  // cleaner code; display errors
     // if (validTelegramCRCFound) Serial.print((String) " (E#="          + telegramError + ")"); // data contains errors
     // else               Serial.print((String) " (e#="          + telegramError + ")"); // data contains errors;
 
-    Serial.print((String) "\tGpio5:" + (digitalRead(WATERSENSOR) ? "1" : "0") ); // cleaner code; display sensor state
+    Serial.print((String) F("\tGpio5:") + (digitalRead(WATERSENSOR) ? F("1") : F("0")) ); // cleaner code; display sensor state
     // bool tmpd = digitalRead(WATERSENSOR); // read watersensor pin    
     // Serial.print( "\tGpio5:" );
     // if ( tmpd) Serial.print( "1" );
     // if (!tmpd) Serial.print( "0" );
     
-    Serial.print( (String)", Water#:"   + waterReadCounter);
-    Serial.print( (String)", Hot#:" + waterReadHotCounter);
+    Serial.print( (String) F(", Water#:")   + waterReadCounter);
+    Serial.print( (String) F(", Hot#:") + waterReadHotCounter);
 
-    Serial.print((String) ", WaterState:" + (waterReadState ? "1" : "0") ); // cleaner code; display state
+    Serial.print((String) F(", WaterState:") + (waterReadState ? F("1") : F("0")) ); // cleaner code; display state
     // Serial.print( ", WaterState:" );
     // if ( waterReadState) Serial.print( "1" );
     // if (!waterReadState) Serial.print( "0" );
     
-    Serial.print( (String) ", Trg#:" + waterTriggerCnt);    // print ISR call counter   
-    Serial.print( (String) ", DbC#:" + waterDebounceCnt);   // print Debounce counter
-    Serial.print( (String) ", Int#:" + intervalP1cnt);      // print Interval checking counter
-    Serial.print( (String) ", Yld#:" + RX_yieldcount);      // v52 current yield value
-    Serial.println( " ." );
+    Serial.print( (String) F(", Trg#:") + waterTriggerCnt);    // print ISR call counter   
+    Serial.print( (String) F(", DbC#:") + waterDebounceCnt);   // print Debounce counter
+    Serial.print( (String) F(", Int#:") + intervalP1cnt);      // print Interval checking counter
+    Serial.print( (String) F(", Yld#:") + RX_yieldcount);      // v52 current yield value
+    Serial.println( F(" .") );
   }
   // publishP1ToMqtt();      // PUBLISH this mqtt
 } // processGpio()
@@ -4381,11 +4381,11 @@ void callbackMqtt(char* topic, byte* payload, unsigned int myLength) {
   }
 
   if (outputOnSerial) {
-    Serial.print("\rCallback Message arrived [");
+    Serial.print(F("\rCallback Message arrived ["));
     Serial.print(topic);
-    Serial.print("]: ");
+    Serial.print(F("]: "));
     // char w1 = (char)payload[0];
-    Serial.println((String)(mqttCommand) + ", myLen=" + i );
+    Serial.println((String)(mqttCommand) + F(", myLen=") + i );
     // Serial.println((String)mqttReceivedCommand[0] + (int)mqttReceivedCommand[1]); 
     // yield();  // do background processing required for wifi etc.
   }
@@ -4451,42 +4451,42 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       
     if         ((char)payload[0] == '0' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)) {
       new_ThermostatState = 0;                   // Heating on
-      if (outputOnSerial) Serial.print("Thermostat will be switched off.");
+      if (outputOnSerial) Serial.print(F("Thermostat will be switched off."));
     } else  if ((char)payload[0] == '1' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)
       new_ThermostatState = 1;                   // Heating off
-      if (outputOnSerial) Serial.print("Thermostat will be switched on.");
+      if (outputOnSerial) Serial.print(F("Thermostat will be switched on."));
     } else  if ((char)payload[0] == '2') {
       new_ThermostatState = 2;                   // Heating follows input
-      if (outputOnSerial) Serial.print("Thermostat will follow input.");
+      if (outputOnSerial) Serial.print(F("Thermostat will follow input."));
     } else  if ((char)payload[0] == '3' && mqttCnt_In > 0 ) {               // ignore state v72; process only when it is a suubsequent command)
-      if (outputOnSerial) Serial.print("Thermostat routine disabled.");
+      if (outputOnSerial) Serial.print(F("Thermostat routine disabled."));
     } else  if ((char)payload[0] == 'R' && mqttCnt_In > 0 ) {               // restart; v72 process only when it is a suubsequent command)
-      if (outputOnSerial) Serial.print("Restart Request Received.");
+      if (outputOnSerial) Serial.print(F("Restart Request Received."));
       ESP.restart();
     } else  if ((char)payload[0] == 'D') {
       outputOnSerial  = !outputOnSerial ; // re/enable print logging
-      Serial.print("Serial Debug ");
-      if (!outputOnSerial)  Serial.print("Inactive\r\n");
-      if (outputOnSerial)   Serial.println("\nActive.");
+      Serial.print(F("Serial Debug "));
+      if (!outputOnSerial)  Serial.print(F("Inactive\r\n"));
+      if (outputOnSerial)   Serial.println(F("\nActive."));
     } else  if ((char)payload[0] == 'L') {       // v51 log lines to topic mqttLogTopic
       outputMqttLog   = !outputMqttLog ;         // swap
-      Serial.print(" MqttLogging ");
-      if (!outputMqttLog)  Serial.print("OFF\r\n ");
-      if (outputMqttLog)   Serial.println("\nON ");
+      Serial.print(F(" MqttLogging "));
+      if (!outputMqttLog)  Serial.print(F("OFF\r\n "));
+      if (outputMqttLog)   Serial.println(F("\nON "));
     } else  if ((char)payload[0] == 'l') {       // v51 make RX record toggle to topic mqttLogTopic2
       outputMqttLog2   = !outputMqttLog2 ;       // swap
-      Serial.print(" MqttLogging2 ");
-      if (!outputMqttLog2)  Serial.print("OFF\r\n ");
-      if (outputMqttLog2)   Serial.println("\nON ");
+      Serial.print(F(" MqttLogging2 "));
+      if (!outputMqttLog2)  Serial.print(F("OFF\r\n "));
+      if (outputMqttLog2)   Serial.println(F("\nON "));
     } else  if ((char)payload[0] == 'v') {
       if ( (char)payload[1] >= '0' && (char)payload[1] <= '9') {
           verboseLevel =  (int)payload[1] - 48;   // set number myself
           if (verboseLevel == 8) {
-            Serial.print("\tv8/setDebugOutput(true)\t");    // v58
+            Serial.print(F("\tv8/setDebugOutput(true)\t"));    // v58
             Serial.setDebugOutput(true);    // v58
           }                
           if (verboseLevel == 9) {
-            Serial.print("\tv9/setDebugOutput(false)\t");    // v58            
+            Serial.print(F("\tv9/setDebugOutput(false)\t"));    // v58            
             Serial.setDebugOutput(false);   // v58
           }            
           if (verboseLevel > VERBOSE_MAX) {
@@ -4496,10 +4496,10 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       } else { 
             verboseLevel++ ;
       }
-      if (outputOnSerial) Serial.print((String)" Verbose=" +  verboseLevel + " ");
+      if (outputOnSerial) Serial.print((String) F(" Verbose=") +  verboseLevel + F(" "));
       if (verboseLevel >= VERBOSE_MAX) verboseLevel = VERBOSE_OFF;
     } else  if ((char)payload[0] == 'e' && (char)payload[1] == '1' && mqttCnt_In > 0 ) {  // v72 process only when it is a suubsequent command)
-        Serial.print("## forcing divide error");
+        Serial.print(F("## forcing divide error"));
         while (true) {
           int a = 0;
           int b = 10;
@@ -4508,7 +4508,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           // force a never ending loop        
         } 
     } else  if ((char)payload[0] == 'e' && (char)payload[1] == '2' && mqttCnt_In > 0 ) {  // v72 process only when it is a suubsequent command)
-        Serial.print("## forcing infinite loop");
+        Serial.print(F("## forcing infinite loop"));
         while (true) {
           int a = 1;
           int b = 10;
@@ -4518,9 +4518,9 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         } 
     } else  if ((char)payload[0] == 'E') {       // v52 enforce Read fault to check recovering
       doForceFaultP1   = !doForceFaultP1 ;       // swap
-      Serial.print("\t doForceFaultP1=");
-      if (!doForceFaultP1)  Serial.println("OFF\t");
-      if (doForceFaultP1)   Serial.println("ON\t");
+      Serial.print(F("\t doForceFaultP1="));
+      if (!doForceFaultP1)  Serial.println(F("OFF\t"));
+      if (doForceFaultP1)   Serial.println(F("ON\t"));
 
     } else  if ((char)payload[0] == 'B') {    // v58b: changed to control Baudrate of port 1/2 with +/- 0-9
       if (((char)payload[1] >= '1' && (char)payload[1] <= '3') &&
@@ -4535,27 +4535,27 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           if ( (char)payload[1] == '1' || (char)payload[1] == '3') serial1Baudrate = serial1Baudrate + temp; // set number 1-10  
           if ( (char)payload[1] == '2' || (char)payload[1] == '3') serial2Baudrate = serial2Baudrate + temp; // set number 1-10  
           
-          Serial.print((String)"\tBaud" + (char)payload[1] + "="   // v58b display result
+          Serial.print((String) F("\tBaud") + (char)payload[1] + F("=")   // v58b display result
                  + ( (char)payload[1] == '1' ?  serial1Baudrate : serial2Baudrate )
-                 + "\t" );
+                 + F("\t") );
         }
     } else  if ( (char)payload[0] == '\\') {   // v60a change l_bitwait        
-          Serial.println("hello");
+          Serial.println(F("hello"));
     } else  if ( (char)payload[0] == 'K' || (char)payload[0] == 'k' ) {   // v60a change l_bitwait
-          Serial.print((String) "\n\rM_TIME_BIT_START=" + mySerial1.peekTime(M_TIME_BIT_START) 
-                        + "(" + (mySerial1.peekTime(M_TIME_BIT_STOP) - mySerial1.peekTime(M_TIME_BIT_START)) + ")"
-                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_STOP))  
-                        + "\r\n" ); 
+          Serial.print((String) F("\n\rM_TIME_BIT_START=") + mySerial1.peekTime(M_TIME_BIT_START) 
+                        + F("(") + (mySerial1.peekTime(M_TIME_BIT_STOP) - mySerial1.peekTime(M_TIME_BIT_START)) + F(")")
+                        + F("=\t") + (mySerial1.peekTime(M_TIME_BIT_STOP))  
+                        + F("\r\n") ); 
           Serial.print((String) "M_TIME_BIT_START1=" + mySerial1.peekTime(M_TIME_BIT_START1) 
-                        + "(" + (mySerial1.peekTime(M_TIME_BIT_STOP1) - mySerial1.peekTime(M_TIME_BIT_START1)) + ")"
-                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_STOP1))  
-                        + "\r\n" ); 
+                        + F("(") + (mySerial1.peekTime(M_TIME_BIT_STOP1) - mySerial1.peekTime(M_TIME_BIT_START1)) + F(")")
+                        + F("=\t") + (mySerial1.peekTime(M_TIME_BIT_STOP1))  
+                        + F("\r\n") ); 
           Serial.print((String) "M_TIME_BIT_STOP=" + mySerial1.peekTime(M_TIME_BIT_STOP) 
-                        + "(" + (mySerial1.peekTime(M_TIME_BIT_END1) - mySerial1.peekTime(M_TIME_BIT_STOP)) + ")"          
-                        + "=\t M_TIME_BIT_END1=" + mySerial1.peekTime(M_TIME_BIT_END1) 
-                        + "(" + (mySerial1.peekTime(M_TIME_BIT_END2) - mySerial1.peekTime(M_TIME_BIT_END1)) + ")"
-                        + "=\t" + (mySerial1.peekTime(M_TIME_BIT_END2))  
-                        + "\r\n" ); 
+                        + F("(") + (mySerial1.peekTime(M_TIME_BIT_END1) - mySerial1.peekTime(M_TIME_BIT_STOP)) + F(")")
+                        + F("=\t M_TIME_BIT_END1=") + mySerial1.peekTime(M_TIME_BIT_END1) 
+                        + F("(") + (mySerial1.peekTime(M_TIME_BIT_END2) - mySerial1.peekTime(M_TIME_BIT_END1)) + F(")")
+                        + F("=\t") + (mySerial1.peekTime(M_TIME_BIT_END2))  
+                        + F("\r\n") ); 
     } else  if (  ( (char)payload[0] == 'J' || (char)payload[0] == 'j' )  &&              // v58 change m_bitwait
                   ( (char)payload[1] == '+' || (char)payload[1] == '-')   &&
                   ( (char)payload[2] >= '0' && (char)payload[2] <= '9') ) {
@@ -4584,11 +4584,11 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
           speed = serial2Baudrate;
         }
 
-        Serial.print((String) "\r\n"
+        Serial.print((String) F("\r\n")
               + (char)payload[0] + (char)payload[1] + (char)payload[2] 
-              + "-> Bitwait-" + 
-              + ( (char)payload[0] == 'J' ? "P1" : "WL" )
-              + "=" + temp 
+              + F("-> Bitwait-") + 
+              + ( (char)payload[0] == 'J' ? F("P1") : F("WL") )
+              + F("=") + temp 
               ) ;
         /*
             set timer in Driver
@@ -4605,7 +4605,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
 
 
       unsigned long l_wait = l_bitTime + l_bitTime/3 - m_bitWait;		// 497-501-505-515 // 425 115k2@80MHz /
-      Serial.print((String) ", l_bitTime="+ l_bitTime +", l_wait=" + l_wait + "..(");
+      Serial.print((String) F(", l_bitTime=")+ l_bitTime +F(", l_wait=") + l_wait + F("..("));
       #define BYTE_MAXWAIT_T 7100
       #define WAITIram5K { while (ESP.getCycleCount()-l_start < l_wait && l_wait<BYTE_MAXWAIT_T); l_wait += l_bitTime; }
       uint8_t rec = 0;
@@ -4626,7 +4626,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       // sei();   // resume interrupts
       ETS_INTR_UNLOCK(); // v63a enable as suggested by DeepSeek 
   
-      Serial.print((String)"t_wait=" + (temp - l_start) + ")..\t" ) ;   // 407
+      Serial.print((String) F("t_wait=") + (temp - l_start) + F(")..\t") ) ;   // 407
 
 
   /* DNO , leave it to investigate how to force an exception
@@ -4640,8 +4640,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
     } else  if ((char)payload[0] == 'F') {
       rx2_function = !rx2_function ; // toggle on/off testing newFunction
       if (outputOnSerial) {
-          Serial.print("rx2_function=");
-          Serial.print(rx2_function == true ? "ON" : "OFF");
+          Serial.print(F("rx2_function="));
+          Serial.print(rx2_function == true ? F("ON") : F("OFF"));
       }
 
     } else  if ((char)payload[0] == 'f') {  // control Blue_led2 assignment     //v61a revise CRC->Off->Water->Hot
@@ -4653,35 +4653,35 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             if      ((char)payload[1] == '0'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, HIGH); // light OFF
             else if ((char)payload[1] == '1'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, LOW);  // light ON
             else if ((char)payload[1] == '2'  && !loopbackRx2Tx2) digitalWrite(BLUE_LED2, !digitalRead(BLUE_LED2));  // ON/OFF
-            // Serial.print((String) "BlueLed2 = Bluef" + ((char)payload[1]) + "."  );           // BlueLed2 Off
-            Serial.print((String)               "Bluef" + ((char)payload[1]) + "."  );           // BlueLed2 Off
+            // Serial.print((String) "BlueLed2 = Bluef" + ((char)payload[1]) + F(".")  );           // BlueLed2 Off
+            Serial.print((String)             F("Bluef") + ((char)payload[1]) + F(".")  );           // BlueLed2 Off
           #endif                    
           // Serial.print("BlueLed2 = Inact");           // BlueLed2 Off
       } else if (blue_led2_Water) {
           blue_led2_Water    = false;
           blue_led2_Crc      = false;
           blue_led2_HotWater = true;
-          Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add "."
+          Serial.print("BlueLed2 = HotWater");         // monitor HotWater to BleuLed2, initial  OFF, v43 add F(".")
           // Serial.print(""); // stability test v43 // extra
           // Serial.print(""); // stability test v43
-          Serial.print("."); // stability test v43
+          Serial.print(F(".")); // stability test v43
           // Serial.print(""); // stability test v38    // stability deactive v44
           // Serial.print("."); // stability test v38   // stability deactive v44
       } else if (blue_led2_HotWater) {
           blue_led2_Water    = false;
           blue_led2_Crc      = true;
           blue_led2_HotWater = false;
-          Serial.print("BlueLed2 = blue_led2_Crc");  // monitor Crc check to BleuLed2 , initial On
+          Serial.print(F("BlueLed2 = blue_led2_Crc"));  // monitor Crc check to BleuLed2 , initial On
       } else if (blue_led2_Crc) {
           blue_led2_Crc      = false;
           blue_led2_Water    = false;
           blue_led2_HotWater = false;
-          Serial.print("BlueLed2 = Off");            // BlueLed2 Off
+          Serial.print(F("BlueLed2 = Off"));            // BlueLed2 Off
       } else {
           blue_led2_Water    = true;
           blue_led2_Crc      = false;
           blue_led2_HotWater = false;
-          Serial.print("BlueLed2 = Water");           // BlueLed2 to Water, initial ON
+          Serial.print(F("BlueLed2 = Water"));           // BlueLed2 to Water, initial ON
       }
        // Clear GJ buffer
     } else  if ((char)payload[0] == 'T') {    // loopbackRx2Mode, 1=invertP1, 2=invertRX2
@@ -4716,19 +4716,19 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         */
       } else {
          loopbackRx2Tx2   = !loopbackRx2Tx2 ; // loopback serial port
-         Serial.print((String) " P1 baudrateA1=" + mySerial1.baudRate() // v53: print diagse status if resetted myserial2
-                             + " WL baudrateA2=" + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
-                             + " loopbackRx2Tx2=" + (loopbackRx2Tx2 == true ? ":ON" : ":OFF")
-                             + " " );
+         Serial.print((String) F(" P1 baudrateA1=") + mySerial1.baudRate() // v53: print diagse status if resetted myserial2
+                             + F(" WL baudrateA2=") + mySerial2.baudRate() // v53: print diagse status if resetted myserial2
+                             + F(" loopbackRx2Tx2=") + (loopbackRx2Tx2 == true ? F(":ON") : F(":OFF"))
+                             + F(" ") );
       }
 
       // mySerial2.begin( 1200);    // GJ meter port   1200 baud
       // mySerial2.println("..echo.."); // echo back
 
       if (outputOnSerial) {
-         Serial.print((String) "RX2TX2 looptest=" 
-              + (loopbackRx2Tx2 == true ? "ON" : "OFF") 
-              + " mode:" + loopbackRx2Mode);
+         Serial.print((String) F("RX2TX2 looptest=") 
+              + (loopbackRx2Tx2 == true ? F("ON") : F("OFF")) 
+              + F(" mode:") + loopbackRx2Mode);
       }
 
       /* Does not operate, as serial isetup during setup
@@ -4753,12 +4753,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         waterTriggerTime = micros();       // set our time
         // waterTriggerCnt  = 1;              // indicate we are in detached mode
         if (outputOnSerial) {
-          Serial.print("useWaterTrigger1=");
+          Serial.print(F("useWaterTrigger1="));
           if (useWaterTrigger1) {
-            Serial.print("ON .");
+            Serial.print(F("ON ."));
             // attachInterrupt(WATERSENSOR, WaterTrigger1_ISR, CHANGE); // trigger at every change
           } else {
-            Serial.print("OFF .");
+            Serial.print(F("OFF ."));
             // attachInterrupt(WATERSENSOR,  WaterTrigger_ISR, CHANGE); // trigger at every change
           }
         }
@@ -4767,21 +4767,21 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
     } else  if ((char)payload[0] == 'w') {
       useWaterPullUp = !useWaterPullUp;  // No/Yes use internal pullup
       if (outputOnSerial) {
-        Serial.print("assist useWaterPullUp=");
+        Serial.print(F("assist useWaterPullUp="));
         if (useWaterPullUp) {
-          Serial.print("ON .");
+          Serial.print(F("ON ."));
           pinMode(WATERSENSOR, INPUT_PULLUP);        // Use watersensor with internal pullup
         } else {
-          Serial.print("OFF .");
+          Serial.print(F("OFF ."));
           pinMode(WATERSENSOR, INPUT);               // Do not use internal pullup
         }
       }
     } else  if ((char)payload[0] == 'y') {
-        Serial.println((String) "\r\n debounce_time=" + debounce_time 
-              + ", waterTriggerTime=" + waterTriggerTime 
-              + ", waterTriggerCnt="  + waterTriggerCnt 
-              + ", ISR_time="         + ISR_time
-              + ", ISR_time_cnt="     + ISR_time_cnt
+        Serial.println((String) F("\r\n debounce_time=") + debounce_time 
+              + F(", waterTriggerTime=") + waterTriggerTime 
+              + F(", waterTriggerCnt=")  + waterTriggerCnt 
+              + F(", ISR_time=")         + ISR_time
+              + F(", ISR_time_cnt=")     + ISR_time_cnt
               );
     } else  if ((char)payload[0] == 'Z') {
       debounce_time    = 0 ;     // v47 Zero out debounce time
@@ -4802,7 +4802,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       waterTriggerState = LOW;   // reset debounce
       waterReadState    = LOW;   // read watersensor pin
       if (outputOnSerial) {
-        Serial.print("WaterCnt = 0, mqttCnt_Out = 0, reset/Watersensor/timers");
+        Serial.print(F("WaterCnt = 0, mqttCnt_Out = 0, reset/Watersensor/timers"));
       }
     } else  if ((char)payload[0] == 'I') {
       intervalP1cnt = 2880;              // make P1 Interval not critical
@@ -4812,30 +4812,30 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       if (intervalP1cnt > 50)   intervalP1cnt = intervalP1cnt - 25;
       if (intervalP1cnt > 10)   intervalP1cnt = intervalP1cnt - 10;
       if (intervalP1cnt > 3)    intervalP1cnt = intervalP1cnt - 2;
-      Serial.println((String)"#!!# ESP P1 timeout count intervalP1cnt=" + intervalP1cnt );
+      Serial.println((String)F("#!!# ESP P1 timeout count intervalP1cnt=") + intervalP1cnt );
     } else  if ((char)payload[0] == 'P') {
       outputMqttPower = !outputMqttPower ;       // Do not publish P1 meter
       if (outputOnSerial) {
-        Serial.print("outputMqttPower now ");
-        if (outputMqttPower ) Serial.print("Active.");
-        if (!outputMqttPower ) Serial.print("Inactive.");
+        Serial.print(F("outputMqttPower now "));
+        if (outputMqttPower ) Serial.print(F("Active."));
+        if (!outputMqttPower ) Serial.print(F("Inactive."));
       }
     } else  if ((char)payload[0] == 'p') {
       outputMqttPower2 = !outputMqttPower2 ;       // Do not publish P1 meter
       if (outputOnSerial) {
-        Serial.print("outputMqttPower2 now ");
-        if (outputMqttPower2 ) Serial.print("Active.");
-        if (!outputMqttPower2 ) Serial.print("Inactive.");
+        Serial.print(F("outputMqttPower2 now "));
+        if (outputMqttPower2 ) Serial.print(F("Active."));
+        if (!outputMqttPower2 ) Serial.print(F("Inactive."));
       }
     } else  if ((char)payload[0] == 'm') {       // v48 10jun25 print m-asked Input array
       switchMaskingCmd = !switchMaskingCmd;      // v74: swich on/off masking function that resets at every CRCin 
-      Serial.println((String)"\r\n dataIn telegram_crcIn"
-         + " myLen=" + telegram_crcIn_len 
-         + " Masking("+ (switchMaskingOut ? "m" : "M") +") now " + (switchMaskingCmd ? "Active" : "Inactive")   // v74: display state
-         + " MaskCount=" + telegram_crcOut_cnt     // v74 print number of masked poisitions
-         + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-         + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
-         + " som>>");
+      Serial.println((String)F("\r\n dataIn telegram_crcIn")
+         + F(" myLen=") + telegram_crcIn_len 
+         + F(" Masking(")+ (switchMaskingOut ? F("m") : F("M")) +F(") now ") + (switchMaskingCmd ? F("Active") : F("Inactive"))   // v74: display state
+         + F(" MaskCount=") + telegram_crcOut_cnt     // v74 print number of masked poisitions
+         + F(" Rcvr=") + p1RecoverCnt        // v52 recovered P1 
+         + F(" Elen=") + p1ShortCnt          // v74 number of errors length Input != Mask
+         + F(" som>>"));
       switchMaskingOut = false;
       printCrcInTable();    // v74g split to subroutine 
     } else  if ((char)payload[0] == 'M') {       // v48 10jun25 print M-asking array
@@ -4843,17 +4843,17 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
       if ((char)payload[1] == '+') setMaskLimitCnt++ ;                            // increase Mask limiter
       else if ((char)payload[1] == '-' && setMaskLimitCnt > 4) setMaskLimitCnt--; // decrease Mask limiter
       
-      Serial.println((String)"\r\n Recovery telegram_crcOut"      // display states
-         + " myLen="     + telegram_crcOut_len                    // lenth of output record
-         + " Masking("
-                + (switchMaskingCmd ? "m" : "M")    // v74 m/M  On/Off masking
+      Serial.println((String)F("\r\n Recovery telegram_crcOut")      // display states
+         + F(" myLen=")     + telegram_crcOut_len                    // lenth of output record
+         + F(" Masking(")
+                + (switchMaskingCmd ? F("m") : F("M"))    // v74 m/M  On/Off masking
                 + (((char)payload[1] == '+' || (char)payload[1] == '-') ? (char)payload[1] : (char)'.') // v74 show limit
                 + setMaskLimitCnt                   // v74 display maslimiter
-                +")=" + (switchMaskingOut  ? "Active" : "Inactive")   // v74: display state
-         + " MaskCount=" + telegram_crcOut_cnt      // v74 print number of masked poisitions in Masking array
-         + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-         + " Elen=" + p1ShortCnt                    // v74 number of errors length Input != Mask
-         + " som>>");
+                + F(")=") + (switchMaskingOut  ? F("Active") : F("Inactive"))   // v74: display state
+         + F(" MaskCount=") + telegram_crcOut_cnt      // v74 print number of masked poisitions in Masking array
+         + F(" Rcvr=") + p1RecoverCnt        // v52 recovered P1 
+         + F(" Elen=") + p1ShortCnt                    // v74 number of errors length Input != Mask
+         + F(" som>>"));
       printcrcOutTable();    // v74g split to subroutine          
     
     } else  if ( (char)payload[0] == 'S') {  // v52 serial stop activating P1
@@ -4871,12 +4871,12 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             + " Finish="  + (p1SerialFinish  ? "1" : "0") + " )" 
             + " Active="  + (p1SerialActive  ? "1" : "0") + " )" ) ;
 
-        else Serial.print((String) "\tSerial1=" 
-              + (!serial1Stop  ? "E" : "D") 
+        else Serial.print((String) F("\tSerial1=") 
+              + (!serial1Stop  ? F("E") : F("D")) 
               + serial1PortMode
-              + (p1SerialActive  ? "A" : "a")
-              + (p1SerialFinish  ? "F" : "f")              
-              + "\t" );
+              + (p1SerialActive  ? F("A") : F("a"))
+              + (p1SerialFinish  ? F("F") : F("f"))              
+              + F("\t") );
     } else  if ( (char)payload[0] == 's') {  // v52 serial stop activating RX2
         if (     (char)payload[1] >= '1' && (char)payload[1] <= '9') 
              rx2ReadInterval = (int)payload[1] - 48;   // set number myself
@@ -4892,9 +4892,9 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             + " mode="           + serial2PortMode    // v58b   
             + " interval="       + rx2ReadInterval ) ;   //  % mqttCnt_Out
 
-        else Serial.print((String) "\tserial2=" 
-              + (!serial2Stop  ? "e" : "d") 
-              + serial2PortMode + "\t"  );
+        else Serial.print((String) F("\tserial2=") 
+              + (!serial2Stop  ? F("e") : F("d")) 
+              + serial2PortMode + F("\t")  );
 
     } else  if ((char)payload[0] == 'a') {  // v52 manipulate analog read value
         // nowValueAdc = 0;
@@ -4903,8 +4903,8 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
         else if ((char)payload[1] == '+') doReadAnalog = true;
         else doReadAnalog = !doReadAnalog;
 
-        if (outputOnSerial) Serial.print((String) " Analog=" + nowValueAdc  
-                            + " (" + (doReadAnalog  ? "Active" : "disabled") + " )" ) ;
+        if (outputOnSerial) Serial.print((String) F(" Analog=") + nowValueAdc  
+                            + F(" (") + (doReadAnalog  ? F("Active") : F("disabled") ) + F(" )") ) ;
 
     } else  if ((char)payload[0] == 'h') {
           command_testH1();       // v51 check call functions of pointers and data
@@ -4950,31 +4950,31 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'z' ) {   // v74 set error exection condition
                     switchDebugCmd = 1;                       // v74 execute t16 when we have a _Z fault condition
                     // outputOnSerial  = true;  // v74e activate debugging
-                    Serial.print((String) "_te1_"); 
+                    Serial.print((String) F("_te1_")); 
                  }
             else if ((char)payload[1] == 'e' && (char)payload[2] == 'r' ) {   // v74 set error exection condition
                     switchDebugCmd = 2;                       // v74 execute t16 when we have a _R fault condition
                     // outputOnSerial  = true;  // v74e activate debugging                    
-                    Serial.print((String) "_te2_"); 
+                    Serial.print((String) F("_te2_")); 
                  }
 
             else if ((char)payload[1] == 's') {
-                      Serial.println((String)"\n\rT-imer Porstate: ");
+                      Serial.println((String)F("\n\rT-imer Porstate: "));
                       printf_port_state_isr();
-                      Serial.println((String)"");
+                      Serial.println((String)F(""));
                  }
 
             else if ((char)payload[1] == 't') {   // print m_buffer_time[M_TIME_BIT_...] table entries
-                      Serial.println((String)"\n\rT-imer Task: ");
+                      Serial.println((String)F("\n\rT-imer Task: "));
                       serial_Print_PeekTime(1,M_TIME_ENTRIES);
                       serial_Print_PeekTime(2,M_TIME_ENTRIES);
-                      Serial.println((String)"");
+                      Serial.println((String)F(""));
             } else if ((char)payload[1] == '2')  serial_Print_PeekBits(2       ,  16);   // print 16 entries serial 2
             else                                 serial_Print_PeekBits(1       ,  16);   // print 16 entries serial 1
 
     } else  if ((char)payload[0] == '?') {       // v48 Print help , v51 varbls https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
             doCmdHelp();
-    } else  {   if (outputOnSerial) Serial.print((String)"Invalid command:" + (char)payload[0] + "" ); }
+    } else  {   if (outputOnSerial) Serial.print((String)F("Invalid command:") + (char)payload[0] + F("") ); }
 
      if (outputOnSerial) Serial.println();   // ensure crlf
   }
@@ -5194,7 +5194,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
       if (outputMqttPower) publishMqtt(mqttTopic, output);   // are we publishing data ? (on *mqttTopic = "/energy/p1")
       mqttP1Published = true;             // yes we have publised energy data
     } else {
-      Serial.println((String)"v");        // indicate no connection at datarecord
+      Serial.println((String)F("v"));        // indicate no connection at datarecord
     }
 
     // (p)reset WL Crc after reporting on MQTT 
@@ -5207,7 +5207,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
         if (((mqttCnt_Out - (Got_Telegram2Record_last)+1) % 7) == 1) {  // signal error at every 7th fault, +1 to prevent initial fault
                                             // normally , every 7th interval we have a RX2 record., 
           if (outputOnSerial) {
-             Serial.println((String)"#!!# ESP RX2 timeout Warmtelink=" + intervalP1cnt );
+             Serial.println((String)F("#!!# ESP RX2 timeout Warmtelink=") + intervalP1cnt );
           }
           String mqttMsg = "{\"error\":004 ,\"msg\":\"RX2fail";  // start of Json error message
           mqttMsg.concat((String) " " +  + "\", \"RX2Cnt\":"+ (Got_Telegram2Record_cnt) );      // finish JSON error message
@@ -5230,7 +5230,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
 bool processThermostat(bool myOperation)    // my operation is currently readed thermostate during call
 {
   thermostatReadState = digitalRead(THERMOSTAT_READ); // read
-  if (outputOnSerial) Serial.print("\r\nProcessThermostat:") ;
+  if (outputOnSerial) Serial.print(F("\r\nProcessThermostat:")) ;
 
   // Process this one-to-one directly to output
   // new_ThermostatState = 0-off, 1-set, 2-follow, 3-leave
@@ -5252,25 +5252,25 @@ bool processThermostat(bool myOperation)    // my operation is currently readed 
   if (outputOnSerial) {
 
     if (thermostatReadState)            {
-      Serial.print(" ThermostateIn D7 high(OFF), ") ; // Display input Thermostate
+      Serial.print(F(" ThermostateIn D7 high(OFF), ")) ; // Display input Thermostate
     } else                              {
-      Serial.print(" ThermostateIn D7 low(ON), ") ;  // LOW means set, HIGH means unset
+      Serial.print(F(" ThermostateIn D7 low(ON), ")) ;  // LOW means set, HIGH means unset
     }
 
     if         (new_ThermostatState == 0) {
-      Serial.print(" ThermoCommand=OFF "    ) ;        // Display processsing mode
+      Serial.print(F(" ThermoCommand=OFF ")    ) ;        // Display processsing mode
     } else  if (new_ThermostatState == 1) {
-      Serial.print(" ThermoCommand=ON "     ) ;
+      Serial.print(F(" ThermoCommand=ON ")     ) ;
     } else  if (new_ThermostatState == 2) {
-      Serial.print(" ThermoCommand=FOLLOW " ) ;
+      Serial.print(F(" ThermoCommand=FOLLOW ") ) ;
     } else                              {
-      Serial.print(" ThermoCommand=LEAVE "  ) ;
+      Serial.print(F(" ThermoCommand=LEAVE ")  ) ;
     }
 
     if (thermostatWriteState)           {
-      Serial.print(" := ThermostateOut high(ON) ") ;  // Display result
+      Serial.print(F(" := ThermostateOut high(ON) ")) ;  // Display result
     } else {
-      Serial.print(" := ThermostateOut low(OFF) ") ;
+      Serial.print(F(" := ThermostateOut low(OFF) ")) ;
     }
 
   }
@@ -5283,29 +5283,29 @@ bool processThermostat(bool myOperation)    // my operation is currently readed 
 
   // if (outputOnSerial) Serial.print("processThermostat:");
   if (new_ThermostatState >= 0 && new_ThermostatState <= 2) {
-    if (outputOnSerial) Serial.print(" set ") ;
+    if (outputOnSerial) Serial.print(F(" set ")) ;
     if ( thermostatWriteState) {
       digitalWrite(THERMOSTAT_WRITE, HIGH ); // leave to high, switch off relay that issues voltage to Valve
     } else {
       digitalWrite(THERMOSTAT_WRITE, LOW );  // pull to ground switch on relay that issues voltage to Valve
     }
   } else {
-    if (outputOnSerial) Serial.print(" kept ") ;
+    if (outputOnSerial) Serial.print(F(" kept ")) ;
   }
 
   thermostatWriteState = digitalRead(THERMOSTAT_WRITE); // Get status of output relay
   if (thermostatWriteState) {
-    if (outputOnSerial) Serial.print(" high(ON) ") ;
+    if (outputOnSerial) Serial.print(F(" high(ON) ")) ;
   } else {
-    if (outputOnSerial) Serial.print(" low(OFF) ") ;
+    if (outputOnSerial) Serial.print(F(" low(OFF) ")) ;
   }
 
   if (thermostatWriteState != thermostatReadState) {    // request=result or nothing changed (note thermoritestate is 1L=ON, 0H=off for humans)
-    if (outputOnSerial) Serial.println(" Same as requested.") ;
+    if (outputOnSerial) Serial.println(F(" Same as requested.")) ;
     return false ;
   }
 
-  if (outputOnSerial) Serial.println(" Overruling the request.") ;
+  if (outputOnSerial) Serial.println(F(" Overruling the request.")) ;
   return true ;  // was actively changed
 } // processThermostat()
 
@@ -5321,9 +5321,9 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
   // nowValueAdc = 123;
   filteredValueAdc = (pastValueAdc + nowValueAdc) / 2;  // smooth values by avarageing
   if (outputOnSerial and thermostatReadState) {  // debug
-    Serial.print("\r\nAnalog sensor = ");
+    Serial.print(F("\r\nAnalog sensor = "));
     Serial.print(nowValueAdc);
-    Serial.print(" filtered Value = ");
+    Serial.print(F(" filtered Value = "));
     Serial.print(filteredValueAdc);
   }
 
@@ -5348,23 +5348,23 @@ int processAnalogRead()   // read adc analog A0 pin and smooth it with previous 
 void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqtt routine
   // note: to check for occurance on "const char* " , use strstr that searches 
   if (!mqttTopic) {
-    Serial.println((String) "!m");
-    if (outputOnSerial) Serial.println((String) "\r\n\t mqttTopic is empty.");
+    Serial.println((String) F("!m"));
+    if (outputOnSerial) Serial.println((String) F("\r\n\t mqttTopic is empty."));
     return; // check empty of ! in topic
   }
   if (strstr(mqttTopic,"!") ) {
-    Serial.println((String) "!m");
-    if (outputOnSerial) Serial.println((String) "\r\n\t mqttTopic=" + mqttTopic + ", prohibits output.");
+    Serial.println((String) F("!m"));
+    if (outputOnSerial) Serial.println((String) F("\r\n\t mqttTopic=") + mqttTopic + F(", prohibits output."));
     return; // check empty of ! in topic
   }    
 
   
-  Serial.print("^");     // signal write mqtt entered
+  Serial.print(F("^"));     // signal write mqtt entered
   if (outputOnSerial) {  // debug
     if (verboseLevel >= VERBOSE_MQTT) {
-      Serial.println((String) "\r\n[" + mqttTopic + ":" + payLoad + ".");
+      Serial.println((String) F("\r\n[") + mqttTopic + F(":") + payLoad + F("."));
     } else {
-      Serial.print("{");        // print mqtt start operation
+      Serial.print(F("{"));        // print mqtt start operation
     }
   }
   
@@ -5399,16 +5399,16 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     }   
   } else {
     if (outputOnSerial) {  // debug
-      Serial.println("_Error in publishMqtt, nullreference fault_");  // display error on debug
+      Serial.println(F("_Error in publishMqtt, nullreference fault_"));  // display error on debug
     } else {
-      Serial.print("{E}");    // display error sign
+      Serial.print(F("{E}"));    // display error sign
     }
   }
   if (outputOnSerial) {  // debug
     if (verboseLevel > VERBOSE_MQTT) {
-      Serial.print("]\r\n");
+      Serial.print(F("]\r\n"));
     } else {
-      Serial.print("}");      // print mqtt finish oeration
+      Serial.print(F("}"));      // print mqtt finish oeration
     }
   }
 
@@ -5462,14 +5462,14 @@ bool processHotLedRead(bool notkeep_HoldState) {
   }
 
   if (outputOnSerial && notkeep_HoldState == false) {  // regular debug once per P1 interval LOW
-             Serial.print((String) "\r\n Hotwater:2\t"    // v70 debug cuyrret, active and sent state of HotWater led
-              + "LightReadState D6 is "
-              + (local_lightReadState ? "High" : "Low")   // active state
-              + " last=" 
-              + (      lightReadState ? "Cold" : "Hot")      // hold status was high
-              + " preserve=" 
-              + (preserve_lightReadState_for_mqtt  ? "Yes"  : "No" )      // hold status was high
-              + "." );  // debug
+             Serial.print((String) F("\r\n Hotwater:2\t")    // v70 debug cuyrret, active and sent state of HotWater led
+              + F("LightReadState D6 is ")
+              + (local_lightReadState ? F("High") : F("Low"))   // active state
+              + F(" last=") 
+              + (      lightReadState ? F("Cold") : F("Hot"))      // hold status was high
+              + F(" preserve=") 
+              + (preserve_lightReadState_for_mqtt  ? F("Yes")  : F("No") )      // hold status was high
+              + F(".") );  // debug
   }   
 
   return local_lightReadState;  // return active status
@@ -5649,16 +5649,16 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                   
                   /* here we have the difference position  */
                   if (verboseLevel == VERBOSE_ON || (outputOnSerial && verboseLevel > VERBOSE_P1) ) {  /// v74 debug
-                    Serial.print((String) " CRCio-delta: "
-                            +  " crcI=" + telegram_crcIn_len
-                            + ", crcO=" + telegram_crcOut_len
-                            + ", pos=" + j
-                            + " ");
+                    Serial.print((String) F(" CRCio-delta: ")
+                            +  F(" crcI=") + telegram_crcIn_len
+                            + F(", crcO=") + telegram_crcOut_len
+                            + F(", pos=") + j
+                            + F(" "));
                    }
                   if (j != 0 ) {                 // we can do byte shift starting with insert at j (nonmaksed)
                     if (outputOnSerial) Serial.printf(", insert=%d(%d):", j, (telegram_crcOut_len - telegram_crcIn_len) ); // indicate number shifted
                     for (int l = 0; telegram_crcIn_len < telegram_crcOut_len && l < recovery_INSERTION_LENTGH; l++) {
-                      if (!outputOnSerial) Serial.print(">"); // indicate we have shifted
+                      if (!outputOnSerial) Serial.print(F(">")); // indicate we have shifted
                       int k = telegram_crcOut[j+l];         // get first masked position to be inserted into one-byte short Crcin
                       for (int i=(j+l); i < telegram_crcOut_len; i++) {   // search for 2byte error}
                           j = telegram_crcIn[i];  // save this current one to do next insert
@@ -5678,8 +5678,8 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                     telegram_crcIn_len++ ;  // add one to execute for next CRC recover/compare
                     */
                   } else {
-                    if (!outputOnSerial) Serial.print("<0");  // too short cannot recover, indicate
-                    else Serial.print((String) "shortJ=" + j + "/lenDiff=" + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted
+                    if (!outputOnSerial) Serial.print(F("<0"));  // too short cannot recover, indicate
+                    else Serial.print((String) F("shortJ=") + j + F("/lenDiff=") + (telegram_crcOut_len - telegram_crcIn_len)); // indicate we have shifted
                    }
                }
            
@@ -5693,7 +5693,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                         if (outputOnSerial) {
                           Serial.printf(", mskio=%d:", i);
                           if (isprint(telegram_crcIn[i]))  Serial.print(telegram_crcIn[i]); else Serial.print("?");
-                          Serial.print("/");
+                          Serial.print(F("/"));
                           if (isprint(telegram_crcOut[i])) Serial.print(telegram_crcOut[i]); else Serial.print("?");
                         }
 
@@ -5714,7 +5714,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
                           if (outputOnSerial) {
                             Serial.printf(", mskg=%d:", i);
                             if (isprint(telegram_crcIn[i]))  Serial.print(telegram_crcIn[i]); else Serial.print("?");
-                            Serial.print("/");
+                            Serial.print(F("/"));
                             if (isprint(telegram_crcOut[i])) Serial.print(telegram_crcOut[i]); else Serial.print("?");
                           }
                           telegram_crcIn[i] = '0'; // assume predictive 0 in this position
@@ -5731,7 +5731,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
              } else {   // if  (telegram_crcIn_len == telegram_crcOut_len && !doForceFaultP1)
                 if (!doForceFaultP1) {    // no debug/print if we are forcing out due to unconnected P1
                     p1ShortCnt++;   // add one to short/fail/lengt count
-                    if (!outputOnSerial) Serial.print((String) "<" + (telegram_crcOut_len - telegram_crcIn_len));  // too short cannot recover, indicate
+                    if (!outputOnSerial) Serial.print((String) F("<") + (telegram_crcOut_len - telegram_crcIn_len));  // too short cannot recover, indicate
                     else Serial.print((String)" shortCrcLen=" + (telegram_crcOut_len - telegram_crcIn_len) + " "); // indicate we have shifted
                  } 
              }
@@ -5989,7 +5989,7 @@ bool decodeTelegram(int myLen)    // done at every P1 line read by rs232 that en
 */
 void RecoverTelegram_crcIn() {
   if (outputOnSerial) {   // print debug changed values
-    Serial.print("Recovery active.");
+    Serial.print(F("Recovery active."));
     if (currentTime2 != currentTime)  Serial.printf("\r\n\t..RcurrentTime2=%d/%d" , currentTime2 , currentTime );
     if (powerConsumptionLowTariff2  != powerConsumptionLowTariff)  Serial.printf("\r\n\t..RpowerConsumptionLowTariff2=%d/%d" , powerConsumptionLowTariff2 , powerConsumptionLowTariff  );
     if (powerConsumptionHighTariff2 != powerConsumptionHighTariff) Serial.printf("\r\n\t..RpowerConsumptionHighTariff2=%d/%d", powerConsumptionHighTariff2, powerConsumptionHighTariff );
@@ -6326,7 +6326,7 @@ unsigned int Crc16In(unsigned int crc, unsigned char *dataIn, int dataInLen) {
     telegram_crcIn_cnt = 0; // Initialise 
     telegram_crcIn_len = 0; // Initialise
     telegram_crcIn[telegram_crcIn_len] = 0x00;
-    if (outputOnSerial) Serial.println((String)" ch(" + dataInLen + ")" + telegram_crcIn_cnt + ":" + telegram_crcIn_len ) ;
+    if (outputOnSerial) Serial.println((String) F(" ch(") + dataInLen + F(")") + telegram_crcIn_cnt + F(":") + telegram_crcIn_len ) ;
   }
    
   // loop and collect the passed string into inputarray
@@ -6546,14 +6546,14 @@ void SetupDS18B20() {
   DS18B20.begin();                                // initialise
 
   // if (outputOnSerial) {                          // debug will disable
-  Serial.print("Parasite power is: ");
+  Serial.print(F("Parasite power is: "));
   if ( DS18B20.isParasitePowerMode() ) {
-    Serial.print("ON");
+    Serial.print(F("ON"));
   } else {
-    Serial.print("OFF");
+    Serial.print(F("OFF"));
   }
   numberOfDsb18b20Devices = DS18B20.getDeviceCount();
-  Serial.print( ", device count: " );
+  Serial.print( F(", device count: ") );
   Serial.println( numberOfDsb18b20Devices );
   //  }
 
@@ -6566,21 +6566,21 @@ void SetupDS18B20() {
     // Search the wire for address
     if ( DS18B20.getAddress(devAddr[i], i) ) {
       //devAddr[i] = tempDeviceAddress;
-      Serial.print("Found Ds18b20 device ");
+      Serial.print(F("Found Ds18b20 device "));
       Serial.print(i, DEC);
       Serial.print(" with address: " + GetAddressToString(devAddr[i]));
       // Serial.println();
       //Get resolution of DS18b20
-      Serial.print(" at Resolution: ");
+      Serial.print(F(" at Resolution: "));
       Serial.print(DS18B20.getResolution( devAddr[i] ));
       //Read temperature from DS18b20
       float tempC = DS18B20.getTempC( devAddr[i] );
-      Serial.print(", Temp C: ");
+      Serial.print(F(", Temp C: "));
       Serial.println(tempC);
     } else {
-      Serial.print("Found Temp ghost device at ");
+      Serial.print(F("Found Temp ghost device at "));
       Serial.print(i, DEC);
-      Serial.print(" but could not detect address. Check power and cabling");
+      Serial.print(F(" but could not detect address. Check power and cabling"));
     }
   } // for
   // } // outputonserial
@@ -6614,11 +6614,11 @@ void processTemperatures() {
           if (bTemp_Reading_State) {
             mqttMsg.concat("Tempsensor failure "); 
             if (outputOnSerial) {   // report failures
-              Serial.print((String)" Temperature failure on ");
+              Serial.print((String)F(" Temperature failure on "));
             }
           }
           if (outputOnSerial) {   // report failures
-              Serial.print((String)   " T" + i + "=" + tempC + " " );
+              Serial.print((String)   F(" T") + i + F("=") + tempC + F(" ") );
           }
           mqttMsg.concat((String) "T" + i + "=" + tempC + " "); 
           bTemp_Reading_State = false;
@@ -6643,16 +6643,16 @@ void processTemperatures() {
 
   if (outputOnSerial) {
     char temperatureString[6];
-    Serial.print( "Sending temperatures: " );
+    Serial.print( F("Sending temperatures: ") );
     for (int i = 0; i < numberOfDsb18b20Devices; i++) {
       // The dtostrf() function converts the double value passed in val into an ASCII representationthat will be stored under s.
       dtostrf(tempDev[i], 2, 2, temperatureString);
       //if ( i == 1 ) dtostrf(tempDev[i], 2, 2, temperatureString1);  // not longer used
-      Serial.print( "\t" );
+      Serial.print( F("\t") );
       Serial.print( temperatureString );
       // message += GetAddressToString( devAddr[i] )
     }
-    Serial.println(" ");
+    Serial.println(F(" "));
     // message += "</table>\r\n";
   }
 }
@@ -6667,10 +6667,10 @@ void attachWaterInterrupt() {   // activate waterinerrupt sensor
   if ( !(waterErrorSwitch & WATER_ERROR_SWITCH_isrLoop)) { ; // v74d prevent error loop and delay until hot water is used
       if (useWaterTrigger1) {
         attachInterrupt(WATERSENSOR, WaterTrigger1_ISR, CHANGE); // establish trigger
-        if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR + " to second WaterTrigger1_ISR routine");
+        if (outputOnSerial) Serial.println((String)F("\nSet Gpio") + WATERSENSOR + F(" to second WaterTrigger1_ISR routine"));
       } else {
         attachInterrupt(WATERSENSOR, WaterTrigger0_ISR, CHANGE); // establish trigger
-        if (outputOnSerial) Serial.println((String)"\nSet Gpio" + WATERSENSOR + " to first WaterTrigger0_ISR routine");
+        if (outputOnSerial) Serial.println((String)F("\nSet Gpio") + WATERSENSOR + F(" to first WaterTrigger0_ISR routine"));
       }
       waterTriggerCnt = 1;          // indicate ISR has been activated
     }
@@ -7227,7 +7227,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
           mySerial1.end();          // v58b: not sure  but to acertain,  finish any active
           mySerial1.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
           bSerial1State = false; // v57 indicate state
-          if (mySerial1.portActive()) Serial.print((String) "#!1#" );
+          if (mySerial1.portActive()) Serial.print((String) F("#!1#") );
       } else if (serial_port_number == SERIALPORT_P1_DATA && serial_port_mode == SERIALPORT_OPEN ) {
           if (mySerial1.portActive()) openCloseSerial(SERIALPORT_P1_DATA,SERIALPORT_CLOSE );
           if (mySerial3.portActive()) openCloseSerial(SERIALPORT_P1_TIME,SERIALPORT_CLOSE );
@@ -7245,7 +7245,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
           mySerial2.end();          // v58b: not sure  but to acertain,  finish any active
           mySerial2.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
           bSerial2State = false; // v57 indicate state
-          if (mySerial2.portActive()) Serial.print((String) "#!2#" );
+          if (mySerial2.portActive()) Serial.print((String) F("#!2#") );
       } else if (serial_port_number == SERIALPORT_WL_DATA && serial_port_mode == SERIALPORT_OPEN ) {
           if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
           if (mySerial4.portActive()) openCloseSerial(SERIALPORT_WL_TIME,SERIALPORT_CLOSE );
@@ -7260,7 +7260,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
           mySerial3.end();          // v58b: not sure  but to acertain,  finish any active
           mySerial3.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
           bSerial3State = false; // v57 indicate state
-          if (mySerial3.portActive()) Serial.print((String) "#!3#" );
+          if (mySerial3.portActive()) Serial.print((String) F("#!3#") );
       } else if (serial_port_number == SERIALPORT_P1_TIME && serial_port_mode == SERIALPORT_OPEN ) {
           if (mySerial1.portActive()) openCloseSerial(SERIALPORT_P1_DATA,SERIALPORT_CLOSE );
           if (mySerial3.portActive()) openCloseSerial(SERIALPORT_P1_TIME,SERIALPORT_CLOSE );
@@ -7275,7 +7275,7 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
           mySerial4.end();          // v58b: not sure  but to acertain,  finish any active
           mySerial4.flush();        // v58b: not sure  but to acertain,  Clear GJ buffer
           bSerial4State = false; // v57 indicate state
-          if (mySerial4.portActive()) Serial.print((String) "#!4#" );
+          if (mySerial4.portActive()) Serial.print((String) F("#!4#") );
       } else if (serial_port_number == SERIALPORT_WL_TIME && serial_port_mode == SERIALPORT_OPEN ) {
           if (mySerial2.portActive()) openCloseSerial(SERIALPORT_WL_DATA,SERIALPORT_CLOSE );
           if (mySerial4.portActive()) openCloseSerial(SERIALPORT_WL_TIME,SERIALPORT_CLOSE );
@@ -7321,60 +7321,60 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
     
     
     */
-    Serial.print((String) "\r\n" + P1_VERSION_TYPE + " serial1 setup"     // print first 4 (time initiated an port allocated)
-        + " "  +  mySerial1.peekTime(M_TIME_START)
-        + " "  +  mySerial1.peekTime(M_TIME_RX_START)
-        + ". "
-        + " "  +  mySerial1.peekTime(M_TIME_RX_END));
+    Serial.print((String) "\r\n" + P1_VERSION_TYPE + F(" serial1 setup")     // print first 4 (time initiated an port allocated)
+        + F(" ")  +  mySerial1.peekTime(M_TIME_START)
+        + F(" ")  +  mySerial1.peekTime(M_TIME_RX_START)
+        + F(". ")
+        + F(" ")  +  mySerial1.peekTime(M_TIME_RX_END));
     if (m_time_request >= M_TIME_RX_END )              // print all standard
       Serial.print((String) 
-        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))         
-        + "= " +  mySerial1.peekTime(M_TIME_BEGIN_START) 
-        + " +" + (mySerial1.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
-        + "="  +  mySerial1.peekTime(M_TIME_BEGIN_END) 
-        + " +" + (mySerial1.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
-        + "="  +  mySerial1.peekTime(M_TIME_AVAIL_START)
-        + " +" + (mySerial1.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
-        + "="  +  mySerial1.peekTime(M_TIME_AVAIL_END)
-        + "\r\n"
-        + " ISR1st: "
-        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR_START) + ":\t"
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_START1) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR_START1))
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_END))
-        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
-        + " , ISRstart2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_START) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
-        + "\r\n"
-        + " ISR2ls: "
-        + " " +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":\t"
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START1))
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))
-        + " +" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_END))
-        + " =" + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
-        + " , ISRexit2-1= " + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT) - mySerial1.peekTime(M_TIME_BIT_ISR_EXIT))
-        + "\r\n"
+        + F(" +") + (mySerial1.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))         
+        + F("= ") +  mySerial1.peekTime(M_TIME_BEGIN_START) 
+        + F(" +") + (mySerial1.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
+        + F("=")  +  mySerial1.peekTime(M_TIME_BEGIN_END) 
+        + F(" +") + (mySerial1.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
+        + F("=")  +  mySerial1.peekTime(M_TIME_AVAIL_START)
+        + F(" +") + (mySerial1.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
+        + F("=")  +  mySerial1.peekTime(M_TIME_AVAIL_END)
+        + F("\r\n")
+        + F(" ISR1st: ")
+        + F(" ") +   mySerial1.peekTime(M_TIME_BIT_ISR_START) + ":\t"
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR_START1) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR_START1))
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR_END )   - mySerial1.peekTime(M_TIME_BIT_ISR_READ))
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_END))
+        + F(" =") + (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + F(" , ISRstart2-1= ") + (mySerial1.peekTime(M_TIME_BIT_ISR2_START) - mySerial1.peekTime(M_TIME_BIT_ISR_START))
+        + F("\r\n")
+        + F(" ISR2ls: ")
+        + F(" ") +   mySerial1.peekTime(M_TIME_BIT_ISR2_START) + ":\t"
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START1))
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR2_END )   - mySerial1.peekTime(M_TIME_BIT_ISR2_READ))
+        + F(" +") + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_END))
+        + F(" =") + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - mySerial1.peekTime(M_TIME_BIT_ISR2_START))
+        + F(" , ISRexit2-1= ") + (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT) - mySerial1.peekTime(M_TIME_BIT_ISR_EXIT))
+        + F("\r\n")
         );  
   }                
   if (time_port == 2) {
-    Serial.println((String) "time: Begin + end ( / + startread /endread )\r\n");
-    Serial.print((String) P1_VERSION_TYPE + " serial2 setup "     // print first 4 (time initiated an port allocated)
-        + " "  +  mySerial2.peekTime(M_TIME_START)
-        + " "  +  mySerial2.peekTime(M_TIME_RX_START)
-        + ". "
-        + " "  +  mySerial2.peekTime(M_TIME_RX_END));
+    Serial.println((String) F("time: Begin + end ( / + startread /endread )\r\n"));
+    Serial.print((String) F(P1_VERSION_TYPE) + F(" serial2 setup ")     // print first 4 (time initiated an port allocated)
+        + F(" ")  +  mySerial2.peekTime(M_TIME_START)
+        + F(" ")  +  mySerial2.peekTime(M_TIME_RX_START)
+        + F(". ")
+        + F(" ")  +  mySerial2.peekTime(M_TIME_RX_END));
     if (m_time_request > M_TIME_RX_END )              // print all standard
     Serial.print((String) 
-        + " +" + (mySerial2.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
-        + "= " +  mySerial2.peekTime(M_TIME_BEGIN_START) 
-        + " +" + (mySerial2.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
-        + "="  +  mySerial2.peekTime(M_TIME_BEGIN_END) 
-        + " +" + (mySerial2.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
-        + "="  +  mySerial2.peekTime(M_TIME_AVAIL_START)
-        + " +" + (mySerial2.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
-        + "="  +  mySerial2.peekTime(M_TIME_AVAIL_END)
-        + "\r\n"
+        + F(" +") + (mySerial2.peekTime(M_TIME_BEGIN_START) - mySerial1.peekTime(M_TIME_RX_END))
+        + F("= ") +  mySerial2.peekTime(M_TIME_BEGIN_START) 
+        + F(" +") + (mySerial2.peekTime(M_TIME_BEGIN_END)   - mySerial1.peekTime(M_TIME_BEGIN_START)) 
+        + F("=")  +  mySerial2.peekTime(M_TIME_BEGIN_END) 
+        + F(" +") + (mySerial2.peekTime(M_TIME_AVAIL_START) - mySerial1.peekTime(M_TIME_BEGIN_END))
+        + F("=")  +  mySerial2.peekTime(M_TIME_AVAIL_START)
+        + F(" +") + (mySerial2.peekTime(M_TIME_AVAIL_END)   - mySerial1.peekTime(M_TIME_AVAIL_START))
+        + F("=")  +  mySerial2.peekTime(M_TIME_AVAIL_END)
+        + F("\r\n")
         );
   }                
   RETURN_NOP_MACRO512;
@@ -7391,10 +7391,10 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
     // unsigned long compensate_bitTime = 0;    // compensate lagging  approx 75µSec + 2.6µSec lagging
-    Serial.print((String) "\r\n Print bitTimeA ("+ l_bitTime + ") sequences "+ 
-                  + " serial port="+ bit_port 
-                  + " #Inpos=" + mySerial1.peekBitPos()
-                  + "\t-------------time:" + micros()
+    Serial.print((String) F("\r\n Print bitTimeA (")+ l_bitTime + F(") sequences ")+ 
+                  + F(" serial port=")+ bit_port 
+                  + F(" #Inpos=") + mySerial1.peekBitPos()
+                  + F("\t-------------time:") + micros()
                   );
 
      // print timer table, when in request > then buffer, skip this
@@ -7408,7 +7408,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH && bit_sequence <= MAXLINELENGTH; i++ )  {  // print bitTimeA character field
       // Serial.print((String) "\t" + mySerial1.peekBit(i));
       if (i > 0) {
-          Serial.print((String) "\t\b" + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
+          Serial.print((String) F("\t\b") + (((mySerial1.peekBit(i-1) & 7) != 0) ? (char)((mySerial1.peekBit(i-1) & 7)|0x30) : (char)0x20) ) ; // v74 print bittime deviation
           temp = mySerial1.peekBit(i)-mySerial1.peekBit(i-1); 
           /*
           tempc1 = temp;
@@ -7524,7 +7524,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               Serial.printf("\t(l=%8d)", (temp - mySerial1.peekBit(i-8) ) ); // finish previous line with total)
               
               if (tmpdataFaultDetected) {
-                  Serial.print(" #"); // finish line v75d indicate possible datafault  
+                  Serial.print(F(" #")); // finish line v75d indicate possible datafault  
                   tmpdataFaultDetected = false;   // v75d reset fault error switch
               }
               // if (!(mySerial1.peekByte(i) >= 'a'  && mySerial1.peekByte(i) <= 'g') ) tmpdataFaultDetected = false;  // v75d indicate possible datafault
@@ -7534,14 +7534,14 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
           Serial.printf("\r\n %3d=>", i);
           // Serial.print((String) "> ");  // %11.6f
           if (temp > 999999999UL) { Serial.printf("%3d", (temp / 1000000000UL)); temp = temp - ((temp / 1000000000UL) * 1000000000UL); 
-                                    Serial.print("."); }
-                               else Serial.print( "    ");
+                                    Serial.print(F(".")); }
+                               else Serial.print( F("    "));
           if (temp >    999999UL) { Serial.printf("%.3d", (temp /    1000000UL)); temp = temp - ((temp /    1000000UL) *    1000000UL);
-                                    Serial.print("."); }
-                               else Serial.print( "    ");
+                                    Serial.print(F(".")); }
+                               else Serial.print( F("    "));
           if (temp >       999UL) { Serial.printf("%.3d", (temp /       1000UL)); temp = temp - ((temp /       1000UL) *       1000UL);
-                                    Serial.print("."); }
-                               else Serial.print( "    ");
+                                    Serial.print(F(".")); }
+                               else Serial.print( F("    "));
                                     Serial.printf("%.3d", (temp));
           // Serial.print("> ");
           Serial.printf(" #%10d >",( mySerial1.peekBit(i) - temp0s));
@@ -7561,7 +7561,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     */
     int temp0 = mySerial1.peekBit(0);  // get zero reference
     if (bit_sequence >=0 )  {
-        Serial.print((String) "\r\n Print time data Lines (position , mSec):"); 
+        Serial.print((String) F("\r\n Print time data Lines (position , mSec):")); 
     }
     /*
           Print: input / mask /delta
@@ -7598,7 +7598,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         if (i == 0)  Serial.printf("\r\n dati%3d - %9.4f:C\t", i, (float) 0.0000);
         else if (convert_p1_print( mySerial1.peekByte(i-1)) == '|' || convert_p1_print( mySerial1.peekByte(i-1)) == '!') {
                  if (tmpdataFaultDetected) {
-                         Serial.print(" #"); // finish line v75d indicate possible datafault  
+                         Serial.print(F(" #")); // finish line v75d indicate possible datafault  
                          tmpdataFaultDetected = false;
                  }                  
                  Serial.printf("\r\n dati%.3d - %9.4f:C\t", i, 
@@ -7643,8 +7643,8 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
               for (int m = j; m <= i; m++ )  {      // v61 print differences line for caring positions
                 if (telegram_crcOut[m] == mySerial1.peekByte(m) ||
                     telegram_crcOut[m] == 'X') 
-                    Serial.print(" "); 
-                else Serial.print("^");
+                    Serial.print(F(" ")); 
+                else Serial.print(F("^"));
               }
               j = i + 1;
           }
@@ -7660,7 +7660,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
     */
     if (bit_sequence < 0) {   // print only bitchanges in Binary with/when range is negative
       if (((bit_sequence*-1) / MAXLINELENGTH) == 1 ) {
-        Serial.print((String) "\t <M> Check binary Mask: 0  to " +  (bit_sequence * -1) );
+        Serial.print((String) F("\t <M> Check binary Mask: 0  to ") +  (bit_sequence * -1) );
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
         doYIELD_MACRO;  // v77a execute yeield and wdtfeed
@@ -7671,19 +7671,19 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
             // Serial.print((String) "\r\n Data:" + m +  "\t");
             Serial.printf("\r\n Data:%3d t=%6.4f\t", m, 
                           (float)((((mySerial1.peekBit(m) - compensate_bitTime) - temp0)*12.5)/1000000.0000));
-            Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+            Serial.print((String) F(" ") + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
             print_binary(mySerial1.peekByte(m));
-            Serial.print((String)+  " <i-M> " );
+            Serial.print((String)+  F(" <i-M> ") );
             print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
-            Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
-            Serial.print((String)+  " <m-I> " );
-            Serial.print((String) " " + (char) convert_p1_print(telegram_crcIn[m]) );
+            Serial.print((String) F(" ") + (char) convert_p1_print(telegram_crcOut[m]) );
+            Serial.print((String)+  F(" <m-I> ") );
+            Serial.print((String) F(" ") + (char) convert_p1_print(telegram_crcIn[m]) );
             cnt++; // maximize
           }
           if (  telegram_crcOut[m]    == '!'    ||
                 mySerial1.peekByte(m) == '!'    || 
                 cnt > 15) {
-            Serial.println((String) "\r\n break diff cnt=" + cnt  + " at=" + m);
+            Serial.println((String) F("\r\n break diff cnt=") + cnt  + F(" at=") + m);
             break; // terminate at end
           }            
         }   
@@ -7693,7 +7693,7 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
         /*
           Print binary read timed
         */
-        Serial.print((String) "\t <I> Check binary Read (scope-time): 0  to " +  (bit_sequence * -1) );
+        Serial.print((String) F("\t <I> Check binary Read (scope-time): 0  to ") +  (bit_sequence * -1) );
         int cnt = 0;
         int temp0 = mySerial1.peekBit(0);  // get zero reference
         int temp1 = mySerial1.peekBit(0);  // get zero previous
@@ -7709,11 +7709,11 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
                                 (float) ( ((mySerial1.peekBit(m) - temp0)*12.5)/1000000.0000 ),
                                 (float) ( ((mySerial1.peekBit(m) - temp1)*12.5)/1000000.0000 )
                               );
-                Serial.print((String) " " + (char) convert_p1_print(mySerial1.peekByte(m)) + " " );
+                Serial.print((String) F(" ") + (char) convert_p1_print(mySerial1.peekByte(m)) + F(" ") );
                 print_binary(mySerial1.peekByte(m));
-                Serial.print((String)+  " <i-M> " );
+                Serial.print((String)+  F(" <i-M> ") );
                 print_binary((char) telegram_crcOut[m]);  // loop/shit numer into binary
-                Serial.print((String) " " + (char) convert_p1_print(telegram_crcOut[m]) );
+                Serial.print((String) F(" ") + (char) convert_p1_print(telegram_crcOut[m]) );
                 cnt++; // maximize
                 if  (m > 3  && mySerial1.peekByte(m-4)  == '!') break;   // exit to prevent beyond telegram print
               }
@@ -7738,34 +7738,34 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   if (bit_port == 2) {
     unsigned long temp = 0UL;    
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial2Baudrate;
-    Serial.print((String) "\r\n Print bitTimeCycle ("+ l_bitTime + ") sequences "+ 
-                  + " serial port="+ bit_port 
-                  + " #Inpos=" + mySerial2.peekBitPos()
-                  + "-------------time:" + micros()
-                  + " \r\n");
+    Serial.print((String) F("\r\n Print bitTimeCycle (")+ l_bitTime + F(") sequences ")+ 
+                  + F(" serial port=")+ bit_port 
+                  + F(" #Inpos=") + mySerial2.peekBitPos()
+                  + F("-------------time:") + micros()
+                  + F(" \r\n"));
     for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
       // Serial.print((String) "\t" + mySerial2.peekBit(i));
       if (i > 0) {
           if ( ( temp > ( (10 * l_bitTime) + (l_bitTime/3) ) &&
                  temp < ( (20 * l_bitTime) - (l_bitTime/3) ) ) ||
                  temp < ( (10 * l_bitTime) - (l_bitTime/3) ) )
-               Serial.print((String) "\t" + temp + "~" );
-          else Serial.print((String) "\t" + temp + " " );
+               Serial.print((String) F("\t") + temp + F("~") );
+          else Serial.print((String) F("\t") + temp + F(" ") );
           Serial.print((char) convert_p1_print( mySerial2.peekByte(i-1)) );
        }
-      if ( (i % 8) == 0) Serial.print((String) "\r\n" + i + "=" + mySerial2.peekBit(i) + "> " );  // next line time
+      if ( (i % 8) == 0) Serial.print((String) F("\r\n") + i + F("=") + mySerial2.peekBit(i) + F("> ") );  // next line time
       if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 8) i = bit_sequence; // exit
     }
-    Serial.print((String) "\r\n data0:\t");                 // print character line data
+    Serial.print((String) F("\r\n data0:\t"));                 // print character line data
     for (volatile int i = 0; i <= bit_sequence && i < MAXLINELENGTH2; i++ )  {
          Serial.print((char) convert_p1_print( mySerial2.peekByte(i)) );
          if (convert_p1_print( mySerial2.peekByte(i)) == '|')     // check if we are going to new P1 record
-             Serial.print((String) "\r\n data"+ i + ":\t");  
+             Serial.print((String) F("\r\n data")+ i + F(":\t"));  
          if ( convert_p1_print( mySerial2.peekByte(i-8)) == '!' && i > 9) i = bit_sequence; // exit             
     }     
   }    
 
-  Serial.print((String) "\r\n\t\t\t-------------time:" + micros() + "\r\n");
+  Serial.print((String) F("\r\n\t\t\t-------------time:") + micros() + F("\r\n"));
   RETURN_NOP_MACRO512;
 }
 
@@ -7775,28 +7775,28 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 void printCrcInTable() {
   doDUMMY_MACRO;    // dv77a do some dummy code
   bool tmpdataFaultDetected = false;
-  Serial.print((String) "\r\nsI=0\t");   // initialise
+  Serial.print((String) F("\r\nsI=0\t"));   // initialise
   for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
     if ( CheckFaultCharacter(telegram_crcIn[cnt]) ) tmpdataFaultDetected = true;  // v75d indicate we have a posisble datafault
 
     if (isprint(telegram_crcIn[cnt])) {             // if printable
         Serial.print(telegram_crcIn[cnt]);
     } else if (telegram_crcIn[cnt] == '\x0d') {     // carriage return
-        Serial.print("_");
+        Serial.print(F("_"));
     } else if (telegram_crcIn[cnt] == '\x0a') {     // linefeed
         if (tmpdataFaultDetected) {             // v76 print lower case fault
-            Serial.print((String) "\r\t\b\b#");   // CR tab backspace print # for lowercase a-g
+            Serial.print((String) F("\r\t\b\b#"));   // CR tab backspace print # for lowercase a-g
             tmpdataFaultDetected = false;       // v76 reset fault error switch
         } 
-        Serial.print((String) "\r\n"+ cnt +"\t>");  
+        Serial.print((String) F("\r\n")+ cnt +F("\t>"));  
     } else if (telegram_crcIn[cnt] == '\x00') {     // end of data
-        Serial.print("|");
+        Serial.print(F("|"));
         // break;
     } else  {
-        Serial.print("?");                    // unprintable
+        Serial.print(F("?"));                    // unprintable
     }
   }
-  Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+  Serial.println((String)F("<< eom"));    // v33 debug lines didnot end in newline
   RETURN_NOP_MACRO512;  
 }
 
@@ -7805,22 +7805,22 @@ void printCrcInTable() {
 */
 void printcrcOutTable() {
       doDUMMY_MACRO;    // dv77a do some dummy code
-      Serial.print((String) "\r\nsM=0\t");   // initialise
+      Serial.print((String) F("\r\nsM=0\t"));   // initialise
       for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
         if (isprint(telegram_crcOut[cnt])) {             // if printable
             Serial.print(telegram_crcOut[cnt]);
         } else if (telegram_crcOut[cnt] == '\x0d') {     // carriage return
-            Serial.print("_");
+            Serial.print(F("_"));
         } else if (telegram_crcOut[cnt] == '\x0a') {     // linefeed
-            Serial.print((String) "\r\n"+ cnt +"\t>");
+            Serial.print((String) F("\r\n")+ cnt +F("\t>"));
         } else if (telegram_crcOut[cnt] == '\x00') {     // end of data
-            Serial.print("|");
+            Serial.print(F("|"));
             // break;
         } else  {
-            Serial.print("?");                    // unprintable
+            Serial.print(F("?"));                    // unprintable
         }
       }
-      Serial.println((String)"<< eom");    // v33 debug lines didnot end in newline
+      Serial.println((String)F("<< eom"));    // v33 debug lines didnot end in newline
   RETURN_NOP_MACRO512;      
 }
 
@@ -7829,20 +7829,20 @@ void printcrcOutTable() {
 */
 void print_binary(unsigned int number) {
   if (number <= 255) {                      // print byte
-    Serial.print((String) " ");
-    Serial.print((String) (number & 0x40 ? '1' : '0'));
-    Serial.print((String) (number & 0x20 ? '1' : '0'));
-    Serial.print((String) (number & 0x10 ? '1' : '0'));
-    Serial.print((String) (number & 0x80 ? '1' : '0'));
-    Serial.print((String) " ");
-    Serial.print((String) (number & 0x08 ? '1' : '0'));
-    Serial.print((String) (number & 0x04 ? '1' : '0'));
-    Serial.print((String) (number & 0x02 ? '1' : '0'));
-    Serial.print((String) (number & 0x01 ? '1' : '0'));
-    Serial.print((String) " ");    
+    Serial.print((String) F(" "));
+    Serial.print((String) (number & 0x40 ? F("1") : F("0")));
+    Serial.print((String) (number & 0x20 ? F("1") : F("0")));
+    Serial.print((String) (number & 0x10 ? F("1") : F("0")));
+    Serial.print((String) (number & 0x80 ? F("1") : F("0")));
+    Serial.print((String) F(" "));
+    Serial.print((String) (number & 0x08 ? F("1") : F("0")));
+    Serial.print((String) (number & 0x04 ? F("1") : F("0")));
+    Serial.print((String) (number & 0x02 ? F("1") : F("0")));
+    Serial.print((String) (number & 0x01 ? F("1") : F("0")));
+    Serial.print((String) F(" "));    
   } else {
     if (number >> 1) print_binary(number >> 1);
-    Serial.print((String) (number & 1 ? '1' : '0'));
+    Serial.print((String) (number & 1 ? F("1") : F("0")));
   }
   RETURN_NOP_MACRO512;  
 }
@@ -7868,7 +7868,7 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
     if (Serial.available()) { 
        // Check if data is available to read    
        String data = Serial.readStringUntil('\n'); // Read until newline    
-       Serial.println("\t>>"+data+"=="+(char) data[0] +"<<\t");      // Print the received data  }
+       Serial.println("\t>>"+data+"=="+(char) data[0] +"<<\t");      // Print the received data cannot F()
 
         publishMqtt(mqttLogTopic, (String) "ESP P1 console:" 
                           + (char) data[0] 
@@ -7878,7 +7878,7 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
 
        if         ((char) data[0] == '?') doCmdHelp();              // '?' - Help
        else if    ((int) data[0] == 8 )  
-                    Serial.println((String)"\r\n Reconnect console"); //  v77 ^H
+                    Serial.println((String)F("\r\n Reconnect console")); //  v77 ^H
        else if    ((char) data[0] == 't') {                         // 't'= 
              serial_Print_PeekBits(1, 1024);                    // print time table P1
              serial_Print_PeekBits(1, 2048);                    // print diff table P1
@@ -7890,24 +7890,24 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
        } else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
          else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
          else if  ((char) data[0] == 'm') {       // v48 10jun25 print m-asked Input array
-                   Serial.println((String)"\r\n dataIn telegram_crcIn"
-                    + " myLen=" + telegram_crcIn_len 
-                    + " Masking("+ (switchMaskingOut ? "m" : "M") +") now " + (switchMaskingCmd ? "Active" : "Inactive")   // v74: display state
-                    + " MaskCount=" + telegram_crcOut_cnt     // v74 print number of masked poisitions
-                    + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-                    + " Elen=" + p1ShortCnt          // v74 number of errors length Input != Mask
-                    + " som>>");
+                   Serial.println((String)F("\r\n dataIn telegram_crcIn")
+                    + F(" myLen=") + telegram_crcIn_len 
+                    + F(" Masking(")+ (switchMaskingOut ? F("m") : F("M")) +F(") now ") + (switchMaskingCmd ? F("Active") : F("Inactive"))   // v74: display state
+                    + F(" MaskCount=") + telegram_crcOut_cnt     // v74 print number of masked poisitions
+                    + F(" Rcvr=") + p1RecoverCnt        // v52 recovered P1 
+                    + F(" Elen=") + p1ShortCnt          // v74 number of errors length Input != Mask
+                    + F(" som>>") );
                   printCrcInTable();    // v74g split to subroutine 
        } else  if ((char) data[0] == 'M') {       // v48 10jun25 print M-asked array
-                  Serial.println((String)"\r\n Recovery telegram_crcOut"      // display states
-                    + " myLen="     + telegram_crcOut_len                    // lenth of output record
-                    + " Masking("
+                  Serial.println((String)F("\r\n Recovery telegram_crcOut")      // display states
+                    + F(" myLen=")     + telegram_crcOut_len                    // lenth of output record
+                    + F(" Masking(")
                             + setMaskLimitCnt                   // v74 display maslimiter
-                            +")=" + (switchMaskingOut  ? "Active" : "Inactive")   // v74: display state
-                    + " MaskCount=" + telegram_crcOut_cnt      // v74 print number of masked poisitions in Masking array
-                    + " Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-                    + " Elen=" + p1ShortCnt                    // v74 number of errors length Input != Mask
-                    + " som>>");
+                            +F(")=") + (switchMaskingOut  ? F("Active") : F("Inactive"))   // v74: display state
+                    + F(" MaskCount=") + telegram_crcOut_cnt      // v74 print number of masked poisitions in Masking array
+                    + F(" Rcvr=") + p1RecoverCnt        // v52 recovered P1 
+                    + F(" Elen=") + p1ShortCnt                    // v74 number of errors length Input != Mask
+                    + F(" som>>"));
                   printcrcOutTable();    // v74g split to subroutine 
        }
      }
@@ -7947,38 +7947,38 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
       //      }
    #endif
 
-      Serial.print((String) "\r\n M_TIME_ENTRIES #" + M_TIME_ENTRIES + " , currentcycle=" + ESP.getCycleCount() + " , SSoffset= " + offset + " , ISRoffset= " + offset2);
+      Serial.print((String) F("\r\n M_TIME_ENTRIES #") + M_TIME_ENTRIES + F(" , currentcycle=") + ESP.getCycleCount() + F(" , SSoffset= ") + offset + F(" , ISRoffset= ") + offset2);
       serial_Print_PeekTime(1,M_TIME_ENTRIES);  // print calculation(s)
 
    #ifdef M_TIME_NAMES
-      Serial.print((String) "\r\n M_TIME_START             2 =  start of Object                         = " +   mySerial1.peekTime(M_TIME_START) )    ;
-      Serial.print((String) "\r\n M_TIME_BIT_WAIT          0 =  first ISR wait                          = " +   mySerial1.peekTime(M_TIME_BIT_WAIT))  ;
-      Serial.print((String) "\r\n M_TIME_BIT_WAIT1         1 =  last ISR wait                           = " +   mySerial1.peekTime(M_TIME_BIT_WAIT1)) ;
-      Serial.print((String) "\r\n M_TIME_RX_START          3 =  start of SoftwareSerial::enableRx Attach= " + ((mySerial1.peekTime(M_TIME_RX_START)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_START)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_RX_START)        + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_RX_END            4 =  end of SoftwareSerial::enableRx Detach  = " + ((mySerial1.peekTime(M_TIME_RX_END)           == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_END)          - offset )) + "\t( " + mySerial1.peekTime(M_TIME_RX_END)          + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BEGIN_START       5 =  start SoftwareSerial::begin             = " + ((mySerial1.peekTime(M_TIME_BEGIN_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_START)     - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BEGIN_START)     + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BEGIN_END         6 =  end  SoftwareSerial::begin              = " + ((mySerial1.peekTime(M_TIME_BEGIN_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_END)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BEGIN_END)       + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_AVAIL_START       7 =  start SoftwareSerial::enableRx Attach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_START)     - offset )) + "\t( " + mySerial1.peekTime(M_TIME_AVAIL_START)     + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_AVAIL_END         8 =  start SoftwareSerial::enableRx Detach   = " + ((mySerial1.peekTime(M_TIME_AVAIL_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_END)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_AVAIL_END)       + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_START         9 =  ISR START                               = " + ((mySerial1.peekTime(M_TIME_BIT_START)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_START)       + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_STOP         10 =  ISR AFTER STOPBIT                       = " + ((mySerial1.peekTime(M_TIME_BIT_STOP)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOP)        + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_START1       10 =  ISR Nominal end Actual End              = " + ((mySerial1.peekTime(M_TIME_BIT_START1)       == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START1)      - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_START1)      + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_STOPT        11 =  ISR Nominal to save                     = " + ((mySerial1.peekTime(M_TIME_BIT_STOPT)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOPT)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOPT)       + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_STOP1        12 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_STOP1)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP1)       - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_STOP1)       + " )" ) ;
+      Serial.print((String) F("\r\n M_TIME_START             2 =  start of Object                         = ") +   mySerial1.peekTime(M_TIME_START) )    ;
+      Serial.print((String) F("\r\n M_TIME_BIT_WAIT          0 =  first ISR wait                          = ") +   mySerial1.peekTime(M_TIME_BIT_WAIT))  ;
+      Serial.print((String) F("\r\n M_TIME_BIT_WAIT1         1 =  last ISR wait                           = ") +   mySerial1.peekTime(M_TIME_BIT_WAIT1)) ;
+      Serial.print((String) F("\r\n M_TIME_RX_START          3 =  start of SoftwareSerial::enableRx Attach= ") + ((mySerial1.peekTime(M_TIME_RX_START)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_START)        - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_RX_START)        + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_RX_END            4 =  end of SoftwareSerial::enableRx Detach  = ") + ((mySerial1.peekTime(M_TIME_RX_END)           == 0) ? 0 : (mySerial1.peekTime(M_TIME_RX_END)          - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_RX_END)          + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BEGIN_START       5 =  start SoftwareSerial::begin             = ") + ((mySerial1.peekTime(M_TIME_BEGIN_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_START)     - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BEGIN_START)     + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BEGIN_END         6 =  end  SoftwareSerial::begin              = ") + ((mySerial1.peekTime(M_TIME_BEGIN_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BEGIN_END)       - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BEGIN_END)       + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_AVAIL_START       7 =  start SoftwareSerial::enableRx Attach   = ") + ((mySerial1.peekTime(M_TIME_AVAIL_START)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_START)     - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_AVAIL_START)     + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_AVAIL_END         8 =  start SoftwareSerial::enableRx Detach   = ") + ((mySerial1.peekTime(M_TIME_AVAIL_END)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_AVAIL_END)       - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_AVAIL_END)       + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_START         9 =  ISR START                               = ") + ((mySerial1.peekTime(M_TIME_BIT_START)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START)       - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_START)       + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_STOP         10 =  ISR AFTER STOPBIT                       = ") + ((mySerial1.peekTime(M_TIME_BIT_STOP)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP)        - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_STOP)        + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_START1       10 =  ISR Nominal end Actual End              = ") + ((mySerial1.peekTime(M_TIME_BIT_START1)       == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_START1)      - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_START1)      + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_STOPT        11 =  ISR Nominal to save                     = ") + ((mySerial1.peekTime(M_TIME_BIT_STOPT)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOPT)       - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_STOPT)       + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_STOP1        12 =  ISR Nominal end                         = ") + ((mySerial1.peekTime(M_TIME_BIT_STOP1)        == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_STOP1)       - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_STOP1)       + F(" )") ) ;
       doYIELD_MACRO;  // v77a execute yeield and wdtfeed
-      Serial.print((String) "\r\n M_TIME_BIT_END1         13 =  ISR END                                 = " + ((mySerial1.peekTime(M_TIME_BIT_END1)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END1)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END1)        + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_END2         14 =  ISR Nominal end                         = " + ((mySerial1.peekTime(M_TIME_BIT_END2)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END2)        - offset )) + "\t( " + mySerial1.peekTime(M_TIME_BIT_END2)        + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_START    15 =  first ISR entered                       = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_START)   + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_START1   16 =  first ISR getCycleCountIram()           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_START1)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START1)  - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_START1)  + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_READ     17 =  first ISR start read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_READ)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_READ)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_READ)    + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_END      18 =  first ISR finish read                   = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_END)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_END)     - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_END)     + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR_EXIT     19 =  first ISR exit                          = " + ((mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START   20 =  last ISR entered                        = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START)  - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_START)  + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_START1  21 =  last ISR getCycleCountIram()            = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START1)  == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_START1) + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_READ    22 =  last ISR start read                     = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_READ)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_END     23 =  last ISR finish read                    = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_END)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_END)    - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_END)    + " )" ) ;
-      Serial.print((String) "\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = " + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset2)) + "\t( " + mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   + " )" ) ;
-      Serial.print((String) "\r\n");
+      Serial.print((String) F("\r\n M_TIME_BIT_END1         13 =  ISR END                                 = ") + ((mySerial1.peekTime(M_TIME_BIT_END1)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END1)        - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_END1)        + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_END2         14 =  ISR Nominal end                         = ") + ((mySerial1.peekTime(M_TIME_BIT_END2)         == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_END2)        - offset )) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_END2)        + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR_START    15 =  first ISR entered                       = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR_START)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START)   - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR_START)   + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR_START1   16 =  first ISR getCycleCountIram()           = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR_START1)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_START1)  - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR_START1)  + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR_READ     17 =  first ISR start read                    = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR_READ)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_READ)    - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR_READ)    + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR_END      18 =  first ISR finish read                   = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR_END)      == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_END)     - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR_END)     + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR_EXIT     19 =  first ISR exit                          = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR_EXIT)    + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR2_START   20 =  last ISR entered                        = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START)   == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START)  - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR2_START)  + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR2_START1  21 =  last ISR getCycleCountIram()            = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR2_START1)  == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_START1) - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR2_START1) + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR2_READ    22 =  last ISR start read                     = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR2_READ)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR2_READ)   + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR2_END     23 =  last ISR finish read                    = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR2_END)     == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_END)    - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR2_END)    + F(" )") ) ;
+      Serial.print((String) F("\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   + F(" )") ) ;
+      Serial.print((String) F("\r\n"));
   #endif
   RETURN_NOP_MACRO512;
 }   
@@ -7988,100 +7988,102 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
 */
 void doCmdHelp() {    // v76
       doDUMMY_MACRO;    // dv77a do some dummy code
-      Serial.println((String)"\r\n? (bell) \a Help commands "  + __FILE__ 
+      Serial.println((String)F("\r\n? (bell) \a Help commands ")  + __FILE__ 
                                                     + " version " + DEF_PROG_VERSION 
                                                     + ", compiled " __DATE__ + " " + __TIME__ );
       // Serial.println((String)"_ check espconn"  +  espconn.dnsIP );  // espconn was not declared
-      Serial.println((String)"0 Heating On"     + (new_ThermostatState == 0 ? " <--" : "" ) );
-      Serial.println((String)"1 heating off"    + (new_ThermostatState == 1 ? " <--" : "" ) );
-      Serial.println((String)"2 Heat follow ("  + (thermostatWriteState ? "1" : "0" ) + ") Thermostate"  
-                                                + (new_ThermostatState == 2 ? " <--" : "" ) );
-      Serial.println((String)"3 Thermostate ("  + (!thermostatReadState ? "1" : "0" ) + ") disable"      
-                                                + (new_ThermostatState == 3 ? " <--" : "" ) );
-      Serial.println((String)"R restart (mqttserver=" + mqttServer + ")");
-      Serial.println((String)"D debug ( ip=" + String(WiFi.localIP().toString().c_str()) + " )"    + "\t" +  (outputOnSerial ? "Yes" : "No") ); // v51: reverse tupled (35.1.168.192)
-      Serial.println((String)"L log WL to "  + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-      Serial.println((String)"e 1/2 force exception "
-                      + "( heap:" + ESP.getFreeHeap() +")"
+      Serial.println((String)F("0 Heating On")     + (new_ThermostatState == 0 ? F(" <--") : F("") ) );
+      Serial.println((String)F("1 heating off")    + (new_ThermostatState == 1 ? F(" <--") : F("") ) );
+
+      Serial.println((String)F("2 Heat follow (")  + (thermostatWriteState ? F("1") : F("0") ) + F(") Thermostate")  
+                                                + (new_ThermostatState == 2 ? F(" <--") : F("") ) );
+
+      Serial.println((String)F("3 Thermostate (")  + (!thermostatReadState ? F("1") : F("0") ) + F(") disable")
+                                                + (new_ThermostatState == 3 ? F(" <--") : F("") ) );
+      Serial.println((String)F("R restart (mqttserver=") + mqttServer + F(")"));
+      Serial.println((String)F("D debug ( ip=") + String(WiFi.localIP().toString().c_str()) + " )"    + F("\t") +  (outputOnSerial ? F("Yes") : F("No")) ); // v51: reverse tupled (35.1.168.192)
+      Serial.println((String)F("L log WL to ")  + mqttLogTopic2   + F("\t") +  (outputMqttLog2  ? F("ON") : F("OFF")) );
+      Serial.println((String)F("e 1/2 force exception ")
+                      + F("( heap:") + ESP.getFreeHeap() +")"
                       // + "( stack:" + ESP.getFreeContStack() + ")"      // v75b4 (2.4.1) // 2.4.2 function
                     );   // v52: display FreeHeap
-      Serial.println((String)"E force ReadP1 fault:"          + "\t" + (doForceFaultP1  ? "Yes" : "No"));
-      Serial.println((String)"B 12/+-/0-5|6^9 Baudrate25\t"
-                                + " serial1=" +  serial1Baudrate
-                                + " serial2=" +  serial2Baudrate);
-      Serial.println((String)"L log P1 to " + mqttLogTopic    + "\t" +  (outputMqttLog   ? "ON" : "OFF") );
-      Serial.println((String)"l log WL to " + mqttLogTopic2   + "\t" +  (outputMqttLog2  ? "ON" : "OFF") );
-      Serial.println((String)"F ON/off test Rx2 function:"    + "\t" + (rx2_function  ? "Yes" : "No")  );
-      Serial.println((String)"f Blueled cycle CRC/Water/Hot:" + "\t" + (blue_led2_Crc ? "Y" : "N") 
-                                                                      + (blue_led2_Water ? "Y" : "N") 
-                                                                      + (blue_led2_HotWater ? "Y" : "N") );
-      Serial.println((String)"T RX loopback Blue0, Test1:"    + "\t" + (loopbackRx2Tx2  ? "ON" : "OFF")
-                                                              + ", mode:" + loopbackRx2Mode );
-      Serial.println((String)"t {12 0-6/i/c/d | ez/r="+switchDebugCmd+"} Print Byte Tables serial1/2 ");        // v59, v64a v74
+      Serial.println((String)F("E force ReadP1 fault:")          + F("\t") + (doForceFaultP1  ? F("Yes") : F("No")));
+      Serial.println((String)F("B 12/+-/0-5|6^9 Baudrate25\t")
+                                + F(" serial1=") +  serial1Baudrate
+                                + F(" serial2=") +  serial2Baudrate);
+      Serial.println((String)F("L log P1 to ") + mqttLogTopic    + F("\t") +  (outputMqttLog   ? F("ON") : F("OFF")) );
+      Serial.println((String)F("l log WL to ") + mqttLogTopic2   + F("\t") +  (outputMqttLog2  ? F("ON") : F("OFF")) );
+      Serial.println((String)F("F ON/off test Rx2 function:")    + F("\t") + (rx2_function  ? F("Yes") : F("No"))  );
+      Serial.println((String)F("f Blueled cycle CRC/Water/Hot:") + F("\t") + (blue_led2_Crc ? F("Y") : F("N")) 
+                                                                      + (blue_led2_Water ? F("Y") : F("N")) 
+                                                                      + (blue_led2_HotWater ? F("Y") : F("N")) );
+      Serial.println((String)F("T RX loopback Blue0, Test1:")    + F("\t") + (loopbackRx2Tx2  ? F("ON") : F("OFF"))
+                                                              + F(", mode:") + loopbackRx2Mode );
+      Serial.println((String)F("t {12 0-6/i/c/d | ez/r=")+switchDebugCmd+F("} Print Byte Tables serial1/2 "));        // v59, v64a v74
       // Serial.println((String)"t {12 0-6/i/c/d} Print Byte Tables serial1/2 ");        // v59, v64a
-      Serial.println((String)"W on/OFF Watertrigger1 (Err="+waterErrorSwitch+") :" + "\t" + (useWaterTrigger1  ? "ON" : "OFF") ) ;
-      Serial.println((String)"w on/OFF Water Pullup:"         + "\t" + (useWaterPullUp  ? "ON" : "OFF")   );
-      Serial.println((String)"y print water debounce");
-      Serial.println((String)"Z zero counters " + 
-            + "(mqtt=" + mqttCnt_Out              // v63 Output count
-            + " cmd=" + mqttCnt_In            // v72 display input number
-            + " faults: " 
-            + " Miss=" + p1MissingCnt         // v52 failed to read any P1
-            + ", Crc=" + p1CrcFailCnt         // v52 Crc failed
-            + ", LenE=" + p1ShortCnt          // v74 updated when we have a length mismatch between Input and Mask
-            + ", Rcvr=" + p1RecoverCnt        // v52 recovered P1 
-            + ", Rp1=" + p1FailRxCnt          // v52 rj11 not connected
-            + ", Yld="+  RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
-            + ", lT2="+  loopTelegram2cnt     // V53 print current loopTelegram2cnt
-            + " )" );
-      Serial.println((String)"I intervalcount 2880="          + "\t" +  intervalP1cnt);
-      Serial.println((String)"i decrease interval count:"     + "\t" +  intervalP1cnt);
-      Serial.println((String)"P ON/off publish Json:"  + mqttTopic + "\t" +  (outputMqttPower  ? "Yes" : "No") );
-      Serial.println((String)"p ON/off publish Power:" + mqttPower + "\t" +  (outputMqttPower2 ? "Yes" : "No") );
-      Serial.println((String)"M {+-} print Masking array(limiter) "
-                      + "( MaskX="+ telegram_crcOut_cnt    // v52 number of X maskings
-                      + "<"+ setMaskLimitCnt + " )"       // v74 display masklimit count
-                      + " Masking("+ (switchMaskingCmd  ? "+m" : "-m")  + ")="  // v74 display state of masking command
-                      + (switchMaskingOut  ? "Active" : "Inactive")             // v74: display state masking array
+      Serial.println((String)F("W on/OFF Watertrigger1 (Err=")+waterErrorSwitch+F(") :") + F("\t") + (useWaterTrigger1  ? F("ON") : F("OFF")) ) ;
+      Serial.println((String)F("w on/OFF Water Pullup:")         + F("\t") + (useWaterPullUp  ? F("ON") : F("OFF"))   );
+      Serial.println((String)F("y print water debounce"));
+      Serial.println((String)F("Z zero counters ") + 
+            + F("(mqtt=")  + mqttCnt_Out              // v63 Output count
+            + F(" cmd=")   + mqttCnt_In            // v72 display input number
+            + F(" faults: ") 
+            + F(" Miss=")  + p1MissingCnt         // v52 failed to read any P1
+            + F(", Crc=")  + p1CrcFailCnt         // v52 Crc failed
+            + F(", LenE=") + p1ShortCnt          // v74 updated when we have a length mismatch between Input and Mask
+            + F(", Rcvr=") + p1RecoverCnt        // v52 recovered P1 
+            + F(", Rp1=")  + p1FailRxCnt          // v52 rj11 not connected
+            + F(", Yld=")  + RX_yieldcount        // V52 Yield count 0-3-8 yes/no process serial data
+            + F(", lT2=")  + loopTelegram2cnt     // V53 print current loopTelegram2cnt
+            + F(" )") );
+      Serial.println((String)F("I intervalcount 2880=")          + F("\t") +  intervalP1cnt);
+      Serial.println((String)F("i decrease interval count:")     + F("\t") +  intervalP1cnt);
+      Serial.println((String)F("P ON/off publish Json:")  + mqttTopic + F("\t") +  (outputMqttPower  ? F("Yes") : F("No")) );
+      Serial.println((String)F("p ON/off publish Power:") + mqttPower + F("\t") +  (outputMqttPower2 ? F("Yes") : F("No")) );
+      Serial.println((String)F("M {+-} print Masking array(limiter) ")
+                      + F("( MaskX=")+ telegram_crcOut_cnt    // v52 number of X maskings
+                      + F("<")+ setMaskLimitCnt + F(" )")       // v74 display masklimit count
+                      + F(" Masking(")+ (switchMaskingCmd  ? F("+m") : F("-m"))  + F(")=")  // v74 display state of masking command
+                      + (switchMaskingOut  ? F("Active") : F("Inactive"))             // v74: display state masking array
               );
-      Serial.println((String)"m print Input array ( Processed="+ p1ReadRxCnt + " )"      // v52 number of Times we validated
-                      + " & flips Masking(m) to " + (switchMaskingCmd  ? "Off" : "On")   // v74: display state
+      Serial.println((String)"F(m print Input array ( Processed=)"+ p1ReadRxCnt + F(" )")      // v52 number of Times we validated
+                      + F(" & flips Masking(m) to ") + (switchMaskingCmd  ? F("Off") : F("On"))   // v74: display state
               );
-      Serial.println((String)"h help testing C=" + __VERSION__ + " on "+ __FILE__ );
+      Serial.println((String)F("h help testing C=") + __VERSION__ + F(" on ")+ __FILE__ );
       int temp1 = mySerial1.m_bitWait * 1;
         // S P/T|0-1 serial1 on/off finish
         // s P/T|0-9 serial2 interval
-      Serial.println((String)"S (p|Test|0-1) ON/off "
-                    + "\t" + (!serial1Stop  ? "Yes" : "No") 
-                    + "\tserial1P1-"
-                    + (bSerial1State  ? "A" : "i")
-                    +  (mySerial1.portActive() ? "+" : "-") // v59 display if port has ISR activated                        
-                    + " , bitWait=" + temp1
-                    + ", mode=" + serial1PortMode        // v58b display portread or SS241 similated data
-                    + ", p1SerialFinish="  + (p1SerialFinish  ? "1" : "0") 
-                    + ", p1SerialActive="  + (p1SerialActive  ? "1" : "0") + " )" 
+      Serial.println((String)F("S (p|Test|0-1) ON/off ")
+                    + F("\t") + (!serial1Stop  ? F("Yes") : F("No")) 
+                    + F("\tserial1P1-")
+                    + (bSerial1State  ? F("A") : F("i"))
+                    +  (mySerial1.portActive() ? F("+") : F("-")) // v59 display if port has ISR activated                        
+                    + F(" , bitWait=") + temp1
+                    + F(", mode=") + serial1PortMode        // v58b display portread or SS241 similated data
+                    + F(", p1SerialFinish=")  + (p1SerialFinish  ? F("1") : F("0")) 
+                    + F(", p1SerialActive=")  + (p1SerialActive  ? F("1") : F("0")) + F(" )") 
                     );
       
       int temp2 = mySerial2.m_bitWait * 1;
-      Serial.println((String)"s (p|Test|0-9) ON/off" 
-                    + " \t" + (!serial2Stop  ? "Yes" : "No")          
-                    + "\tserial2P2-"
-                    + (bSerial2State  ? "A" : "i")
-                    +  (mySerial2.portActive() ? "+" : "-") // v59 display if port has ISR activated
-                    + " , bitWait=" + temp2
-                    + ", mode=" + serial2PortMode       // v58b display portread or SS241 similated data
-                    + ", interval:"+ rx2ReadInterval  
+      Serial.println((String)F("s (p|Test|0-9) ON/off") 
+                    + F(" \t") + (!serial2Stop  ? F("Yes") : F("No"))
+                    + F("\tserial2P2-")
+                    + (bSerial2State  ? F("A") : F("i"))
+                    +  (mySerial2.portActive() ? F("+") : F("-")) // v59 display if port has ISR activated
+                    + F(" , bitWait=") + temp2
+                    + F(", mode=") + serial2PortMode       // v58b display portread or SS241 similated data
+                    + F(", interval:")+ rx2ReadInterval  
                     );
       
-      Serial.println((String)"a ON/off/{+-0-9} Analog read:"+ nowValueAdc  +" \t" + (doReadAnalog ? "Yes" : "No") );          
-      Serial.println((String)"J/j 12/+-/0-5|6^9 bitwait1 Jserial1=" + mySerial1.m_bitWait
+      Serial.println((String)F("a ON/off/{+-0-9} Analog read:")+ nowValueAdc  +F(" \t") + (doReadAnalog ? F("Yes") : F("No")) );          
+      Serial.println((String)F("J/j 12/+-/0-5|6^9 bitwait1 Jserial1=") + mySerial1.m_bitWait
                                                   // + "/" + (mySerial1.m_bitWait % 1) + "/"
-                                                  + ((mySerial1.m_bitWait % 2) ? "bs" : "  ") // check for bitshift compensation
-                                                  + ", jserial2=" + mySerial2.m_bitWait);
+                                                  + ((mySerial1.m_bitWait % 2) ? F("bs") : F("  ")) // check for bitshift compensation
+                                                  + F(", jserial2=") + mySerial2.m_bitWait);
       
-      Serial.println((String)"v {0-9} Verboselevel:"                + "\t" +  verboseLevel );
+      Serial.println((String)F("v {0-9} Verboselevel:")                + F("\t") +  verboseLevel );
       
-      Serial.println((String)"-------log @=yieldloop ^=mqttout &=gotrx2----");
+      Serial.println((String)F("-------log @=yieldloop ^=mqttout &=gotrx2----"));
       
       /* // cannot do here as resetInfo is not defined and cannot be not globalised
       Serial.printf("Restart reason: 0x%08x epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x" , 
@@ -8090,17 +8092,17 @@ void doCmdHelp() {    // v76
       Serial.printf("\t restart reason 0x%08x  epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x depc=0x%08x ",
                           save_reason, save_epc1, save_epc2, save_epc3, save_excvaddr, save_depc ); // v52: print registers
       Serial.println();
-      Serial.println("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)");          // v51 print portstatus 
-      Serial.println((String) "\t" + BLUE_LED          + "=BLUE_LED:"         + !digitalRead(BLUE_LED)         
-                            + "\t" + WATERSENSOR       + "=WATERSENSOR:"      + !digitalRead(WATERSENSOR) 
-                            + "\t" + SERIAL_RX2        + "=SERIAL_RX2:"       + !digitalRead(SERIAL_RX2)       
-                            + "\t" + DS18B20_SENSOR    + "=DS18B20_SENSOR:"   + !digitalRead(DS18B20_SENSOR)   
-                            + "\t" + BLUE_LED2         + "=BLUE_LED2:"        + !digitalRead(BLUE_LED2)       ); 
-      Serial.println((String) "\t" + SERIAL_RX         + "=SERIAL_RX:"        + !digitalRead(SERIAL_RX)        
-                            + "\t" + LIGHT_READ        + "=HOT_READ:"         + !digitalRead(LIGHT_READ)       
-                            + "\t" + THERMOSTAT_READ   + "=THERMOSTAT_READ:"  + !digitalRead(THERMOSTAT_READ)  
-                            + "\t" + THERMOSTAT_WRITE  + "=THERMOSTAT_WRITE:" + !digitalRead(THERMOSTAT_WRITE) 
-                            + "\t" + ANALOG_IN         + "=ANALOG_IN:"        +   analogRead(ANALOG_IN)       );  
+      Serial.println(F("Portmap/read: D0/16 D1/05 D2/04 D3/16 D4/02 D5/14 D6/12 D7/13 D8/15 (digital-invert)"));          // v51 print portstatus 
+      Serial.println((String) F("\t") + BLUE_LED          + F("=BLUE_LED:")         + !digitalRead(BLUE_LED)         
+                            + F("\t") + WATERSENSOR       + F("=WATERSENSOR:")      + !digitalRead(WATERSENSOR) 
+                            + F("\t") + SERIAL_RX2        + F("=SERIAL_RX2:")       + !digitalRead(SERIAL_RX2)       
+                            + F("\t") + DS18B20_SENSOR    + F("=DS18B20_SENSOR:")   + !digitalRead(DS18B20_SENSOR)   
+                            + F("\t") + BLUE_LED2         + F("=BLUE_LED2:")        + !digitalRead(BLUE_LED2)       ); 
+      Serial.println((String) F("\t") + SERIAL_RX         + F("=SERIAL_RX:")        + !digitalRead(SERIAL_RX)        
+                            + F("\t") + LIGHT_READ        + F("=HOT_READ:")         + !digitalRead(LIGHT_READ)       
+                            + F("\t") + THERMOSTAT_READ   + F("=THERMOSTAT_READ:")  + !digitalRead(THERMOSTAT_READ)  
+                            + F("\t") + THERMOSTAT_WRITE  + F("=THERMOSTAT_WRITE:") + !digitalRead(THERMOSTAT_WRITE) 
+                            + F("\t") + ANALOG_IN         + F("=ANALOG_IN:")        +   analogRead(ANALOG_IN)       );  
   RETURN_NOP_MACRO512;
 }
 
@@ -8132,8 +8134,8 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
          waterErrorSwitch &= ~WATER_ERROR_SWITCH_hoton;    // v75e reset hoton
   } else {                                                 // v74f we have/had vibration on, try to re-initialise
       if (!(waterErrorSwitch & WATER_ERROR_SWITCH_done)) {
-        if (outputOnSerial) Serial.print((String) "WaterErrorISR!!"); // v74f
-        else Serial.print((String) "!W"); 
+        if (outputOnSerial) Serial.print((String) F("WaterErrorISR!!")); // v74f
+        else Serial.print((String) F("!W")); 
         waterErrorSwitch |=  WATER_ERROR_SWITCH_done;     // v75e indicate we have reported this
       }
 
