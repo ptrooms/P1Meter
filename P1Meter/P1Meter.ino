@@ -1,5 +1,6 @@
 
-#define VERSION_NUMBER "80a" // v80a 2026-09-18 14:34:58 revert to v79 to test syslog function
+#define VERSION_NUMBER "80c" // v80c 2026-09-20 00:06:46 97% stable after cleaning dummy code
+                            // 80b 2026-09-19  was very stable 99%
                             // v80 2026-09-17 version to actively use syslog, works but P1 unstbale.
                             // v79 2026-09-06 23:12:58 06sep26 master base version
                             // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
@@ -18,68 +19,16 @@ Flash Variable	const char t[] PROGMEM = "Hi";	Serial.print(FPSTR(t)); 	0 bytes (
 
 
 */
-// #define DEBUG_ESP_PORT "Serial"  // v75b5  playing around
-// #define DEBUG_ESP_OOM 1          // v75b5  playing around
-
-// TBD https://github.com/hideakitai/DebugLog
-
-/*  sof test & investigage intability at switchDebugCmd function in readTelegramP1() v75d
-  // ---------------------------------------------------------------------------------------------test switches
-  debug analysis why code runs untable if these are/used activated in readTelegramP1() line 3437
-      test logic.
-             z0    if (switchDebugCmd == 1) {            // v74 add fault analysis
-             !z0-3       switchDebugCmd = 0;               // v74 reset this condition
-             z1          Serial.print((String) "\r\n Z fault ");  // v52 count Recoveries _R -R
-             z2          serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                       // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable                                       
-                   }
-  switch usage v75d1 (set 3 character >> 75x << to eliminate extra bytes when using 75d1.... )
-  
-  none = 333.200 almost no read faults.....  2 errors to 100  size 333.200
-    DUMMY_SWITCHCMD_Z   = 333.264 add  64 adds major errors
-    DUMMY_SWITCHCMD_R   = 333.280 add  80 bytes tbd 
-    DUMMY_SWITCHCMD_Z+R = 333.328 add 128 frequent Z-fault starts to appear (4 in 10 records
-  
-  // code initial without Z testing Initial 333.200 without R
-    DUMMY_SWITCHCMD_Z     = 333.200  (only do switchDebugCmd = 0;)  1:10 2:10  good
-    + DUMMY_SWITCHCMD_Z0  = 333.200  optimized without Z1/Z2/ (null if) runs OK
-    | DUMMY_SWITCHCMD_Z1  = 333.248  initial Z-faults & more
-    | DUMMY_SWITCHCMD_Z2  = 333.216  problem startting & z-faults
-    & DUMMY_SWITCHCMD_Z2  = 333.264  heavy Z-faults
-  */
-  #define DUMMY_SWITCHCMD_Z   // use/activate code to start debug printing after a Z_ read fault
-  #define DUMMY_SWITCHCMD_Z0  // use/activate within switchSerialDebug If condition
-                                // else without Z1 and Z2: switchDebugCmd = 0
-  #define DUMMY_SWITCHCMD_Z1  // use/activate within switchSerialDebug Serial.print((String) "\r\n Z fault ");
-  #define DUMMY_SWITCHCMD_Z2  // use/activate within switchSerialDebug serial_Print_PeekBits(1, 1024);
-  // --------------------------------------------------------------------------------------------------------------
-  // stable with NOP's on  without: 333.216 and DUMMY_SWITCHCMD_Z:333.568  delta 352 of wich 2 slack
-  //    in between less stable to very unstable
-  // --------------------------------------------------------------------------------------------------------------
-  #define DUMMY_SWITCHCMD_R   // add 80bytes use/activate code to start debug printing after a R_ recovery fault
-//  eof test & investigage intability at switchDebugCmd in readTelegramP1() v75d
-
-#define DUMMY_CNTHEAP 0  // v75d1 test cntHeapStart/Finish definition 0 / 1-loop{}start  / 2loop{}end / 3-both
-                            // as to date executing ESP.getFreeHeap() leads to instability at using rs232
- // cntHeapFinish && cntHeapStart are now laways defined, extra code soze = 
- // below DUMMYTABLE_LENGTH 256; DUMMYCODE1-3 to test insert/code stability. v75c keep 
- // #define DUMMYTABLE_LENGTH 256    // v75b7  for using char dummyTable[DUMMYTABLE_LENGTH] allocation table
- // #define DUMMYCODE1    // v75b10f v75b7  for adding dummy code to end of loop{}
- // #define DUMMYCODE2    // v75b10f v75b7  for adding dummy code to end of loop{}
- // #define DUMMYCODE3    // v75b10f v75b10c  for adding dummy code to end of loop{}
- // #define DUMMYCODE4    // v75b10c  for adding dummy code to end of loop{}
- // #define DUMMYCODE5    // v75b10c  for adding dummy code to end of loop{}
- // #define DUMMYCODE6    // v75b7  for adding dummy code to end of loop{}
- // #define DUMMYCODE7    // v75b7  for adding dummy code to end of loop{}
- // #define DUMMYCODE8    // v75b7  for adding dummy code to end of loop{}
- // #define DUMMYCODE9    // v75b7  for adding dummy code to end of loop{}
- // -------------------------------------------------------------------------------------------------test switches
 
 #define TEST_MODE           // set for Arduino to prevent default production compilation
 // #define DEBUG_ESP_OTA    // v49 wifi restart issues 
 //Note: disabled MDNS in  file://home/pafoxp/.platformio/packages/framework-arduinoespressif8266@1.20401.3/libraries/ArduinoOTA/ArduinoOTA.cpp
 
 /* code documentation v78.... starting 31aug26
+      v80c - 2026-09-20 00:08:36 clear dummy/nop code and add 2 other F() strings
+      v80b - 2026-09-19 15:06:34 move print constants to flash/progmem:  print(.*)"(.*)" --> print$1F("$2")
+          - this solves the erratic behavior , very stable 4500/50 errors
+          - see https://arduino-esp8266.readthedocs.io/en/latest/PROGMEM.html
       v79 - 2026-09-08 13:41:00 cosolidate to new master. 
           - v78d after imprtoving ISR routines en specially, adding dummy code at end of program, is very stable.
            - At 5000 reads, we now have 95% (Miss=116, Crc=112, LenE=91, Rcvr=763)
@@ -1395,62 +1344,11 @@ Flash Variable	const char t[] PROGMEM = "Hi";	Serial.print(FPSTR(t)); 	0 bytes (
 // D9   = 2;
 // D10  = 2;
 
-#define NOP_MACRO354 asm( \   // used to seprrate function in switchcmd......
-              "NOP;NOP;" \ //  32
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  32
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  64
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ //  96
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 128
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 160
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 196
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 224
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 256
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 288
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 320
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \ // 352
-  );
-
-#define NOP_MACRO512 asm( \   // used to seprate functions......
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  64
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  96
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 128
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 160
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 196
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 224
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 256
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  64
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  96
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 128
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 160
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 196
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 224
-              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  // 256
-  );
-
-/*
-  v79 This does do return followed by 512 bytes of NOP
-*/  
-#define RETURN_NOP_MACRO512 \
-      return;
-      // NOP_MACRO512;
-
-
 const char  *prog_Version = DEF_PROG_VERSION;  // added ptro 2021 version , v57 changed from int to char
 
-/* doDUMMY_MACRO doYIELD_MACRO v77a  ------------------------------------------- dummy code insertions
-    default of nullify by activation
-  */
-
-  // #define doDUMMY_MACRO { };            // do background processing required for wifi etc.
-  // #define doYIELD_MACRO { };            // do background processing required for wifi etc.
-  #ifndef doDUMMY_MACRO
-  #define doDUMMY_MACRO { delay(0);delay(0);delay(0); };  // do some dummy delay code 
-  #endif
-  #ifndef doYIELD_MACRO
-  #define doYIELD_MACRO { yield(); ESP.wdtFeed(); };      // do background processing wifi etc.
-  #endif
+#ifndef doYIELD_MACRO
+#define doYIELD_MACRO { yield(); ESP.wdtFeed(); };      // do background processing wifi etc.
+#endif
 // ------------------------------------------------------------------------------- dummy code insertions
 
 #ifndef ARDUINO_ESP8266_RELEASE     // include #include <core_version.h>
@@ -1675,10 +1573,6 @@ int  telegramError    = false;   // indicate the P1 Telegram contains non-printa
 // bool outputOnSerial  = true;    // "D" debug default output in Testmode
 // ---------------------------------------------------------------------------------------------------
 #define MASKING_LIMIT 18         // Number of masked positions after we sw
-#if defined(DUMMY_CNTHEAP)     // v75testing
-  long cntHeapStart     = 0;       // v75d1 heap at start of loop()
-  long cntHeapFinish    = 0;       // v75d1 heap at finish of loop()
-#endif
 int  switchDebugCmd   = 0;       // execute a debug after a certain condition
                                  //  switchDebugCmd=1  onze execute t16 command after a _Z fault
 bool switchMaskingOut = true;    // every time we have an OK CRC out record we flipback the previously masked "X" position
@@ -1812,13 +1706,7 @@ int filteredValueAdc = 0; // average between previous and and published
     Global variables use 33044 bytes (40%) of dynamic memory, leaving 48876 bytes for local variables. Maximum is 81920 bytes.
 */
 
-#ifdef DUMMYTABLE_LENGTH
-char dummyTable[DUMMYTABLE_LENGTH];       // v75b7 enforce memory reservation.....
-#endif
-
 // Telegram datarecord and arrays   // corrupted op 5e regel (data#93 e.v.) positie 27: 0-0:96.1.1(453030323730303x3030x4313xx235313x)
-// char dummy2[17];       // add some spare bytes, v55b remove
-// const char dummy2a[] = {0x0000};    // prevent overwrite, v55b remove
 char telegram[MAXLINELENGTH+32];       // telegram maxsize bytes for P1 meter
 char telegramLast[3+13];               // used to catch P1meter line termination bracket
 bool telegramP1header = false;      // used to trigger/signal Header window /KFM5KAIFA-METER
@@ -2261,80 +2149,12 @@ void setup()
   */
 
   ArduinoOTA.setHostname(hostName);   // nodemcut1/p1
-  // Serial.println(hostName );
-  // const char  testPrint = "z";
-  // Serial.println("ArduinoOTA.setHostname set" );
-  // Serial.println("12345678901234567890123456" ); // no fault very stable
-  // Serial.println("1234567890" );   // give Z at 2nd & 10th P1
-  // Serial.println("12" );                               //     zCCCCC-----
-  // Serial.println("123" );                              //     CCrCrCCCCCC
-  // Serial.println("1234" );                             //     ...zCCCCCrC
-  // Serial.println("12345" ); // problem catchin gup P1 and then Z's at start with R's
-  // Serial.println("12345678901234567890" ); // start C, then 2Z followed by C's & R's & 1Z (#13)
-  // Serial.println("12345678901234567890123"          ); // 23   CCCCzCCCrC
-  // Serial.println("123456789012345678901234"         ); // 24   CCzCCCrCCz 
-  // Serial.println("1234567890123456789012345"        ); // 25   CCzzCCCCCr
-  // Serial.println("12345678901234567890123456"       ); // 26   ..CzCCrCrC , restart CCCCCCCCRR , CCCCCRCCCC 
-  // Serial.println("12345678901234567890123456789012" ); // 32   CCCCRCCRCC
-  // Serial.print("1\r\n" );                              //      CCrCCCrrCC
-  // Serial.print("1\n" );                                //      CCCrCCCCCC
-  // Serial.print("1" );                                  //      CzzzzCrrzr
-  // Serial.print("12" );                                 //      CCCCrCCCCC
-  // Serial.print("a" );                                  //      zzzzzzCzzz
-  // char testPrint = 'z'  ; Serial.print("a" );          //      zzCCrrCrrrzzzz
-  // char testPrint = 'xy' ; Serial.print("a" );          //      zzzzCCrzr.r
-  // char testPrint = 'xy' ; Serial.print(testPrint );    // y    zzzz
-  // char testPrint = 'xyz'; Serial.print(testPrint );    // z    zzzzzzzzzC
-  // char tPx = 'x' ; Serial.print(tPx+tPx );             // z240 CCCCCCCCCC
-  // const char *tPx = "u"   ; Serial.print(tPx);         // u    ..CzCCCrCC     
-  // const char *tPx = "uv"  ; Serial.println(tPx);       // uv\  CCzCCCzCCC
-  // const char *tPx = "uvw" ; Serial.println(tPx);       // uvw\ ...zCzCrCC
-  //xconst char *tPx = "uvw" ; Serial.println(tPx+tPx);   // uvw\ 
-  // Serial.print(F("1"));                                //      CCCCCCCzCC
-     Serial.println(F("1") ); 
-  // Serial.println(F("12345678901234567890123456") ); // no fault very stable
-  
-
-
-  /*
-     Serial.println("123456789012345678901234567890121234567890123456"    //  46 CCCCCCCCCR
-                    "123456789012345678901234567890121234567890123456") ;    //  92 CCCCrCCCrr
-                 // "12345678901234567890123456"                   );     // 128 CCRCzCrCCC ... z
-                 //  "123456789012345678901234" );                 );     // 126 OK 438 Miss=9, Crc=9, LenE=7, Rcvr=69
-      Serial.println("123456789012345678901234"                    );     // 2026-09-18 16:54:33 2nd: 24 OK
-  */    
-  // logger.info("connected to wif1");   // with/out it cause Z      
-  // logger.info("loggerline 2273" );   // with/out it cause Z
-  // logger.info("loggerline 2274" );   // with/out it cause Z
-    /*
-     asm("NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-    */
-    /*        
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-        "NOP;"
-      */        
-      // );
-
-      
+  Serial.println(F("ArduinoOTA.setHostname set") );
+  //   Serial.println(F("1") ); 
     // logger.info("connected to wifi");   // with/out it cause Z
   
   ArduinoOTA.onStart([]() {
+    // logger.info("OTA new version." );   // v80b
     Serial.println(F("Start"));
   });
 
@@ -2360,7 +2180,9 @@ void setup()
     else if (error == OTA_END_ERROR)
       Serial.println(F("End Failed"));
   });
+  
   Serial.println(F("ArduinoOTA.begin() activated.") );
+  // logger.info("start." );   // v80b 
   // logger.info("loggerline 2306" );   // with/out it cause Z
   
   //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
@@ -2368,9 +2190,15 @@ void setup()
   ;                       // https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html
   ArduinoOTA.begin();     // ArduinoOTA.begin(false) = disable mdns
 
-  Serial.printf("Reset reason code: %x\n", resetInfo->reason);     // v52: print restart reason
+
+  // Serial.printf_P( PSTR("This is an inline string using printf %s"), "hello"); 
+  // https://arduino-esp8266.readthedocs.io/en/latest/PROGMEM.html#how-do-i-declare-a-global-flash-string-and-use-it
+
+  // Serial.printf("Reset reason code: %x\n", resetInfo->reason);     // v52: print restart reason
+  Serial.printf_P( PSTR("Reset reason code: %x\n"), resetInfo->reason);  // v80c: print restart reason PROGMEM mode
   Serial.println((String) F("\r\nRestart time ") + micros() + F(" for ") + F(__FILE__) + F(" cause:") +  resetInfo->reason); // same but nicer
-  Serial.printf("\t epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x\r\n\n",
+    // Serial.printf("\t epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x\r\n\n",
+  Serial.printf_P( PSTR("\t epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x,depc=0x%08x\r\n\n"),
         resetInfo->epc1, resetInfo->epc2, resetInfo->epc3, resetInfo->excvaddr, resetInfo->depc); // v52: print registers
 
   save_reason   = resetInfo->reason;      // v52: save restart reason
@@ -2905,14 +2733,6 @@ void setup()
 
 void loop()
 { 
-  // cntHeapStart++;
-  // cntHeapFinish++;
-  #if defined(DUMMY_CNTHEAP) && ( DUMMY_CNTHEAP == 1 || DUMMY_CNTHEAP == 3 )
-    // NOP_MACRO512  // try if this stabilises
-    #warning Using DUMMY_CNTHEAP  begin of loop
-    cntHeapStart = ESP.getFreeHeap();   // v75d1 start
-    // cntHeapStart++;
-  #endif   
 
    if (verboseLevel == VERBOSE_ON) Serial.print(F("\b \b")); // exit loop to check if we have entered the the buulding
   // note this loop( ) routine is as of date v51 04jul25 approximately called 5769/sec.dry, without P1/RX2
@@ -3328,74 +3148,6 @@ void loop()
   ArduinoOTA.handle();             // check if we must service on the Air update
   if (verboseLevel == VERBOSE_ON) Serial.print(F(">")); // exit loop to check if we have left the building
 
-  /*
-    Enforce nulll operation tot generate code for using dummyTable as verboseleven will never be 999
-  */
-  /*
-      asm(
-        "NOP;"
-      );
-  */
-
-  #if(defined DUMMYCODE1)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[0] + dummyTable[1] ); // v75b7
-      #warning 1 extra dummy code
-  #endif
-  #if(defined DUMMYCODE2)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[1] + dummyTable[2] ); // v75b7
-      #warning 2 extra dummy code  
-  #endif
-  #if(defined DUMMYCODE3)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[2] + dummyTable[3] ); // v75b7
-      #warning 3 extra dummy code
-  #endif  
-  #if(defined DUMMYCODE4)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-    /*
-        asm(
-        "NOP;"
-        "NOP;"
-        );
-    */        
-      if (verboseLevel == 999)  Serial.println((String) dummyTable[3] + dummyTable[4] ); // v75b7
-      #warning 4 extra dummy code
-  #endif
-  #if(defined DUMMYCODE5)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[4] + dummyTable[5] ); // v75b7
-      #warning 5 extra dummy code      
-  #endif
-  #if(defined DUMMYCODE6)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[5] + dummyTable[6] ); // v75b7
-      #warning 6 extra dummy code      
-  #endif
-  #if(defined DUMMYCODE7)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[6] + dummyTable[7] ); // v75b7
-      #warning 7 extra dummy code      
-  #endif
-  #if(defined DUMMYCODE8)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[7] + dummyTable[8] ); // v75b7
-      #warning 8 extra dummy code      
-  #endif
-  #if(defined DUMMYCODE9)  && defined(DUMMYTABLE_LENGTH) // v75b7 activate if both are defined
-      if (verboseLevel > 999)  Serial.println((String) dummyTable[9] + dummyTable[9] ); // v75b7
-      #warning 9 extra dummy code  
-  #endif
-
-  #if defined(DUMMY_CNTHEAP) && ( DUMMY_CNTHEAP == 2 || DUMMY_CNTHEAP == 3)    
-   #warning Using DUMMY_CNTHEAP  end of loop
-   // NOP_MACRO512  // try if this stabilises
-   cntHeapFinish = ESP.getFreeHeap();    // v75d1, fubar
-    // cntHeapStart++;
-    // cntHeapFinish++; // v75d1
-    // cntHeapFinish = 0; // v75d1
-    /*
-          asm(
-          "NOP;"
-          "NOP;"
-          );
-    */
-  #endif  
-
-  // cntHeapFinish++;
 } // loop() end
 
 
@@ -3666,12 +3418,6 @@ void readTelegramP1() {
         // print validity status of processed for debug reasons.
         allowOtherActivities = true;      // v56c resume finished processing of this P1 record.
 
-        #ifndef DUMMY_SWITCHCMD_Z   // if not testing for override space
-                // NOP_MACRO354              // insert 2+352 NOP's
-                // NOP_MACRO512              // insert 512 NOP's
-        #endif
-        // NOP_MACRO354               // insert 2+352 NOP's
-
         Serial.print((String) (telegram_errIn_cnt > 0 ? '-' : '_'));
         if (validTelegramCRCFound) {
               Serial.print((String) F("C"));      // print checked OK _C -C
@@ -3680,201 +3426,15 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) F("R"));  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
-              #if defined(DUMMY_SWITCHCMD_R) // v75d1 test              
-                 if (switchDebugCmd == 2) {            // v74 add fault analysis
-                     switchDebugCmd = 0;               // v74 reset this condition
-                     Serial.print((String) F("\r\n R fault "));  // v52 count Recoveries _R -R
-                     // serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                     serial_Print_PeekBits(1,(-2 * MAXLINELENGTH)); // print mask compare
-                     serial_Print_PeekBits(1, 1024);       // print time table  
-                     serial_Print_PeekBits(1, 2048);       // print diff table
-                     // outputOnSerial = false;                     // v74e actuvate debugging when tracing timetable
-                 }                    
-             #endif
           } else {
               Serial.print((String) F("Z"));  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
-              #if defined(DUMMY_SWITCHCMD_Z) // v75d1 test              
-                 #if defined(DUMMY_SWITCHCMD_Z0) // v75d1 test
-                   if (switchDebugCmd == 1 || switchDebugCmd == 2) {            // v74 add fault analysis
-                 #else
-                    #ifndef DUMMY_SWITCHCMD_Z1
-                        #ifndef DUMMY_SWITCHCMD_Z2
-                          // NOP translates tp 16bit version NOP.N = 0xF03D
-                        
-                          // object  /home/pafoxp/code-P1Meter/P1Meter.ino.cpp_335.616.o
-                          // 0x0f9d4 - 0x1033C = 2408 --> 1204 instructions
-                          // Binary size 335.616 /home/pafoxp/code-P1Meter/firmware_335.616.bin
-                          // 0x00A7E0  3902 3DFO 3DFO 3DFO    3DFO 3DFO 3DFO 3DFO
-                          // 0x00B140  3DFO 3DFO 3DFO 217A    DE22 0200 DC72 2167
-                          // betwee 0x00B14C - 0x00A7E2 = 2410 --> 1+1204  NOP.N = 0xF03D
-
-                          asm(                    // + 8*2 bytes
-                          //  333.568  320/ 160 NOP's 
-                          //  333.248  32
-                          //  333.216  8 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
-                          //  333.216  5 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
-                          //  333.216  3 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
-                          //  333.216  2 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
-
-                          //  333.200  1 = +/+ 16 bytes -->  error as like switchDebugCmd = 0; will cause some z's
-                          //  333.200  NO DUMMY_SWITCHCMD_Z 
-                            "NOP;"   // 333.216   // Z-errors
-                            "NOP;"   // 333.216
-
-                            // 11 NOP/line  333.216 --> 333.568  -/-352  (stable)
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-                            
-                            // 10 NOP/line  333.216 --> 333.536  -/-320  3i/0s/2z/2r of 20
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-                            
-                            //  8 NOP/line  333.216 --> 333.472  -/-256  0i/2s/1z/3r of  27
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-
-                            //  7 NOP/line  333.216 --> 333.440  -/-224  0i/1s/3z/4r of  27
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-                            
-                            //  6 NOP/line  333.216 --> 333.408  -/-192  0i/6s/1z/3r of  27
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-                            
-                            //  5 NOP/line  333.216 --> 333.376  -/-160  0i/1s/1z/3r of  27
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-                            
-                            //  4 NOP/line  333.216 --> 333.344  -/-128  0i/5s/3z/6r of 27
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-                            
-                            //  4 NOP/line  333.216 --> 333.312  -/- 96  0i/10s/2z/4r of 27
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-
-                            //  4 NOP/line  333.216 --> 333.280  -/- 64  0i/4s/0z/9r of 29
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-
-                            //  4 NOP/line  333.216 --> 333.216  -/- 32  0i/10s/3z/4r of 28
-                            // "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"
-
-                            //  333.200  without 2Nops 0i/2s/0z/5r of 34  very stable
-                            // "NOP;NOP;"
-
-                            // adding block to (slack 333.200+2) base version 333.216 total size 333.568, very stable
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 288
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 320
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 352
-
-                          /* 
-                            // massive blocks to check where this is shown in object
-
-                            // add 256 333.824 stable
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256                            
-                            // add 256 334.080 stable
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256                            
-
-
-                            // add 334.592 stable 512
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
-
-
-                            // add 335.616 stable 1024
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  32
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  64
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  //  96
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 128
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 160
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 196
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 224
-                            "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"  // 256
-                          */
-
-                          );
-                          // switchDebugCmd = 0;               // v74 reset this condition
-                          // #error ddddd
-                        #endif
-                    #endif
-                 #endif
-                      #if defined(DUMMY_SWITCHCMD_Z1) // v75d1 test              
-                        Serial.print((String) F("\r\n Z fault "));  // v52 count Recoveries _R -R
-                      #endif
-                      #if defined(DUMMY_SWITCHCMD_Z2) // v75d1 test
-                         serial_Print_PeekBits(1, 1024);   // v74 print serial_port1 table after this fault
-                       #endif
-                       // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable
-                 #if defined(DUMMY_SWITCHCMD_Z0) // v75d1 test
-                   }
-                 #endif
-
-               /**/
-              #else
-                  /// NOP_MACRO354               // insert 2+352 NOP's
                   if (switchDebugCmd == 1) {            // v74 add fault analysis
-                     // NOP_MACRO354               // insert 2+352 NOP's
-                     // NOP_MACRO512               // insert 512 NOP's
                      // switchDebugCmd = 0;               // v74 reset this condition
                      Serial.print((String) F("\r\n Z fault "));  // v52 count Recoveries _R -R
                      serial_Print_PeekBits(1, 1024);   // v74 print timetable after this fault
                      // outputOnSerial = true;                     // v74e actuvate debugging when tracing timetable
                    }
-              #endif
           } 
         }
 
@@ -4539,7 +4099,7 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
                  + ( (char)payload[1] == '1' ?  serial1Baudrate : serial2Baudrate )
                  + F("\t") );
         }
-    } else  if ( (char)payload[0] == '\\') {   // v60a change l_bitwait        
+    } else  if ( (char)payload[0] == '\\') {  // test 
           Serial.println(F("hello"));
     } else  if ( (char)payload[0] == 'K' || (char)payload[0] == 'k' ) {   // v60a change l_bitwait
           Serial.print((String) F("\n\rM_TIME_BIT_START=") + mySerial1.peekTime(M_TIME_BIT_START) 
@@ -7289,7 +6849,6 @@ void openCloseSerial(int serial_port_number, int serial_port_mode ) {   // SERIA
         Serial.printf("\r\nWrong call %d using seria %d mode %d , states:\r\n", __LINE__, serial_port_number, serial_port_mode );
         printf_port_state_isr();
       }
-  RETURN_NOP_MACRO512;      
 }  // openCloseSerial()    
 
 /*
@@ -7300,14 +6859,13 @@ void printf_port_state_isr() {
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 2, (bSerial2State ? 1 : 0) , (mySerial2.portActive() ? 1 : 0));
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 3, (bSerial3State ? 1 : 0) , (mySerial3.portActive() ? 1 : 0));
          Serial.printf("..serial%i , state=%i ISR=%i\r\n", 4, (bSerial4State ? 1 : 0) , (mySerial4.portActive() ? 1 : 0));
-  RETURN_NOP_MACRO512;         
 }
 
 /*
   Diagnose, print a series of Times as collected by softserial
 */
 void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
-  doDUMMY_MACRO;    // dv77a do some dummy code
+
   if (time_port == 1) {
     /* tt re              +25213841    327691760 
                       START      RXstart      RX-end      START-rxE = B_start     Be-RX=  B_start  +Bend-start= TA-start  TA-e-TA-s = TA-end
@@ -7377,14 +6935,13 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
         + F("\r\n")
         );
   }                
-  RETURN_NOP_MACRO512;
 }
 
 /*
   Diagnose, print a series of Bit Times as collected by softserial
 */
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
-  doDUMMY_MACRO;    // dv77a do some dummy code
+
   if (bit_port == 1) {
     unsigned long temp,tempc1,tempc2,tempc3 = 0UL;               // check duplicates          
     unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
@@ -7766,14 +7323,13 @@ void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
   }    
 
   Serial.print((String) F("\r\n\t\t\t-------------time:") + micros() + F("\r\n"));
-  RETURN_NOP_MACRO512;
 }
 
 /*
     v74g 10aug26 Print the input array table split from command sequences
 */
 void printCrcInTable() {
-  doDUMMY_MACRO;    // dv77a do some dummy code
+
   bool tmpdataFaultDetected = false;
   Serial.print((String) F("\r\nsI=0\t"));   // initialise
   for (int cnt = 0; cnt < telegram_crcIn_len+4; cnt++) {
@@ -7797,14 +7353,13 @@ void printCrcInTable() {
     }
   }
   Serial.println((String)F("<< eom"));    // v33 debug lines didnot end in newline
-  RETURN_NOP_MACRO512;  
 }
 
 /*
     v74g 10aug26 Print the Masking array table split from command sequences
 */
 void printcrcOutTable() {
-      doDUMMY_MACRO;    // dv77a do some dummy code
+
       Serial.print((String) F("\r\nsM=0\t"));   // initialise
       for (int cnt = 0; cnt < telegram_crcOut_len+4; cnt++) {
         if (isprint(telegram_crcOut[cnt])) {             // if printable
@@ -7821,7 +7376,6 @@ void printcrcOutTable() {
         }
       }
       Serial.println((String)F("<< eom"));    // v33 debug lines didnot end in newline
-  RETURN_NOP_MACRO512;      
 }
 
 /*
@@ -7844,7 +7398,6 @@ void print_binary(unsigned int number) {
     if (number >> 1) print_binary(number >> 1);
     Serial.print((String) (number & 1 ? F("1") : F("0")));
   }
-  RETURN_NOP_MACRO512;  
 }
 
 /* return printabel character for diagnose */
@@ -7868,6 +7421,7 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
     if (Serial.available()) { 
        // Check if data is available to read    
        String data = Serial.readStringUntil('\n'); // Read until newline    
+       // Serial.println( (String) F("\t>>")+data+F("==")+(char) data[0] +F("<<\t"));      // Print the received data cannot F()
        Serial.println("\t>>"+data+"=="+(char) data[0] +"<<\t");      // Print the received data cannot F()
 
         publishMqtt(mqttLogTopic, (String) "ESP P1 console:" 
@@ -7889,6 +7443,23 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
              serial_Print_PeekBits(2,(-2 * MAXLINELENGTH));     // print mask compare P2
        } else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
          else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
+         // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), F("hello")); // crash
+         // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), PSTR("hello")); // crash
+         // else if  ((char) data[0] == 'p') publishMqtt(mqttLogTopic, (String) F("test:") + mqttCnt_Out + F(").") ); // ok
+         /*
+         else if  ((char) data[0] == 'p') publishMqtt(mqttLogTopic, (String) F("ESP P1 console:")
+                                            + (char) data[0] 
+                                            + F("=") 
+                                            + (int) data[0]   // 1Z/rrrr
+
+                                            + F(", (") 
+
+                                            + mqttCnt_In      // causes unstable but not yet anymore
+                                            + F("/")  
+                                            + mqttCnt_Out 
+                                            + F(").")  
+                                      );
+         */
          else if  ((char) data[0] == 'm') {       // v48 10jun25 print m-asked Input array
                    Serial.println((String)F("\r\n dataIn telegram_crcIn")
                     + F(" myLen=") + telegram_crcIn_len 
@@ -7911,23 +7482,15 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
                   printcrcOutTable();    // v74g split to subroutine 
        }
      }
-  RETURN_NOP_MACRO512;     
 }
 
 /* print time table related to ISR  
  */
 void serial_Print_m_buffer_time() {      // print tiem table offset
-   doDUMMY_MACRO;    // dv77a do some dummy code
+
    unsigned long offset  = -1;   // time offset setup
    unsigned long offset2 = -1;   // time offset ISR timing
 
-      // v77a 19aug26 23u19  dummy code which improves before the next two (whoich have no volatile in their in=i defintion
-      // unsigned long offset3 =  0;   // time offset ISR timing
-      //      for ( volatile int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
-      //         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) > offset3 ) offset3 = mySerial1.peekTime(i);
-      //      }
-
-      // return; // does not improve things
    #ifdef M_TIME_NAMES
       // v77a 19aug26 23u19 the fornext must use volatile as without, things become unstable
       for (  volatile int i = M_TIME_RX_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number, so table is printed as offset to attach/detach 
@@ -7940,11 +7503,6 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
          if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) < offset2 ) offset2 = mySerial1.peekTime(i);
       }
 
-      // dummy code which improves when wat least one of before loop one of them have volatile
-      // unsigned long offset3 =  0;   // time offset ISR timing
-      //      for (int i = M_TIME_BIT_ISR_START; i < M_TIME_ENTRIES ; i++) {   // search lowest number inside ISR so things are printed as offset within ISR
-      //         if ( mySerial1.peekTime(i) >=1 && mySerial1.peekTime(i) > offset3 ) offset3 = mySerial1.peekTime(i);
-      //      }
    #endif
 
       Serial.print((String) F("\r\n M_TIME_ENTRIES #") + M_TIME_ENTRIES + F(" , currentcycle=") + ESP.getCycleCount() + F(" , SSoffset= ") + offset + F(" , ISRoffset= ") + offset2);
@@ -7980,14 +7538,13 @@ void serial_Print_m_buffer_time() {      // print tiem table offset
       Serial.print((String) F("\r\n M_TIME_BIT_ISR2_EXIT    24 =  last ISR exit                           = ") + ((mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)    == 0) ? 0 : (mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   - offset2)) + F("\t( ") + mySerial1.peekTime(M_TIME_BIT_ISR2_EXIT)   + F(" )") ) ;
       Serial.print((String) F("\r\n"));
   #endif
-  RETURN_NOP_MACRO512;
 }   
 
 /*  
   facilitate Help command
 */
 void doCmdHelp() {    // v76
-      doDUMMY_MACRO;    // dv77a do some dummy code
+
       Serial.println((String)F("\r\n? (bell) \a Help commands ")  + __FILE__ 
                                                     + " version " + DEF_PROG_VERSION 
                                                     + ", compiled " __DATE__ + " " + __TIME__ );
@@ -8103,7 +7660,6 @@ void doCmdHelp() {    // v76
                             + F("\t") + THERMOSTAT_READ   + F("=THERMOSTAT_READ:")  + !digitalRead(THERMOSTAT_READ)  
                             + F("\t") + THERMOSTAT_WRITE  + F("=THERMOSTAT_WRITE:") + !digitalRead(THERMOSTAT_WRITE) 
                             + F("\t") + ANALOG_IN         + F("=ANALOG_IN:")        +   analogRead(ANALOG_IN)       );  
-  RETURN_NOP_MACRO512;
 }
 
 /* v78c -2026-09-06 21:37:58
@@ -8149,7 +7705,6 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
         }
       }
   }
-  RETURN_NOP_MACRO512;
 }  
 
 /*  ESP.getMaxFreeBlockSize(); = unknown
