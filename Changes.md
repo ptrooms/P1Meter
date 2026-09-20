@@ -8,13 +8,18 @@
     Note2: supended deveopment branch
     create stable Versions-Vxx which when stable are merged into master.
 
-## [v21.80a] -  Return to V79: investigate instability caused by using syslog
+## [v21.80a] -  Return to V79: reduce RAM footprint
 
-    - we for test start to only include the syslog function without using it.
-    - version 80 is not stable we have about 400 failures during 12hrs, we return to v79/master
+    - v80d  libs/SoftwareSerial241-P1/SoftwareSerial241.cpp print/cpmnstants converted to PSTR(), F()
+    - v80c  P1Meter.ino removed dummy/NOP Macros, stability approx 98%
+    - v80b  99% stable conversion print/ln(contants)fully converted to Flash using F(), 
+    - v80a  return to v79 , trial error, same (less) symptoms with any other extra function like printing tot mqtt
+
+    - v80 we for test start to only include the syslog function without using it.
+    - version 80/base is not stable we have about 400 failures during 12hrs, we return to v79/master
     - incorperated git submodule add https://github.com/jerryr/EspSyslog libs/EspSyslog (having Syslog.cpp & Syslog.h)
 
-## [v21.80] -  syslog function
+## [v21.80] -  syslog function (abondended)
 
     - version is not stable we have about 400 failures during 12hrs, we return to v79/master
     - and end of code we reduced actual size by // NOP_MACRO_END1K
@@ -77,7 +82,7 @@
         - 15aug26 In case the water ISR overruns, we pause i until, hotwate is tapped.
             hopefully this will move the the water-blinker away from vibration causing interrupts
             Rhis is doen via mapping erroWaterSwitch conditions which is then also reports
-            on JSON !Waterswitch:int (0x10/error, 0x02 reported, 0x01 waiting for hoton))
+            on JSON !Waterswitch:int (0x10/error, 0x02 reported, 0x01 waiting for hoton)
         - changed logic for errorSwitchdebug:
                 "ter" will report  any every Z with table until an error R error with details,
                 "tez""will continious report any Z-error.
@@ -266,6 +271,7 @@
     - 15apr21 00u02 changed to platformio 1.6.0 (uses arduino 2.4.0) to check if this stabilize
     - 15apr21 00u02 platformio 1.7.0 (uses arduino 2.4.1) wdt reset after 500-800 reads
     - removed delay in local-yields
+
 ## [V21.21]
 
     - 14apr21 01u50 only output to mqtt if it is connected  via "if (client.connected())" 

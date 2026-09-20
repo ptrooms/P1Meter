@@ -1,4 +1,5 @@
-/* SoftwareSerial.cpp  v79 - 2026-09-08 13:50:11 new master
+/* SoftwareSerial.cpp  v80d - converted print/strings to F() and array to PSTR() using pgm_read_byte(str1/2+m_inpos)
+   v79 - 2026-09-08 13:50:11 new master
 
    v78d - 07sep26 base version, using RXREAD59 now reduced to basic function.
          deactivate variable bittiming and blueled signalling via bitwai value.
@@ -196,7 +197,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, int inverse_logi
          if (receivePin == 14) ObjList[17] = this;
          enableRx(true);
       } else {
-         Serial.println((String) "Serial Buffer allocation error.");
+         Serial.println((String) F("Serial Buffer allocation error."));
       }
    }
    if (isValidGPIOpin(transmitPin) || transmitPin == 16) {
@@ -260,7 +261,7 @@ SoftwareSerial::SoftwareSerial(int receivePin, int transmitPin, bool inverse_log
          ObjList[m_rxPin] = this;
          enableRx(true);
       } else {
-         Serial.println((String) "Serial Buffer allocation error.");
+         Serial.println((String) F("Serial Buffer allocation error."));
       }
    }
    if (isValidGPIOpin(transmitPin) || transmitPin == 16) {
@@ -283,7 +284,7 @@ SoftwareSerial::~SoftwareSerial() {    // P1meter never called as we keep the bu
       free(m_buffer_time);
    if (m_buffer_bits)          // v59b
       free(m_buffer_bits);
-   Serial.println((String) "SoftwareSerial freed().");
+   Serial.println((String) F("SoftwareSerial freed()."));
 }
 
 bool SoftwareSerial::isValidGPIOpin(int pin) {
@@ -292,7 +293,7 @@ bool SoftwareSerial::isValidGPIOpin(int pin) {
 
 void SoftwareSerial::begin(long speed) {
    // Use getCycleCount() loop to get as exact timing as possible
-   Serial.print((String) ":B" + (portActive() ? "!" : "@") + m_rxPin);      /// v58b/v59 diagnose
+   Serial.print((String) F(":B") + (portActive() ? F("!") : F("@")) + m_rxPin);      /// v58b/v59 diagnose
    this->begin(speed,SERIAL_RECORDTYPE_PORT);   // do normal serial
    
    /*
@@ -318,7 +319,9 @@ void SoftwareSerial::begin(long speed) {
 void SoftwareSerial::begin(long speed, int recordtype) {
    // str1 and str2 are simulation, terminated by 0xff
    // const char * str1 =  "/KFM5KAIFA-METER\r\n\r\n1-3:0.2.8(42)\r\n0-0:1.0.0(210420113523S)\r\n0-0:96.1.1(1234567890123456789012345678901234)\r\n1-0:1.8.1(012345.111*kWh)\r\n1-0:1.8.2(012345.222*kWh)\r\n1-0:2.8.1(000000.000*kWh)\r\n1-0:2.8.2(000000.000*kWh)\r\n0-0:96.14.0(0002)\r\n1-0:1.7.0(00.560*kW)\r\n1-0:2.7.0(00.000*kW)\r\n0-0:96.7.21(00003)\r\n0-0:96.7.9(00003)\r\n1-0:99.97.0(5)(0-0:96.7.19)(210407073103W)(0000001404*s)(181103114840W)(0000008223*s)(180911211118S)(0000003690*s)(160606105039S)(0000003280*s)(000101000001W)(2147483647*s)\r\n1-0:32.32.0(00000)\r\n1-0:32.36.0(00000)\r\n0-0:96.13.1()\r\n0-0:96.13.0()\r\n1-0:31.7.0(002*A)\r\n1-0:21.7.0(00.560*kW)\r\n1-0:22.7.0(00.000*kW)\r\n!078E validated CR , normal=078E\r\n\xFF";                 
-      const char * str1 =  "/KFM5KAIFA-METER\r\n"
+   // read https://arduino-esp8266.readthedocs.io/en/latest/PROGMEM.html#how-do-i-use-inline-flash-strings
+      const char * str1 = PSTR(
+                           "/KFM5KAIFA-METER\r\n"
                            "\r\n"
                            "1-3:0.2.8(42)\r\n"
                            "0-0:1.0.0(210420113523S)\r\n"
@@ -347,9 +350,11 @@ void SoftwareSerial::begin(long speed, int recordtype) {
                            "1-0:21.7.0(00.560*kW)\r\n"
                            "1-0:22.7.0(00.000*kW)\r\n"
                            "!078E validated CR , normal=078E\r\n"
-                           "\xFF";                
+                           "\xFF"
+                          );
    // const char * str2 =  "_/VALID-VI\\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
-      const char * str2 =  "_/VALID-VI\\"
+      const char * str2 =  PSTR(
+                           "_/VALID-VI\\"
                            " 1-3:0.2.8(50) "
                            "0-0:1.1.0(250714103614W) "
                            "0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) "
@@ -357,25 +362,26 @@ void SoftwareSerial::begin(long speed, int recordtype) {
                            "0-1:96.1.0(20000000000000000000000000000000) "
                            "0-1:24.2.1(250714103600W)(12.000*GJ)"
                            "!A5AE_E621_B"
-                           "\xff";
+                           "\xff"
+                           );
 
    // Serial.print((String) "\r\nBegin port" + m_rxPin  + " cycle" + GET_CYCLE_COUNT + "\r\n");
    m_buffer_time[M_TIME_BEGIN_START] = GET_CYCLE_COUNT;   // initialise
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694
    m_highSpeed = speed > 9600;
    m_P1active = false;                    // 28mar21 added Ptro for P1 serialisation between '/' and '!'
-   Serial.print((String) (portActive() ? "!" : "@") ); // v58b/v59 diagnose
+   Serial.print((String) (portActive() ? F("!") : F("@")) ); // v58b/v59 diagnose
    if (recordtype == SERIAL_RECORDTYPE_PORT ) {                // use real port
-         Serial.print((String) "\b" +  (m_rxPin == 14 ? "p" : "w" ) );         // v59 print indication which port to activate
+         Serial.print((String) F("\b") +  (m_rxPin == 14 ? F("p") : F("w") ) );         // v59 print indication which port to activate
          if (!m_rxEnabled) enableRx(true);
-         else Serial.print((String) "\b" +  (m_rxPin == 14 ? "P" : "W" ));    // v59 print indication thingy was already active
+         else Serial.print((String) F("\b") +  (m_rxPin == 14 ? F("P") : F("W") ));    // v59 print indication thingy was already active
          /*
          // Serial.print((String) "\tset@"+ m_rxPin + "=>"); // v58b diagnose
          // note: plain use will calll somethign else and produeces
          this->begin(speed);   // do normal serial
          */
       } else {                                                 // use/simulate data generated power 1=P1/str1, 2=RX/str2
-         Serial.print((String) "\b\tuse@");  
+         Serial.print((String) F("\b\tuse@"));  
          // char *  str = warning: deprecated conversion from string constant to 'char*'
          // corrected to const char * str
          // Serial.print((String) "\r\n using serial " + __FILE__ +  "\r\n" + str);         
@@ -392,21 +398,27 @@ void SoftwareSerial::begin(long speed, int recordtype) {
          // no match for call to '(String) (unsigned int&)'  
          // Serial.print((String) "\r\n using serial " + __FILE__  + ">") ;
          if (recordtype == SERIAL_RECORDTYPE_WL) {
-               for (m_inPos = 0;  str2[m_inPos] != 0xff && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
-               m_buffer[m_inPos] = str2[m_inPos];  // move data
+            //   for (m_inPos = 0;  str2[m_inPos] != 0xff && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
+            //   m_buffer[m_inPos] = str2[m_inPos];  // move data
+               for (m_inPos = 0;   pgm_read_byte(str2 + m_inPos) != 0xff
+                                       && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
+               m_buffer[m_inPos] = pgm_read_byte(str2 + m_inPos); 
                // Serial.print((String) m_buffer[m_inPos]);
                }
          } else {
-            for (m_inPos = 0;  str1[m_inPos] != 0xff && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
-               m_buffer[m_inPos] = str1[m_inPos];  // move data
+            // for (m_inPos = 0;  str1[m_inPos] != 0xff && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
+            //    m_buffer[m_inPos] = str1[m_inPos];  // move data
+               for (m_inPos = 0;   pgm_read_byte(str1 + m_inPos) != 0xff
+                                       && (m_inPos % m_buffSize) < m_buffSize  ;m_inPos++ ) {
+               m_buffer[m_inPos] = pgm_read_byte(str1 + m_inPos); 
                // Serial.print((String) m_buffer[m_inPos]);
             }
          }
 
          m_inPos++;  // position after  last one
          // Serial.print((String) "<\r\n Serialsize=" + m_inPos + " + \r\n");
-         Serial.print((String)  m_rxPin + (portActive() ? "I" : "i" ) + ":"  + recordtype + " "); /// v59 diagnose
-         if (false) Serial.println(" Dummy print line" + __LINE__ );   // v59 just checking if this influences stability
+         Serial.print((String)  m_rxPin + (portActive() ? F("I") : F("i") ) + F(":")  + recordtype + F(" ")); /// v59 diagnose
+         // if (false) Serial.println((String) F(" Dummy print line") + __LINE__ );   // v80c removed, v59 just checking if this influences stability
 
    }
    m_buffer_time[M_TIME_BEGIN_END] = GET_CYCLE_COUNT;   // initialise

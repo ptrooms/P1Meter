@@ -1,6 +1,7 @@
 
-#define VERSION_NUMBER "80c" // v80c 2026-09-20 00:06:46 97% stable after cleaning dummy code
-                            // 80b 2026-09-19  was very stable 99%
+#define VERSION_NUMBER "80d"// v80d 2026-09-21 00:01:14 SoftwareSerial241.cpp , print/constants to PROGMEM / F() / PSTR()
+                            // v80c 2026-09-20 00:06:46 97% stable after cleaning dummy code
+                            // 80b 2026-09-19 was very stable 99%
                             // v80 2026-09-17 version to actively use syslog, works but P1 unstbale.
                             // v79 2026-09-06 23:12:58 06sep26 master base version
                             // v77b 20aug26 enhance bittiming with bitshuft on soft=serial
@@ -26,6 +27,7 @@ Flash Variable	const char t[] PROGMEM = "Hi";	Serial.print(FPSTR(t)); 	0 bytes (
 
 /* code documentation v78.... starting 31aug26
       v80c - 2026-09-20 00:08:36 clear dummy/nop code and add 2 other F() strings
+           - SoftwareSerial241.cpp print()/constamnns moved to Flash PSTR(), F()
       v80b - 2026-09-19 15:06:34 move print constants to flash/progmem:  print(.*)"(.*)" --> print$1F("$2")
           - this solves the erratic behavior , very stable 4500/50 errors
           - see https://arduino-esp8266.readthedocs.io/en/latest/PROGMEM.html
@@ -1504,6 +1506,11 @@ const int durationTemp = 5000;            // The frequency of temperature measur
 //  port1 commands: i/I make P1 timeout critica, l/L logging, R-estart, P/p-ublish-P1
 
 // array (not used) to facilitate character ruler (if any)
+/*
+const char *decArray  = PSTR("000000000111111111122222222223333333333444444444455555555556666666666777777777788888888888"); // v80c
+const char *numArray  = PSTR("123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"); // v80c
+const char *charArray = PSTR("abcdefghi1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9"); // v80c
+*/
 const char *decArray  = "000000000111111111122222222223333333333444444444455555555556666666666777777777788888888888";
 const char *numArray  = "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890";
 const char *charArray = "abcdefghi1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9";
