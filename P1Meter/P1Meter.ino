@@ -1,5 +1,6 @@
-
-#define VERSION_NUMBER "80d"// v80d 2026-09-21 00:01:14 SoftwareSerial241.cpp , print/constants to PROGMEM / F() / PSTR()
+// #pragma optimize( "g", off )
+#define VERSION_NUMBER "82" // v81 2026-09-25 13:18:17 return to WL258
+                            // v80d 2026-09-21 00:01:14 SoftwareSerial241.cpp , print/constants to PROGMEM / F() / PSTR()
                             // v80c 2026-09-20 00:06:46 97% stable after cleaning dummy code
                             // 80b 2026-09-19 was very stable 99%
                             // v80 2026-09-17 version to actively use syslog, works but P1 unstbale.

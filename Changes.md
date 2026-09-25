@@ -8,6 +8,12 @@
     Note2: supended deveopment branch
     create stable Versions-Vxx which when stable are merged into master.
 
+## [v21.82] -  final version for master
+
+    - v81 corrupted
+    - length of WL test record is finalized on 258 , effective reliability is 8 to 15%
+    - v80d test & experiments on varyiung length WL2 test record which influences read stability
+
 ## [v21.80a] -  Return to V79: reduce RAM footprint
 
     - v80d  libs/SoftwareSerial241-P1/SoftwareSerial241.cpp print/cpmnstants converted to PSTR(), F()

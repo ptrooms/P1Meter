@@ -1,4 +1,5 @@
-/* SoftwareSerial.cpp  v80d - converted print/strings to F() and array to PSTR() using pgm_read_byte(str1/2+m_inpos)
+/* SoftwareSerial.cpp  v82 - 2026-09-25 13:18:54 length WL record 258
+   v80d - converted print/strings to F() and array to PSTR() using pgm_read_byte(str1/2+m_inpos)
    v79 - 2026-09-08 13:50:11 new master
 
    v78d - 07sep26 base version, using RXREAD59 now reduced to basic function.
@@ -353,8 +354,10 @@ void SoftwareSerial::begin(long speed, int recordtype) {
                            "\xFF"
                           );
    // const char * str2 =  "_/VALID-VI\\ 1-3:0.2.8(50) 0-0:1.1.0(250714103614W) 0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) 0-1:24.1.0(012) 0-1:96.1.0(20000000000000000000000000000000) 0-1:24.2.1(250714103600W)(12.000*GJ)!A5AE_E621_B\xff";
+      /*
       const char * str2 =  PSTR(
-                           "_/VALID-VI\\"
+                        // "_/VALID-VI\\"
+                           "/VALID-VI\\"
                            " 1-3:0.2.8(50) "
                            "0-0:1.1.0(250714103614W) "
                            "0-0:96.1.1(1000000000000000000000000000000000000000000000000000000000000000) "
@@ -362,9 +365,40 @@ void SoftwareSerial::begin(long speed, int recordtype) {
                            "0-1:96.1.0(20000000000000000000000000000000) "
                            "0-1:24.2.1(250714103600W)(12.000*GJ)"
                            "!A5AE_E621_B"
-                           "\xff"
+                           "\xff\x00"
                            );
-
+      */
+      const char * str2 =  PSTR(                      // official test record anonymised 277 = 239 data + 5 CRC + 33 TrailerBytes
+                           "/WARMTELINK-VI\\\r\n"
+                           "\r\n"
+                           "1-3:0.2.8(50)\r\n"
+                           "0-0:1.1.0(250714112709W)\r\n"
+                           "0-0:96.1.1(1234567890123456789012345678901234567890123456789012345678901234)\r\n"
+                           "0-1:24.1.0(012)\r\n"
+                           "0-1:96.1.0(12345678901234567890123456789012)\r\n"
+                           "0-1:24.2.1(250714112700W)(12.345*GJ)\r\n"
+                           "!BE7B"
+                           "\xffOK"           // 247 = 239 data + 5 CRC + 4-1   TrailerBytes
+                           "\x00"             // 248 = 239 data + 5 CRC + 4+0   TrailerBytes 2026-09-23 14:29:33 wdt Z130/1024 13%
+                           "\x00\x00\x00\x00\x00\x00\x00\x00\x00" // 257  compensate -/-1 as version is 81 iso 80d
+                        // "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" // 258 2026-09-24 21:31:07 258  
+                        // "\x00"             // 249 = 239 data + 5 CRC + 4+1   TrailerBytes  2026-09-23 20:21:46 Z773/6428 12%
+                        // "\x00"             // 250 = 239 data + 5 CRC + 4+2   TrailerBytes  2026-09-23 14:47:08 Z100/1025 4-10%
+                        // "\x00"             // 251 = 239 data + 5 CRC + 4+3   TrailerBytes  2026-09-22 23:36:49 Z655/5391 12,1%
+                        // "\x00"             // 252 = 239 data + 5 CRC + 4+4   TrailerBytes  2026-09-22 22:50:39 Z35/250 14%
+                        // "\x00"             // 253 = 239 data + 5 CRC + 4+5   TrailerBytes  Z 28/200  14,0%
+                        // "\x00"             // 254 = 239 data + 5 CRC + 4+6   TrailerBytes  Z558/5384 10,0% Z1-start
+                        // "\x00"             // 255 = 239 data + 5 CRC + 4+6+1 TrailerBytes  Z192/ 650 29,5%
+                        // "\x00"             // 256 = 239 data + 5 CRC + 4+6+2 TrailerBytes  Z130/1000 13,0%
+                        // "\x00"             // 257 = 239 data + 5 CRC + 4+6+3 TrailerBytes  Z144/1000 14,0% 
+                        // "\x00"             // 258 = 239 data + 5 CRC + 4+6+4 TrailerBytes  Z340/4600  7,3%
+                        // "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"      // 16 bytes
+                        // "\x00"       // 275 = 239 data + 5 CRC + 31 TrailerBytes
+                        // "\x00"       // 276 = 239 data + 5 CRC + 32 TrailerBytes
+                        // "\x00"       // 277 = 239 data + 5 CRC + 33 TrailerBytes causes some instability 
+                           );
+      
+   
    // Serial.print((String) "\r\nBegin port" + m_rxPin  + " cycle" + GET_CYCLE_COUNT + "\r\n");
    m_buffer_time[M_TIME_BEGIN_START] = GET_CYCLE_COUNT;   // initialise
    m_bitTime = ESP.getCpuFreqMHz()*1000000/speed;	// for 115k2=80000000/115200 = 694

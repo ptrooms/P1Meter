@@ -1,3 +1,4 @@
+#pragma optimize( "g", off )
 /* SoftwareSerial.h v79 2026-09-08 13:51:36 new master
    v78   - 31aug26 base version
    v77b  - 20aug26 bittiming/bitshift in libs/SoftwareSerial241-P1/SoftwareSerial241.cpp 
