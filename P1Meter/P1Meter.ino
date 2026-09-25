@@ -4554,6 +4554,49 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
     /                        Publish full as JSONPATH record
     / -------------------------------------------------------------------------------
 */
+
+/*
+  #pragma GCC push_options
+  #pragma GCC optimize ("O0")
+  your code
+  #pragma GCC pop_options
+
+  Variants:
+    #pragma message "script 24c256 file option used"
+    _Pragma("GCC warning \"'rtc io' not supported\"")
+    _Pragma("GCC warning \"'EXT 1 wakeup' not supported using gpio mode\"")
+  #pragma inline
+  #pragma pack(1)
+  #pragma pack(0)
+
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wunused-variable"
+  #pragma GCC diagnostic pop
+  #pragma GCC diagnostic ignored "-Wunused-parameter"
+  #pragma GCC diagnostic ignored "-Winvalid-offsetof"   // avoid warnings since we're using offsetof() in a risky way
+  #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+
+  #pragma GCC diagnostic ignored "-Wunused-function"
+  #pragma GCC diagnostic ignored "-Wunused-variable"
+  #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+  #pragma GCC diagnostic ignored "-Wvla"
+  #pragma GCC diagnostic ignored "-Wpointer-arith"
+  #pragma GCC diagnostic ignored "-Wnarrowing"
+  #pragma GCC diagnostic ignored "-Wnull-dereference"
+  #pragma GCC diagnostic ignored "-Wstringop-overflow"
+
+  #pragma GCC optimize ("O3")
+  #pragma GCC optimize ("Os")
+
+  #pragma GCC diagnostic pop
+
+  #pragma once      // header only included once
+*/
+
+#pragma GCC optimize ("O2")                                   // v82
+#pragma message " ** publishP1ToMqtt optimized using O2 ** "  // v82
 void publishP1ToMqtt()    // this will go to Mosquitto
 {
   preserve_lightReadState_for_mqtt = false;  // indicate we have/will process this state  
@@ -4593,15 +4636,22 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(",\"ThermoState\":%u");                 // Johnson
     msg.concat(",\"AnalogRead\":%u");                  // adc
     msg.concat(",\"LedLight1\":%u");                   // Hot water witch on
+    
+    // if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0) { // v82 validate output only
+    // if ( powerConsumptionHighTariff > 0 && publishP1ToMqttCrc > 0 ) { // v82 validate output only OK1
+    // if ( powerConsumptionLowTariff > 0 && publishP1ToMqttCrc > 0 ) { // v82 validate output only
+    // if ( publishP1ToMqttCrc ) { // v82 validate output only
 
-    if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0 ) {
+    if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0 && powerConsumptionHighTariff) { // v82 validate output only
+    // if ( publishP1ToMqttCrc > 0 && powerConsumptionHighTariff > 0 ) { // v82 validate output only OK Z15
         msg.concat(", \"powerConsumptionLowTariff\":%lu");  // P1   always > 0
         msg.concat(",\"powerConsumptionHighTariff\":%lu"); // P1   always > 0
     } else {
-        msg.concat(",\"!powerConsumptionLowTariff\":%lu");  // v46 P1 false or missing read, ignore field
+        msg.concat(", \"!powerConsumptionLowTariff\":%lu");  // v46 P1 false or missing read, ignore field
         msg.concat(",\"!powerConsumptionHighTariff\":%lu"); // v46 P1 false or missing read, ignore field
     }
-    
+   // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;");
+
     // msg.concat(",\"P1crc\":%u");                       // v77 moved to start Validity CRC 0 or 1
 
     char temperatureString[7];
@@ -6951,7 +7001,8 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp,tempc1,tempc2,tempc3 = 0UL;               // check duplicates          
+    unsigned long temp = 0UL;                        // check duplicates          
+    // unsigned long tempc1,tempc2,tempc3 = 0UL;     // v82 avoid unused message
     unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
