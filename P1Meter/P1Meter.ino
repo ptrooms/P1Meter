@@ -2159,10 +2159,10 @@ void setup()
   ArduinoOTA.setHostname(hostName);   // nodemcut1/p1
   Serial.println(F("ArduinoOTA.setHostname set") );
   //   Serial.println(F("1") ); 
-    // logger.info("connected to wifi");   // with/out it cause Z
+  logger.info("connected to wifi");   // v82
   
   ArduinoOTA.onStart([]() {
-    // logger.info("OTA new version." );   // v80b
+    logger.info("OTA new version." ); // v82
     Serial.println(F("Start"));
   });
 
@@ -2190,8 +2190,6 @@ void setup()
   });
   
   Serial.println(F("ArduinoOTA.begin() activated.") );
-  // logger.info("start." );   // v80b 
-  // logger.info("loggerline 2306" );   // with/out it cause Z
   
   //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   // #define DEF_PROG_VERSION 1123.240
@@ -4771,7 +4769,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             publishP1ToMqttCrc,         // v77 to start, v45 1=validTelegramCRCFound or 2=recovered validCrcInFound
             CurrentPowerConsumption,
             !thermostatReadState,       // input setting Switch press 1=ON low , Not active High 0=OFF
-            filteredValueAdc,           // read analog value
+            filteredValueAdc,           // read ana  value
             !lightReadState,            // Hotwater we want 1=ONlight , Not active 0=OFFlight
             powerConsumptionLowTariff,
             powerConsumptionHighTariff,
@@ -7473,7 +7471,8 @@ int convert_p1_print(int data_in) {
 /*
   check process serial input
 */
-
+#pragma GCC optimize ("O2")                                   // v82
+#pragma message " ** cmdSerialInputConsole optimized using O2 ** "  // v82
 void cmdSerialInputConsole() {    // v76 do check console commands on serial input
     // for details read: https://deepwiki.com/esp8266/Arduino/4.1-serial-communication
 
@@ -7501,7 +7500,10 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
              serial_Print_PeekBits(2, 2048);                    // print diff table P2
              serial_Print_PeekBits(2,(-2 * MAXLINELENGTH));     // print mask compare P2
        } else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
-         else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
+         else if  ((char) data[0] == 'l') {
+                                          TestConsoleLogMessage(__LINE__, CurrentPowerConsumption);
+                                          // logger.info("Test logging Message." );   // v82
+       } else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
          // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), F("hello")); // crash
          // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), PSTR("hello")); // crash
          // else if  ((char) data[0] == 'p') publishMqtt(mqttLogTopic, (String) F("test:") + mqttCnt_Out + F(").") ); // ok
@@ -7765,6 +7767,32 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
       }
   }
 }  
+
+/*
+  test/try printing console message with variables
+*/
+#pragma GCC optimize ("O2")                                   // v82
+#pragma message " ** TestConsoleLogMessage optimized using O2 ** "  // v82
+void  TestConsoleLogMessage(int tclType, int tclValue) {
+  // void Syslog::dolog(uint8_t pri, char *message) {
+  // int eggCount = 5;
+  char message[50]; // Create a buffer large enough to hold the final string
+  // logger.info("OTA new version." ); // v82
+  // -->  void info(char *message) { dolog(PRI_INFO, message); }
+  /*
+    uint16_t len = snprintf((char *) 
+                    buffer,                         // target
+                    MAX_PACKET_SIZE,                // size
+                    "<%d> %s %s: %s"                // constant string
+                    , pri, _host, _app, message)    // data fields %s ends on x00
+  */
+
+  // Format the string and store it in the buffer
+  snprintf(message, sizeof(message), "Mqtt %u info %u state = %u"  , mqttCnt_Out, tclType, tclValue);
+  logger.info(message); // v82
+}
+
+// Now `message` contains: "Today we have 5 eggs"
 
 /*  ESP.getMaxFreeBlockSize(); = unknown
 void checkHeap() {
