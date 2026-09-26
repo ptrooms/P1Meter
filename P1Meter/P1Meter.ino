@@ -7776,7 +7776,7 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
 void  TestConsoleLogMessage(int tclType, int tclValue) {
   // void Syslog::dolog(uint8_t pri, char *message) {
   // int eggCount = 5;
-  char message[50]; // Create a buffer large enough to hold the final string
+  char message[48]; // Create a buffer large enough to hold the final string
   // logger.info("OTA new version." ); // v82
   // -->  void info(char *message) { dolog(PRI_INFO, message); }
   /*
@@ -7788,7 +7788,7 @@ void  TestConsoleLogMessage(int tclType, int tclValue) {
   */
 
   // Format the string and store it in the buffer
-  snprintf(message, sizeof(message), "Mqtt %u info %u state = %u"  , mqttCnt_Out, tclType, tclValue);
+  snprintf(message, sizeof(message), "Mqtt=%u line=%u state=%u"  , mqttCnt_Out, tclType, tclValue);
   logger.info(message); // v82
 }
 
@@ -7909,7 +7909,7 @@ void checkHeap() {
 void DummyEndCode() { // plus 4KBYTE
   
   // NOP_MACRO_END1K;
-  NOP_MACRO_END1K;
-  NOP_MACRO_END1K;
-  NOP_MACRO_END1K2;
+//  NOP_MACRO_END1K;
+//  NOP_MACRO_END1K;
+//  NOP_MACRO_END1K2;
 }
