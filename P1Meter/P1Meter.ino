@@ -3432,6 +3432,7 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) F("R"));  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
+              // CycleRecoverwaterErrorSwitchDummy(false) ; // v82a things look ok, (pre)reset any waterErrorSwitch condition
           } else {
               Serial.print((String) F("Z"));  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
@@ -4553,46 +4554,6 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
     / -------------------------------------------------------------------------------
 */
 
-/*
-  #pragma GCC push_options
-  #pragma GCC optimize ("O0")
-  your code
-  #pragma GCC pop_options
-
-  Variants:
-    #pragma message "script 24c256 file option used"
-    _Pragma("GCC warning \"'rtc io' not supported\"")
-    _Pragma("GCC warning \"'EXT 1 wakeup' not supported using gpio mode\"")
-  #pragma inline
-  #pragma pack(1)
-  #pragma pack(0)
-
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wunused-variable"
-  #pragma GCC diagnostic pop
-  #pragma GCC diagnostic ignored "-Wunused-parameter"
-  #pragma GCC diagnostic ignored "-Winvalid-offsetof"   // avoid warnings since we're using offsetof() in a risky way
-  #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-
-  #pragma GCC diagnostic ignored "-Wunused-function"
-  #pragma GCC diagnostic ignored "-Wunused-variable"
-  #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
-  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
-  #pragma GCC diagnostic ignored "-Wvla"
-  #pragma GCC diagnostic ignored "-Wpointer-arith"
-  #pragma GCC diagnostic ignored "-Wnarrowing"
-  #pragma GCC diagnostic ignored "-Wnull-dereference"
-  #pragma GCC diagnostic ignored "-Wstringop-overflow"
-
-  #pragma GCC optimize ("O3")
-  #pragma GCC optimize ("Os")
-
-  #pragma GCC diagnostic pop
-
-  #pragma once      // header only included once
-*/
-
 #pragma GCC optimize ("O2")                                   // v82
 #pragma message " ** publishP1ToMqtt optimized using O2 ** "  // v82
 void publishP1ToMqtt()    // this will go to Mosquitto
@@ -4769,7 +4730,7 @@ void publishP1ToMqtt()    // this will go to Mosquitto
             publishP1ToMqttCrc,         // v77 to start, v45 1=validTelegramCRCFound or 2=recovered validCrcInFound
             CurrentPowerConsumption,
             !thermostatReadState,       // input setting Switch press 1=ON low , Not active High 0=OFF
-            filteredValueAdc,           // read ana  value
+            filteredValueAdc,           // read analog value
             !lightReadState,            // Hotwater we want 1=ONlight , Not active 0=OFFlight
             powerConsumptionLowTariff,
             powerConsumptionHighTariff,
@@ -5051,6 +5012,9 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     HIGH = reset/renew until LOW
     processHotLedRead 
     */
+
+// #pragma GCC optimize ("O2")                                   // v82
+// #pragma message " ** cmdSerialInputConsole optimized using O2 ** "  // v82
 bool processHotLedRead(bool notkeep_HoldState) {
   bool local_lightReadState = false;
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
@@ -5060,8 +5024,16 @@ bool processHotLedRead(bool notkeep_HoldState) {
     when water ISR routine is disabled and hot is turned on, perhaps the water sensor is more stable
     try to reset this condition
     As opf v78c this is also done at the end of een valid CRC cycle, consider to remove it from here.
+    v82a 2026-09-27 21:50:15 , removing it makes the code unstable, this improves a bit by #pragma GCC optimize ("O2", but not enough
   */
-  CycleRecoverwaterErrorSwitch(local_lightReadState);    // check errorWaterSwitch recovery status due Water trigger overrun
+  // CycleRecoverwaterErrorSwitch(local_lightReadState);    // v82a deact, check errorWaterSwitch recovery status due Water trigger overrun
+  CycleRecoverwaterErrorSwitch(true);    // v82a deact, check errorWaterSwitch recovery status due Water trigger overrun
+  // CycleRecoverwaterErrorSwitch(true);    // v82a deact, check errorWaterSwitch recovery status due Water trigger overrun
+  // DummyEndCode(local_lightReadState);
+  // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); 
+  // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); z1/20
+  // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); 
+    // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); 
   
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
@@ -7503,6 +7475,13 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
          else if  ((char) data[0] == 'l') {
                                           TestConsoleLogMessage(__LINE__, CurrentPowerConsumption);
                                           // logger.info("Test logging Message." );   // v82
+       /*
+       } else if  ((char) data[0] == 'L') {
+                                          logger.debug("Test Debug Message." );   // v82a pri=15
+                                          logger.info("Test Info Message."   );   // v82a pri=14
+                                          logger.warn("Test Warm Message."   );   // v82a pri=12
+                                          logger.error("Test Error Message." );   // v82a pri=11
+       */
        } else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
          // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), F("hello")); // crash
          // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), PSTR("hello")); // crash
@@ -7767,9 +7746,17 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
       }
   }
 }  
+// void CycleRecoverwaterErrorSwitchDummy(bool local_state) {    // dummy version
+// }  
 
 /*
-  test/try printing console message with variables
+  v82a test/try printing console message with variables
+
+  #include <string>
+  int eggCount = 5;
+  std::string message = "Today we have " + std::to_string(eggCount) + " eggs";
+  Note: use snprintf() with fixed buffer to overcome esp8266 fragmentation.
+
 */
 #pragma GCC optimize ("O2")                                   // v82
 #pragma message " ** TestConsoleLogMessage optimized using O2 ** "  // v82
@@ -7788,7 +7775,7 @@ void  TestConsoleLogMessage(int tclType, int tclValue) {
   */
 
   // Format the string and store it in the buffer
-  snprintf(message, sizeof(message), "Mqtt=%u line=%u state=%u"  , mqttCnt_Out, tclType, tclValue);
+  snprintf(message, sizeof(message), "Mqtt=%u type=%u state=%u"  , mqttCnt_Out, tclType, tclValue);
   logger.info(message); // v82
 }
 
@@ -7836,6 +7823,10 @@ void checkHeap() {
   }
 }
 */
+
+#define NOP_MACRO_END32 asm( \   // 1KBYTE
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
+);
 
 #define NOP_MACRO_END1K asm( \   // 1KBYTE
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
@@ -7909,7 +7900,7 @@ void checkHeap() {
 void DummyEndCode() { // plus 4KBYTE
   
   // NOP_MACRO_END1K;
-//  NOP_MACRO_END1K;
-//  NOP_MACRO_END1K;
-//  NOP_MACRO_END1K2;
+  NOP_MACRO_END1K;
+  NOP_MACRO_END1K;
+  NOP_MACRO_END1K2;
 }
