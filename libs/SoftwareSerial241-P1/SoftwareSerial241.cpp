@@ -379,8 +379,8 @@ void SoftwareSerial::begin(long speed, int recordtype) {
                            "0-1:24.2.1(250714112700W)(12.345*GJ)\r\n"
                            "!BE7B"
                            "\xffOK"           // 247 = 239 data + 5 CRC + 4-1   TrailerBytes
-                           "\x00"             // 248 = 239 data + 5 CRC + 4+0   TrailerBytes 2026-09-23 14:29:33 wdt Z130/1024 13%
-                           "\x00\x00\x00\x00\x00\x00\x00\x00\x00" // 257  compensate -/-1 as version is 81 iso 80d
+                        //   "\x00"             // 248 = 239 data + 5 CRC + 4+0   TrailerBytes 2026-09-23 14:29:33 wdt Z130/1024 13%
+                        //   "\x00\x00\x00\x00\x00\x00\x00\x00\x00" // 257  compensate -/-1 as version is 81 iso 80d
                         // "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" // 258 2026-09-24 21:31:07 258  
                         // "\x00"             // 249 = 239 data + 5 CRC + 4+1   TrailerBytes  2026-09-23 20:21:46 Z773/6428 12%
                         // "\x00"             // 250 = 239 data + 5 CRC + 4+2   TrailerBytes  2026-09-23 14:47:08 Z100/1025 4-10%

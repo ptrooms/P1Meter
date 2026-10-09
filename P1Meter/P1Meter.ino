@@ -2159,10 +2159,10 @@ void setup()
   ArduinoOTA.setHostname(hostName);   // nodemcut1/p1
   Serial.println(F("ArduinoOTA.setHostname set") );
   //   Serial.println(F("1") ); 
-    // logger.info("connected to wifi");   // with/out it cause Z
+  logger.info("connected to wifi");   // v82
   
   ArduinoOTA.onStart([]() {
-    // logger.info("OTA new version." );   // v80b
+    logger.info("OTA new version." ); // v82
     Serial.println(F("Start"));
   });
 
@@ -2190,8 +2190,6 @@ void setup()
   });
   
   Serial.println(F("ArduinoOTA.begin() activated.") );
-  // logger.info("start." );   // v80b 
-  // logger.info("loggerline 2306" );   // with/out it cause Z
   
   //    #define P1_VERSION_TYPE "t1"      // "t1" for ident nodemcu-xx and other identification to seperate from production
   // #define DEF_PROG_VERSION 1123.240
@@ -3434,6 +3432,7 @@ void readTelegramP1() {
           if (validCrcInFound) {
               Serial.print((String) F("R"));  // v52 count Recoveries _R -R
               p1RecoverCnt++ ;
+              // CycleRecoverwaterErrorSwitchDummy(false) ; // v82a things look ok, (pre)reset any waterErrorSwitch condition
           } else {
               Serial.print((String) F("Z"));  // v45 print failed or recovered -Z _Z
               p1CrcFailCnt++ ;             // v52 count Crc fails
@@ -4554,6 +4553,9 @@ void ProcessMqttCommand(char* payload, unsigned int myLength) {
     /                        Publish full as JSONPATH record
     / -------------------------------------------------------------------------------
 */
+
+#pragma GCC optimize ("O2")                                   // v82
+#pragma message " ** publishP1ToMqtt optimized using O2 ** "  // v82
 void publishP1ToMqtt()    // this will go to Mosquitto
 {
   preserve_lightReadState_for_mqtt = false;  // indicate we have/will process this state  
@@ -4593,15 +4595,22 @@ void publishP1ToMqtt()    // this will go to Mosquitto
     msg.concat(",\"ThermoState\":%u");                 // Johnson
     msg.concat(",\"AnalogRead\":%u");                  // adc
     msg.concat(",\"LedLight1\":%u");                   // Hot water witch on
+    
+    // if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0) { // v82 validate output only
+    // if ( powerConsumptionHighTariff > 0 && publishP1ToMqttCrc > 0 ) { // v82 validate output only OK1
+    // if ( powerConsumptionLowTariff > 0 && publishP1ToMqttCrc > 0 ) { // v82 validate output only
+    // if ( publishP1ToMqttCrc ) { // v82 validate output only
 
-    if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0 ) {
+    if ( powerConsumptionLowTariff > 0  && powerConsumptionHighTariff > 0 && powerConsumptionHighTariff) { // v82 validate output only
+    // if ( publishP1ToMqttCrc > 0 && powerConsumptionHighTariff > 0 ) { // v82 validate output only OK Z15
         msg.concat(", \"powerConsumptionLowTariff\":%lu");  // P1   always > 0
         msg.concat(",\"powerConsumptionHighTariff\":%lu"); // P1   always > 0
     } else {
-        msg.concat(",\"!powerConsumptionLowTariff\":%lu");  // v46 P1 false or missing read, ignore field
+        msg.concat(", \"!powerConsumptionLowTariff\":%lu");  // v46 P1 false or missing read, ignore field
         msg.concat(",\"!powerConsumptionHighTariff\":%lu"); // v46 P1 false or missing read, ignore field
     }
-    
+   // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;");
+
     // msg.concat(",\"P1crc\":%u");                       // v77 moved to start Validity CRC 0 or 1
 
     char temperatureString[7];
@@ -5003,6 +5012,9 @@ void publishMqtt(const char* mqttTopic, String payLoad) { // v50 centralised mqt
     HIGH = reset/renew until LOW
     processHotLedRead 
     */
+
+// #pragma GCC optimize ("O2")                                   // v82
+// #pragma message " ** cmdSerialInputConsole optimized using O2 ** "  // v82
 bool processHotLedRead(bool notkeep_HoldState) {
   bool local_lightReadState = false;
   if (digitalRead(LIGHT_READ)) local_lightReadState = true; 
@@ -5012,8 +5024,16 @@ bool processHotLedRead(bool notkeep_HoldState) {
     when water ISR routine is disabled and hot is turned on, perhaps the water sensor is more stable
     try to reset this condition
     As opf v78c this is also done at the end of een valid CRC cycle, consider to remove it from here.
+    v82a 2026-09-27 21:50:15 , removing it makes the code unstable, this improves a bit by #pragma GCC optimize ("O2", but not enough
   */
-  CycleRecoverwaterErrorSwitch(local_lightReadState);    // check errorWaterSwitch recovery status due Water trigger overrun
+  // CycleRecoverwaterErrorSwitch(local_lightReadState);    // v82a deact, check errorWaterSwitch recovery status due Water trigger overrun
+  CycleRecoverwaterErrorSwitch(true);    // v82a deact, check errorWaterSwitch recovery status due Water trigger overrun
+  // CycleRecoverwaterErrorSwitch(true);    // v82a deact, check errorWaterSwitch recovery status due Water trigger overrun
+  // DummyEndCode(local_lightReadState);
+  // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); 
+  // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); z1/20
+  // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); 
+    // asm("NOP;NOP;NOP;NOP;NOP;NOP;NOP;"); 
   
   if (mqttCnt_Out == 0) local_lightReadState = HIGH;    // ensure inverted OFF at first publish
   #ifdef NoTx2Function                      
@@ -6951,7 +6971,8 @@ void serial_Print_PeekTime(int time_port, int m_time_request) {      // v59
 void serial_Print_PeekBits(int bit_port, int bit_sequence) {      // v59
 
   if (bit_port == 1) {
-    unsigned long temp,tempc1,tempc2,tempc3 = 0UL;               // check duplicates          
+    unsigned long temp = 0UL;                        // check duplicates          
+    // unsigned long tempc1,tempc2,tempc3 = 0UL;     // v82 avoid unused message
     unsigned long temp0s = mySerial1.peekBit(0); // started at this time for dereferencing report to line 0
     unsigned long l_bitTime = (ESP.getCpuFreqMHz()*1000000)/serial1Baudrate;
     unsigned long compensate_bitTime = (l_bitTime*8) - 209;    // compensate lagging  approx 8 bits + 208*0,0125nS=2.6µSec lagging
@@ -7422,7 +7443,8 @@ int convert_p1_print(int data_in) {
 /*
   check process serial input
 */
-
+#pragma GCC optimize ("O2")                                   // v82
+#pragma message " ** cmdSerialInputConsole optimized using O2 ** "  // v82
 void cmdSerialInputConsole() {    // v76 do check console commands on serial input
     // for details read: https://deepwiki.com/esp8266/Arduino/4.1-serial-communication
 
@@ -7450,7 +7472,17 @@ void cmdSerialInputConsole() {    // v76 do check console commands on serial inp
              serial_Print_PeekBits(2, 2048);                    // print diff table P2
              serial_Print_PeekBits(2,(-2 * MAXLINELENGTH));     // print mask compare P2
        } else if  ((char) data[0] == 'b') serial_Print_m_buffer_time();   // Print timetable
-         else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
+         else if  ((char) data[0] == 'l') {
+                                          TestConsoleLogMessage(__LINE__, CurrentPowerConsumption);
+                                          // logger.info("Test logging Message." );   // v82
+       /*
+       } else if  ((char) data[0] == 'L') {
+                                          logger.debug("Test Debug Message." );   // v82a pri=15
+                                          logger.info("Test Info Message."   );   // v82a pri=14
+                                          logger.warn("Test Warm Message."   );   // v82a pri=12
+                                          logger.error("Test Error Message." );   // v82a pri=11
+       */
+       } else if  ((char) data[0] == 'd') outputOnSerial = !outputOnSerial;   // 'd'= debug
          // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), F("hello")); // crash
          // else if  ((char) data[0] == 'p') Serial.printf_P( PSTR("This is an printf_P %s"), PSTR("hello")); // crash
          // else if  ((char) data[0] == 'p') publishMqtt(mqttLogTopic, (String) F("test:") + mqttCnt_Out + F(").") ); // ok
@@ -7714,6 +7746,40 @@ void CycleRecoverwaterErrorSwitch(bool local_state) {
       }
   }
 }  
+// void CycleRecoverwaterErrorSwitchDummy(bool local_state) {    // dummy version
+// }  
+
+/*
+  v82a test/try printing console message with variables
+
+  #include <string>
+  int eggCount = 5;
+  std::string message = "Today we have " + std::to_string(eggCount) + " eggs";
+  Note: use snprintf() with fixed buffer to overcome esp8266 fragmentation.
+
+*/
+#pragma GCC optimize ("O2")                                   // v82
+#pragma message " ** TestConsoleLogMessage optimized using O2 ** "  // v82
+void  TestConsoleLogMessage(int tclType, int tclValue) {
+  // void Syslog::dolog(uint8_t pri, char *message) {
+  // int eggCount = 5;
+  char message[48]; // Create a buffer large enough to hold the final string
+  // logger.info("OTA new version." ); // v82
+  // -->  void info(char *message) { dolog(PRI_INFO, message); }
+  /*
+    uint16_t len = snprintf((char *) 
+                    buffer,                         // target
+                    MAX_PACKET_SIZE,                // size
+                    "<%d> %s %s: %s"                // constant string
+                    , pri, _host, _app, message)    // data fields %s ends on x00
+  */
+
+  // Format the string and store it in the buffer
+  snprintf(message, sizeof(message), "Mqtt=%u type=%u state=%u"  , mqttCnt_Out, tclType, tclValue);
+  logger.info(message); // v82
+}
+
+// Now `message` contains: "Today we have 5 eggs"
 
 /*  ESP.getMaxFreeBlockSize(); = unknown
 void checkHeap() {
@@ -7757,6 +7823,10 @@ void checkHeap() {
   }
 }
 */
+
+#define NOP_MACRO_END32 asm( \   // 1KBYTE
+              "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
+);
 
 #define NOP_MACRO_END1K asm( \   // 1KBYTE
               "NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;NOP;" \  //  32
