@@ -1,4 +1,5 @@
-/* SoftwareSerial.cpp  v82 - 2026-09-25 13:18:54 length WL record 258
+/* SoftwareSerial.cpp  v83 -  2026-10-09 23:09:30 new master 
+   v82b - 2026-09-25 13:18:54 length WL record 258
    v80d - converted print/strings to F() and array to PSTR() using pgm_read_byte(str1/2+m_inpos)
    v79 - 2026-09-08 13:50:11 new master
 
